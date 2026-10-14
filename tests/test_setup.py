@@ -49,11 +49,13 @@ class SetupTests(unittest.TestCase):
                                         capture_output=True, text=True)
                 self.assertNotEqual(result.returncode, 0, result.stdout)
 
-    def helper_result(self, include_preflight):
+    def helper_result(self, include_preflight, include_codeql=True, include_ci=True):
         import json
         root = self.fixture()
-        checks = [{'name': 'ci', 'status': 'completed', 'conclusion': 'success'},
-                  {'name': 'Analyze (python)', 'status': 'completed', 'conclusion': 'success'}]
+        checks = [{'name': 'ci' if include_ci else 'other-check',
+                   'status': 'completed', 'conclusion': 'success'}]
+        if include_codeql:
+            checks.append({'name': 'Analyze (python)', 'status': 'completed', 'conclusion': 'success'})
         statuses = [{'context': 'Security Preflight', 'state': 'success'}] if include_preflight else []
         (root / 'checks.json').write_text(json.dumps([{'check_runs': checks}]))
         (root / 'statuses.json').write_text(json.dumps([{'statuses': statuses}]))
@@ -66,6 +68,13 @@ class SetupTests(unittest.TestCase):
 
     def test_helper_does_not_replace_missing_preflight_with_codeql(self):
         self.assertIn('SECURITY_STATUS=SECURITY_UNAVAILABLE', self.helper_result(False))
+
+    def test_helper_rejects_missing_required_codeql(self):
+        self.assertIn('SECURITY_STATUS=SECURITY_UNAVAILABLE',
+                      self.helper_result(True, include_codeql=False))
+
+    def test_helper_rejects_other_ci_as_replacement(self):
+        self.assertIn('CI_STATUS=CI_UNAVAILABLE', self.helper_result(True, include_ci=False))
 
     def test_helper_accepts_exact_preflight_and_codeql(self):
         self.assertIn('SECURITY_STATUS=SECURITY_PASSED', self.helper_result(True))

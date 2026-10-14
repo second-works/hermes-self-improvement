@@ -145,7 +145,8 @@ if fallback_status not in {"SECURITY_PASSED", "SECURITY_FAILED", "SECURITY_NOT_A
 
 ci = groups["ci"]
 security = groups["security"]
-if ci["count"] == 0:
+observed_names = {run.get("name") for run in checks} | {status.get("context") for status in statuses}
+if "ci" not in observed_names:
     ci_status = "CI_UNAVAILABLE"
 elif ci["pending"]:
     ci_status = "CI_PENDING"
@@ -154,11 +155,8 @@ elif ci["failed"]:
 else:
     ci_status = "CI_PASSED"
 
-# Project-specific trusted Preflight is a separate required gate from CodeQL.
-preflight_present = any(run.get("name") == "Security Preflight" for run in checks) or any(
-    status.get("context") == "Security Preflight" for status in statuses
-)
-if not preflight_present:
+# All configured security gates are required independently.
+if not {"Security Preflight", "Analyze (python)"}.issubset(observed_names):
     security_status = "SECURITY_UNAVAILABLE"
 elif security["pending"]:
     security_status = "SECURITY_PENDING"
@@ -215,7 +213,7 @@ PY
     echo "EXPECTED_SHA=$EXPECTED_SHA" >&2
     echo "WAITED_SECONDS=$ELAPSED" >&2
     echo "STATUS=CI_UNAVAILABLE" >&2
-    echo "ERROR: no CI checks were observed; explicit human decision is required before continuing" >&2
+    echo "ERROR: required ci context was not observed; explicit human decision is required before continuing" >&2
     exit 4
   fi
 
@@ -224,7 +222,7 @@ PY
     echo "EXPECTED_SHA=$EXPECTED_SHA" >&2
     echo "WAITED_SECONDS=$ELAPSED" >&2
     echo "STATUS=SECURITY_UNAVAILABLE" >&2
-    echo "ERROR: security checks and fallback were unavailable; explicit human decision is required before continuing" >&2
+    echo "ERROR: required Security Preflight / Analyze (python) contexts were unavailable; explicit human decision is required before continuing" >&2
     exit 4
   fi
 

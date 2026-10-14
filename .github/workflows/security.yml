@@ -21,6 +21,15 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
+          path: candidate
 
-      - name: Run Security Preflight
-        run: bash scripts/security-preflight.sh .
+      - name: Checkout pinned scanner
+        uses: actions/checkout@v7
+        with:
+          repository: second-works/hermes-self-improvement
+          ref: 1118cc6cb996e4eddbd0347b5131fb8b271e116d
+          persist-credentials: false
+          path: security-tool
+
+      - name: Run trusted Security Preflight
+        run: bash security-tool/scripts/security-preflight.sh candidate

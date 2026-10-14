@@ -21,7 +21,7 @@
 
 ## CIと費用・権限
 
-GitHub-hosted runnerのみ使用し、self-hosted runnerやHermes本番には接続しない。CIとSecurityはcontents: read、checkoutは認証情報を残さない。CodeQLだけsecurity-events: writeをjob単位で付与。workflowはPR → mainを検査し、CI/CodeQLはmain pushも検査する。CodeQLは週次実行も行う。pull_request_targetは使用しない。追加Secrets、OPENAI_API_KEY、API課金のActionsは導入しない。
+GitHub-hosted runnerのみ使用し、self-hosted runnerやHermes本番には接続しない。CIとSecurityはcontents: read、checkoutは認証情報を残さない。Securityは検査対象PR headをcandidateへcheckoutし、実行するscannerは固定コミット `1118cc6cb996e4eddbd0347b5131fb8b271e116d` からsecurity-toolへ別checkoutする。PR headのコードをSecurity jobで実行しない。scanner更新時は別の検証済みrevisionへpinを更新し、PRレビューで照合する。CodeQLだけsecurity-events: writeをjob単位で付与。workflowはPR → mainを検査し、CI/CodeQLはmain pushも検査する。CodeQLは週次実行も行う。pull_request_targetは使用しない。追加Secrets、OPENAI_API_KEY、API課金のActionsは導入しない。
 
 公開repo・admin権限・Actions有効をGitHub APIで確認。利用プランの変更は行わない。DependabotはmainへのMerge後に有効になる。ActionsとCodeQLの実発火・利用可否はPRのrunで確認する。
 

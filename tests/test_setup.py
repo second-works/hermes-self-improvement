@@ -95,6 +95,15 @@ class SetupTests(unittest.TestCase):
         self.assertIn('SECURITY_STATUS=SECURITY_FAILED', result.stdout)
         self.assertNotIn(value, result.stdout + result.stderr)
 
+    def test_security_does_not_execute_candidate_scanner(self):
+        root = self.fixture()
+        (root / 'scripts').mkdir()
+        (root / 'scripts/security-preflight.sh').write_text('#!/bin/sh\nexit 0\n')
+        (root / 'leak.txt').write_text('ghp_' + 'a' * 30)
+        result = self.security(root)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn('SECURITY_STATUS=SECURITY_FAILED', result.stdout)
+
     def test_security_template_matches_runtime(self):
         self.assertEqual((ROOT / 'scripts/security-preflight.sh').read_bytes(),
                          (ROOT / 'templates/security/security-preflight.sh').read_bytes())

@@ -2,7 +2,7 @@
 
 2026-10-14。Risk Tier: HIGH（CI・Security・レビュー運用の初期導入）。ユーザーがIssue #1の実装とPR提出を承認。Hermes本番、課金変更、自己改善の自動適用、Auto-Mergeは範囲外。復旧は本PRのrevertで行う。
 
-原本は second-works/ai-development の `b2715a76c5ab3715ccce88167c23ce12c81e85b1`。取得時点の原文とプロジェクト固有境界を照合した。既存ファイルはなく、既存の未追跡 `.bm25/` は保持・除外した。空リポジトリのPR比較先として、ファイルなしの初期コミットだけmainに配置した。
+原本は second-works/ai-development の `b2715a76c5ab3715ccce88167c23ce12c81e85b1`。取得時点の原文とプロジェクト固有境界を照合した。参照資産の3文書（plan-authoring、app/docs/design、web-todo-app-plan.sample）は末尾空白のみ正規化した。既存ファイルはなく、既存の未追跡 `.bm25/` は保持・除外した。空リポジトリのPR比較先として、ファイルなしの初期コミットだけmainに配置した。
 
 | 原本 | 採用・調整 | 理由 |
 | --- | --- | --- |

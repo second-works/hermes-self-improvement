@@ -14,3 +14,4 @@ for root in ('scripts', 'tests'):
         ast.parse(path.read_text(), filename=str(path))
 CHECK
 git diff --check
+git diff --cached --check

@@ -66,9 +66,9 @@ ResultがNEEDS_DECISIONの場合はFramework依存のUI設計を開始せず、�
 
 - Source URL or screenshot:
 - Use:
-  - 
+  -
 - Do NOT copy:
-  - 
+  -
 
 <!-- Referenceごとに、採用する構造と採用しないブランド・著作物を記録する。 -->
 

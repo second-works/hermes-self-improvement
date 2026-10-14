@@ -21,7 +21,7 @@
 
 ## CIと費用・権限
 
-GitHub-hosted runnerのみ使用し、self-hosted runnerやHermes本番には接続しない。CIとSecurityはcontents: read、checkoutは認証情報を残さない。Securityは検査対象PR headをcandidateへcheckoutし、実行するscannerは固定コミット `1118cc6cb996e4eddbd0347b5131fb8b271e116d` からsecurity-toolへ別checkoutする。PR headのコードをSecurity jobで実行しない。scanner更新時は別の検証済みrevisionへpinを更新し、PRレビューで照合する。CodeQLだけsecurity-events: writeをjob単位で付与。workflowはPR → mainを検査し、CI/CodeQLはmain pushも検査する。CodeQLは週次実行も行う。pull_request_targetは使用しない。追加Secrets、OPENAI_API_KEY、API課金のActionsは導入しない。
+GitHub-hosted runnerのみ使用し、self-hosted runnerやHermes本番には接続しない。CIとSecurityはcontents: read、checkoutは認証情報を残さない。Securityはmain側のpull_request_target workflowで検査対象PR headのGitオブジェクトだけをcandidateへfetch/read-treeし、実行するscannerは固定コミット `1118cc6cb996e4eddbd0347b5131fb8b271e116d` からsecurity-toolへ別checkoutする。PR headのコードをSecurity jobで実行しない。scanner更新時は別の検証済みrevisionへpinを更新し、PRレビューで照合する。CodeQLだけsecurity-events: writeをjob単位で付与。workflowはPR → mainを検査し、CI/CodeQLはmain pushも検査する。CodeQLは週次実行も行う。pull_request_targetをSecurityだけに使う。PRコード・設定・テスト・依存installは実行せず、GH_TOKENはstatus報告stepだけへ渡す。jobはcontents: readとstatuses: writeのみ。検査結果はbase SHAではなくPR_HEAD_SHAへSecurity Preflight statusとして報告する。追加Secrets、OPENAI_API_KEY、API課金のActionsは導入しない。
 
 公開repo・admin権限・Actions有効をGitHub APIで確認。利用プランの変更は行わない。DependabotはmainへのMerge後に有効になる。ActionsとCodeQLの実発火・利用可否はPRのrunで確認する。
 
@@ -47,3 +47,10 @@ typecheck / buildはアプリと型検査設定がないため対象外。Securi
 適用候補は `docs/main-protection.proposed.json`。最新headの必須チェック、PR経由、stale review失効、未解決thread解消、管理者も対象、force pushと削除禁止。承認票数0は単独管理者がPR作者として自分に承認票を付けられないための候補値であり、人間の最終Merge判断を免除しない。1票必須にする場合は別の人間reviewerが必要。承認票数0で適用済み。最終Mergeの実行承認は別途必要。
 
 実動確認: PR #10でCI、Security Preflight、CodeQL Analyze (python)とCodeQL結果checkが成功。Codex連携は手動の `@codex review` へ👀反応とRunning summaryを返した。初回の自動発火は未確認だったが、Chromeのログイン済み公式設定画面でリポジトリの自動レビューON、レビュー対象とトリガーは個人設定を継承、個人設定の自動レビューON・PR作成時、レート制限後のクレジット使用OFFを確認した。設定変更や追加課金は行っていない。最終Codex結果と最新headの証拠はPRコメントへ記録する。
+
+
+## 空mainへの信頼境界の初期配置
+
+PR-controlled workflowでrequired job名を維持しつつ検査stepだけをexit 0へ変えられるP1を受け、Security workflowをmain側へ移した。PR headのGitオブジェクトをfetch/read-treeして固定scannerに渡し、候補SHAへpending → success / failure / errorを報告する。GitHubのpull_request_target仕様と最小権限は[公式安全指針](https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target)を確認した。PUBLICデータだけを検査し、Secrets・PRコード実行・本番接続はない。
+
+mainは空の初期コミットのため、このworkflowはPRに追加しただけでは初回発火しない。信頼するsecurity.ymlだけのmain初期配置が必要。既存のmain保護を黙って緩めず、具体的な初期配置commitと差分を提示し、人間が一度限りの初期配置と管理者bypassの一時切替を承認するまで停止する。CI/CodeQL/local Securityの成功でこの未検証を代替しない。配置後は管理者保護を即座に戻し、PRをmainと同期して、trusted workflowの同じheadの実動結果とCodex再レビューを確認する。

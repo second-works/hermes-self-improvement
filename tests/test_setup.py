@@ -95,6 +95,16 @@ class SetupTests(unittest.TestCase):
         self.assertIn('SECURITY_STATUS=SECURITY_FAILED', result.stdout)
         self.assertNotIn(value, result.stdout + result.stderr)
 
+    def test_security_can_scan_index_without_candidate_checkout(self):
+        root = self.fixture()
+        (root / 'leak.txt').write_text('ghp_' + 'a' * 30)
+        subprocess.run(['git', '-C', str(root), 'add', '.'], check=True)
+        (root / 'leak.txt').unlink()
+        result = subprocess.run([BASH, str(ROOT / 'scripts/security-preflight.sh'), str(root)],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn('SECURITY_STATUS=SECURITY_FAILED', result.stdout)
+
     def test_security_does_not_execute_candidate_scanner(self):
         root = self.fixture()
         (root / 'scripts').mkdir()

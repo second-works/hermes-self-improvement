@@ -95,4 +95,4 @@ CI、Security、Reviewは別々に確認し、対象SHAがPR headと一致する
 - 非BLOCKING P2の分類・Follow-up:
 - 修正時のPR番号・head branch・修正後SHA:
 
-[Review Evidence Contract](../blob/main/AGENTS.md#review-evidence-contract) と [FOLLOW-UP](../blob/main/docs/review-followups.md)、[Safe Auto-Fix / Auto-Merge](../blob/main/docs/safe-auto-fix-auto-merge.md) を参照する。修正は既存PR branchで行い、最終Mergeは人間が判断する。
+[Review Evidence Contract](../blob/main/docs/code-review-contract.md#review-evidence-contract) と [FOLLOW-UP](../blob/main/docs/review-followups.md)、[Safe Auto-Fix / Auto-Merge](../blob/main/docs/safe-auto-fix-auto-merge.md) を参照する。修正は既存PR branchで行い、最終Mergeは人間が判断する。

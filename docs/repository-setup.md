@@ -64,3 +64,5 @@ GitHub公式は公開repo向けpull_request_target既定policyの2026-11-02強�
 レビュー追加対応: Secretを含むindexのファイル名も値を表示せず拒否するscanner、Security PreflightをCodeQL成功で代替しない手動helper、未変換index blobのlint、文書化済みPython依存marker認識へ修正した。P1とP2（IN-SCOPE FIX）はそれぞれ修正前fail→修正後passを確認し、20件のテストが成功。固定scannerの更新候補は `ffc843ab1f880917922a9c4fa2ece7d730afbcc2`。mainのpin1行更新は人間が具体差分を承認した後、b590b3e903b13ff3399fffd9fafdf963c51affcaだけを通常pushして実施し、finallyで管理者保護を即復元した。PR全体のMergeはしていない。以降のscanner変更も具体差分の承認・検証が必要。
 
 手動wait-checks helperはci、Security Preflight、Analyze (python)の3 contextを明示的に要求する。他の成功checkやローカルfallbackで不足を代替しない。欠如ケースの回帰を含む22件が成功。
+
+参照用generic / Node / Python / CodeQLのcheckoutもpersist-credentials: falseへ統一した。PRテンプレートのReview Evidence Contractリンクを実在する正本へ修正。Python CIテンプレートのuv / Poetry開発依存導入は非実行資産に関するP2 FOLLOW-UPとしてdocs/review-followups.mdのFU-10-1へ記録し、現行CIでは有効化しない。

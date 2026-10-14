@@ -73,7 +73,19 @@
 
 ## 登録済み項目
 
-現在、登録済みのFOLLOW-UPはない。
+### FU-10-1
+
+- 発生元Issue / PR: #1 / #10。review comment 4272099659。
+- 対象領域: 参照用Python CIテンプレートの依存管理。
+- 内容: uv.lock / poetry.lockの開発groupをpip install .だけではインストールできない。
+- 後回し可能とした根拠: Issue #1はアプリなしのセットアップで、実際のCIはgenericと標準ライブラリunittest。Python CIテンプレートは非実行の参照資産であり、uv / Poetry構成は今回採用していない。現行CIと受入条件に影響せず独立修正可能。
+- 想定症状: Python CIをuv / Poetry projectへそのままコピーし、開発groupのRuff / mypy / pytest / buildを使うとcommand not foundや依存不足で停止する。
+- 関連ファイル / 機能: templates/github-actions/python-ci.yml、templates/verification/README.md。
+- 優先度: P2 / FOLLOW-UP / ISSUE候補。
+- 状態: `open`。
+- 解決Issue / PR: なし。GitHub Issue化は人間の必要性確認後。
+- 置換理由: なし。
+- 対応境界: Python CIを有効化する前に、選んだlock managerで開発依存をlocked状態から導入するか、pip pin構成を選び、実際の標準検証を確認する。未対応のlock構成を検証済みと報告しない。
 
 ## 新規登録テンプレート
 

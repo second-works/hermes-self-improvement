@@ -72,3 +72,5 @@ CI / CodeQLの実行定義は固定scannerと同じ承認済みrevisionに固定
 workflow path集合も固定し、別workflowでrequired job名を複製する回避を拒否する。candidateのSecurity定義も実際のmain側workflow revision（github.workflow_sha）とblob・modeを照合し、同じファイルへのno-op追加も拒否する。
 
 2026-10-15、ユーザーがworkflow定義固定の具体差分を承認した。security.ymlだけの2a5aceba7cee7d43a17ab1be73b6acc5b826c0c2をmainへ通常pushし、finallyで管理者保護を即復元した。PR全体のMergeはしていない。CI / CodeQL定義とworkflow集合は固定revision、Security定義は実行中のmain側workflow revisionに照合する。以降の実動証拠はPRコメントへ記録する。
+
+2026-10-15、専用GitHub App送信元とmain限定Environmentによるstatus上書き対策をユーザーが承認した。作成済みEnvironment・準備中のworkflow・未完了の本人認証/Secret設定/送信元固定を docs/security-reporter.md に記録する。従前の「追加Secretsなし」は初期構成の履歴であり、今回承認済みのEnvironment Secretは未登録。新しい構成を実動確認済みとは扱わない。

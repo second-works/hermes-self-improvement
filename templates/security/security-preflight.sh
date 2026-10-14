@@ -34,8 +34,12 @@ if ! tracked_files="$(mktemp "${TMPDIR:-/tmp}/security-preflight-files.XXXXXX")"
   exit 4
 fi
 scan_root=''
+audit_root=''
 cleanup() {
   rm -f "$tracked_files"
+  if [[ -n "$audit_root" ]]; then
+    rm -rf -- "$audit_root"
+  fi
   if [[ -n "$scan_root" ]]; then
     rm -rf -- "$scan_root"
   fi
@@ -234,11 +238,19 @@ if ((${#manifest_paths[@]} > 0)); then
       audit_dir="$scan_root"
     fi
 
-    audit_output="$(mktemp "${TMPDIR:-/tmp}/security-preflight-audit.XXXXXX")"
+    audit_root="$(mktemp -d "${TMPDIR:-/tmp}/security-preflight-audit.XXXXXX")"
+    mkdir "$audit_root/project" "$audit_root/home"
+    cp "$scan_root/$path" "$audit_root/project/$manifest_name"
+    if [[ -f "$audit_dir/package.json" && ! -L "$audit_dir/package.json" ]]; then
+      cp "$audit_dir/package.json" "$audit_root/project/package.json"
+    fi
+    audit_output="$audit_root/result.json"
     if ! command -v npm >/dev/null 2>&1; then
       dependency_unavailable=1
       dependency_reasons+=("npm is unavailable for $(escape_path "$path")")
-    elif (cd "$audit_dir" && npm audit --json --audit-level=high --package-lock-only >"$audit_output" 2>&1); then
+    elif (cd "$audit_root/project" && env -i PATH="$PATH" HOME="$audit_root/home" \
+      npm --userconfig=/dev/null --globalconfig=/dev/null --registry=https://registry.npmjs.org \
+      audit --json --audit-level=high --package-lock-only >"$audit_output" 2>&1); then
       dependency_reasons+=("npm audit reported no high or critical vulnerabilities for $(escape_path "$path")")
   else
       if python3 - "$audit_output" <<'PY'
@@ -271,7 +283,8 @@ PY
         fi
       fi
     fi
-    rm -f "$audit_output"
+    rm -rf -- "$audit_root"
+    audit_root=''
   done
 
   if ((dependency_failed)); then

@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 import shutil
@@ -50,7 +51,6 @@ class SetupTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0, result.stdout)
 
     def helper_result(self, include_preflight, include_codeql=True, include_ci=True):
-        import json
         root = self.fixture()
         checks = [{'name': 'ci' if include_ci else 'other-check',
                    'status': 'completed', 'conclusion': 'success'}]
@@ -79,12 +79,42 @@ class SetupTests(unittest.TestCase):
     def test_helper_accepts_exact_preflight_and_codeql(self):
         self.assertIn('SECURITY_STATUS=SECURITY_PASSED', self.helper_result(True))
 
+    def test_reporter_missing_configuration_fails_without_exposing_key(self):
+        workflow = (ROOT / '.github/workflows/security.yml').read_text()
+        code = workflow.split('        run: |\n', 1)[1].split('\n      - name:', 1)[0]
+        code = '\n'.join(line[10:] for line in code.splitlines())
+        for app_id, client_id, key, expected in [('', '', '', 2), ('wrong', 'client', 'fixture-key', 2),
+                                                ('123', 'client', '', 2), ('123', 'client', 'fixture-key', 0)]:
+            result = subprocess.run([BASH, '-e', '-c', code], capture_output=True, text=True,
+                env={**os.environ, 'SECURITY_APP_ID': app_id, 'SECURITY_APP_CLIENT_ID': client_id,
+                     'REPORTER_PRIVATE_KEY': key})
+            self.assertEqual(result.returncode, expected)
+            self.assertNotIn('fixture-key', result.stdout + result.stderr)
+            if expected:
+                self.assertIn('SECURITY_STATUS=SECURITY_UNAVAILABLE', result.stdout)
+
+    def test_reporter_does_not_turn_missing_or_failed_scan_into_success(self):
+        workflow = (ROOT / '.github/workflows/security.yml').read_text()
+        code = workflow.split('      - name: Report exact candidate result', 1)[1].split('        run: |\n', 1)[1]
+        code = '\n'.join(line[10:] for line in code.splitlines())
+        root = self.fixture()
+        fake = root / 'gh'
+        fake.write_text('#!/bin/sh\nprintf "%s\\n" "$@"\n')
+        fake.chmod(0o755)
+        for outcome, expected in [('success', 'success'), ('failure', 'failure'), ('skipped', 'error'),
+                                  ('cancelled', 'error'), ('', 'error')]:
+            result = subprocess.run([BASH, '-e', '-c', code], capture_output=True, text=True,
+                env={**os.environ, 'PATH': str(root) + os.pathsep + os.environ['PATH'],
+                     'SCAN_OUTCOME': outcome, 'PR_HEAD_SHA': 'a' * 40, 'RUN_URL': 'https://example.invalid'})
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('state=' + expected, result.stdout)
+
     def test_trusted_gate_rejects_modified_or_missing_ci_definitions(self):
         workflow = (ROOT / '.github/workflows/security.yml').read_text()
         guard = workflow.split('        id: scan\n        run: |\n', 1)[1].split(
             '          bash security-tool/scripts/security-preflight.sh candidate', 1)[0]
         guard = '\n'.join(line[10:] for line in guard.splitlines())
-        for modified in (None, 'ci.yml', 'codeql.yml', 'missing', 'mode', 'extra', 'security'):
+        for modified in (None, 'ci.yml', 'codeql.yml', 'missing', 'mode', 'extra', 'security', 'verifier', 'lint', 'runner', 'tests'):
             with self.subTest(modified=modified):
                 root = self.fixture()
                 for dirname in ('security-tool', 'candidate'):
@@ -94,6 +124,14 @@ class SetupTests(unittest.TestCase):
                     workflows.mkdir(parents=True)
                     for name in ('ci.yml', 'codeql.yml', 'security.yml'):
                         (workflows / name).write_text('name: Trusted fixture\n')
+                    for asset in ('scripts/verify.sh', 'scripts/lint.sh', 'scripts/test.sh', 'tests/test_setup.py'):
+                        target = repo / asset
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        target.write_text('trusted fixture\n')
+                    mapping = {'verifier': 'scripts/verify.sh', 'lint': 'scripts/lint.sh',
+                               'runner': 'scripts/test.sh', 'tests': 'tests/test_setup.py'}
+                    if dirname == 'candidate' and modified in mapping:
+                        (repo / mapping[modified]).write_text('no-op replacement\n')
                     if dirname == 'candidate' and modified in ('ci.yml', 'codeql.yml'):
                         (workflows / modified).write_text('name: Trusted fixture\n# no-op replacement\n')
                     if dirname == 'candidate' and modified == 'missing':
@@ -119,6 +157,32 @@ class SetupTests(unittest.TestCase):
                                  result.stdout + result.stderr)
                 if modified:
                     self.assertIn('SECURITY_STATUS=SECURITY_FAILED', result.stdout)
+
+    def test_npm_audit_ignores_candidate_registry_and_inherited_configuration(self):
+        root = self.fixture()
+        (root / 'package.json').write_text('{"name":"fixture","version":"1.0.0"}')
+        (root / 'package-lock.json').write_text('{"lockfileVersion":3,"packages":{}}')
+        (root / '.npmrc').write_text('registry=https://attacker.example.invalid\nomit=dev\n')
+        bindir = root / 'fixture-bin'
+        bindir.mkdir()
+        npm = bindir / 'npm'
+        npm.write_text('#!/bin/sh\n'
+            'test ! -e .npmrc || exit 31\n'
+            'test ! -e "$HOME/.npmrc" || exit 32\n'
+            'test -z "${NPM_CONFIG_REGISTRY:-}" || exit 33\n'
+            'test "$1" = "--userconfig=/dev/null" || exit 34\n'
+            'test "$2" = "--globalconfig=/dev/null" || exit 35\n'
+            'test "$3" = "--registry=https://registry.npmjs.org" || exit 36\n'
+            "printf '%s\\n' '{\"auditReportVersion\":2,\"metadata\":{\"vulnerabilities\":{\"high\":1,\"critical\":0}}}'\n"
+            'exit 1\n')
+        npm.chmod(0o755)
+        subprocess.run(['git', '-C', str(root), 'add', '.'], check=True)
+        result = subprocess.run([BASH, str(ROOT / 'scripts/security-preflight.sh'), str(root)],
+            env={**os.environ, 'PATH': str(bindir) + os.pathsep + os.environ['PATH'],
+                 'NPM_CONFIG_REGISTRY': 'https://attacker.example.invalid'}, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('DEPENDENCY_STATUS=SECURITY_FAILED', result.stdout)
+        self.assertIn('high or critical vulnerabilities', result.stdout)
 
     def test_security_clean(self):
         root = self.fixture()

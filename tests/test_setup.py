@@ -79,6 +79,47 @@ class SetupTests(unittest.TestCase):
     def test_helper_accepts_exact_preflight_and_codeql(self):
         self.assertIn('SECURITY_STATUS=SECURITY_PASSED', self.helper_result(True))
 
+    def test_trusted_gate_rejects_modified_or_missing_ci_definitions(self):
+        workflow = (ROOT / '.github/workflows/security.yml').read_text()
+        guard = workflow.split('        id: scan\n        run: |\n', 1)[1].split(
+            '          bash security-tool/scripts/security-preflight.sh candidate', 1)[0]
+        guard = '\n'.join(line[10:] for line in guard.splitlines())
+        for modified in (None, 'ci.yml', 'codeql.yml', 'missing', 'mode', 'extra', 'security'):
+            with self.subTest(modified=modified):
+                root = self.fixture()
+                for dirname in ('security-tool', 'candidate'):
+                    repo = root / dirname
+                    subprocess.run(['git', 'init', '-q', str(repo)], check=True)
+                    workflows = repo / '.github/workflows'
+                    workflows.mkdir(parents=True)
+                    for name in ('ci.yml', 'codeql.yml', 'security.yml'):
+                        (workflows / name).write_text('name: Trusted fixture\n')
+                    if dirname == 'candidate' and modified in ('ci.yml', 'codeql.yml'):
+                        (workflows / modified).write_text('name: Trusted fixture\n# no-op replacement\n')
+                    if dirname == 'candidate' and modified == 'missing':
+                        (workflows / 'codeql.yml').unlink()
+                    if dirname == 'candidate' and modified == 'extra':
+                        (workflows / 'fake.yml').write_text('name: Duplicate no-op fixture\n')
+                    if dirname == 'candidate' and modified == 'security':
+                        (workflows / 'security.yml').write_text('name: No-op Security fixture\n')
+                    if dirname == 'candidate' and modified == 'mode':
+                        (workflows / 'codeql.yml').chmod(0o755)
+                    subprocess.run(['git', '-C', str(repo), 'add', '.'], check=True)
+                    subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Fixture',
+                        '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'fixture'], check=True)
+                base = subprocess.check_output(['git', '-C', str(root / 'security-tool'),
+                                                 'rev-parse', 'HEAD'], text=True).strip()
+                subprocess.run(['git', '-C', str(root / 'candidate'), 'fetch', '-q',
+                                str(root / 'security-tool'), base], check=True)
+                head = subprocess.check_output(['git', '-C', str(root / 'candidate'),
+                                                 'rev-parse', 'HEAD'], text=True).strip()
+                result = subprocess.run([BASH, '-e', '-c', guard], cwd=root,
+                    env={**os.environ, 'PR_HEAD_SHA': head, 'BASE_WORKFLOW_SHA': base}, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0 if modified is None else 1,
+                                 result.stdout + result.stderr)
+                if modified:
+                    self.assertIn('SECURITY_STATUS=SECURITY_FAILED', result.stdout)
+
     def test_security_clean(self):
         root = self.fixture()
         (root / 'README.md').write_text('clean fixture\n')

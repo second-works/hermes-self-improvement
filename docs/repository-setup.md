@@ -66,3 +66,7 @@ GitHub公式は公開repo向けpull_request_target既定policyの2026-11-02強�
 手動wait-checks helperはci、Security Preflight、Analyze (python)の3 contextを明示的に要求する。他の成功checkやローカルfallbackで不足を代替しない。欠如ケースの回帰を含む22件が成功。
 
 参照用generic / Node / Python / CodeQLのcheckoutもpersist-credentials: falseへ統一した。PRテンプレートのReview Evidence Contractリンクを実在する正本へ修正。Python CIテンプレートのuv / Poetry開発依存導入は非実行資産に関するP2 FOLLOW-UPとしてdocs/review-followups.mdのFU-10-1へ記録し、現行CIでは有効化しない。
+
+CI / CodeQLの実行定義は固定scannerと同じ承認済みrevisionに固定し、main側Security gateがcandidate treeのworkflow blob・modeを照合する。ci.ymlまたはcodeql.ymlの改変・欠如・mode変更はSecurityを失敗させ、required job名だけを維持したno-opを受理しない。CI / CodeQL定義を正当に更新する場合は、承認済みrevisionの更新とgateの実動検証を先に行う。1正常・6異常の無害なGit fixtureでこの検査を確認した。main側guardの反映は具体差分への人間承認後にのみ行う。
+
+workflow path集合も固定し、別workflowでrequired job名を複製する回避を拒否する。candidateのSecurity定義も実際のmain側workflow revision（github.workflow_sha）とblob・modeを照合し、同じファイルへのno-op追加も拒否する。

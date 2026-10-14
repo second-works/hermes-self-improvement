@@ -41,9 +41,9 @@ typecheck / buildはアプリと型検査設定がないため対象外。Securi
 
 ## 保護と実動証拠
 
-初期状態: main rulesetなし。2026-10-14の保護設定適用は自動承認レビューが人間承認不足として拒否したため、未適用。必要なチェックはCI `ci`、Security `Security Preflight`、CodeQL `Analyze (python)`。PR経由、人間の承認、未解決threadの解消、最新headのチェック、force pushと削除の禁止を推奨する。設定の適用結果と本PRのCI / Security / Codex実動証拠はPRコメントへ記録する。未設定・未確認を適用済みと扱わない。
+初期状態: main rulesetなし。2026-10-14に自動承認レビューが具体設定への承認不足として一度拒否した後、ユーザーが承認票数0の設定を明示承認し、main保護を適用・APIで確認した。必要なチェックはCI `ci`、Security `Security Preflight`、CodeQL `Analyze (python)`。PR経由、人間の承認、未解決threadの解消、最新headのチェック、force pushと削除の禁止を推奨する。設定の適用結果と本PRのCI / Security / Codex実動証拠はPRコメントへ記録する。未設定・未確認を適用済みと扱わない。
 
 
-適用候補は `docs/main-protection.proposed.json`。最新headの必須チェック、PR経由、stale review失効、未解決thread解消、管理者も対象、force pushと削除禁止。承認票数0は単独管理者がPR作者として自分に承認票を付けられないための候補値であり、人間の最終Merge判断を免除しない。1票必須にする場合は別の人間reviewerが必要。具体設定への人間承認後にだけ適用する。
+適用候補は `docs/main-protection.proposed.json`。最新headの必須チェック、PR経由、stale review失効、未解決thread解消、管理者も対象、force pushと削除禁止。承認票数0は単独管理者がPR作者として自分に承認票を付けられないための候補値であり、人間の最終Merge判断を免除しない。1票必須にする場合は別の人間reviewerが必要。承認票数0で適用済み。最終Mergeの実行承認は別途必要。
 
-実動確認: PR #10でCI、Security Preflight、CodeQL Analyze (python)とCodeQL結果checkが成功。Codex連携は手動の `@codex review` へ👀反応とRunning summaryを返した。初回の自動発火は確認できず、OpenAI設定画面はログインを要求したため未確認。自動レビュー設定の確認・有効化は管理者がログインして行う必要がある。最終Codex結果と最新headの証拠はPRコメントへ記録する。
+実動確認: PR #10でCI、Security Preflight、CodeQL Analyze (python)とCodeQL結果checkが成功。Codex連携は手動の `@codex review` へ👀反応とRunning summaryを返した。初回の自動発火は未確認だったが、Chromeのログイン済み公式設定画面でリポジトリの自動レビューON、レビュー対象とトリガーは個人設定を継承、個人設定の自動レビューON・PR作成時、レート制限後のクレジット使用OFFを確認した。設定変更や追加課金は行っていない。最終Codex結果と最新headの証拠はPRコメントへ記録する。

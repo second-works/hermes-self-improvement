@@ -82,6 +82,19 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(result.returncode, 4, result.stdout)
         self.assertIn('SECURITY_STATUS=SECURITY_UNAVAILABLE', result.stdout)
 
+    def test_security_does_not_apply_checkout_filters(self):
+        root = self.fixture()
+        value = 'ghp_' + 'a' * 30
+        (root / '.gitattributes').write_text('leak.txt filter=redact\n')
+        (root / 'leak.txt').write_text(value)
+        subprocess.run(['git', '-C', str(root), 'config', 'filter.redact.clean', 'cat'], check=True)
+        subprocess.run(['git', '-C', str(root), 'config', 'filter.redact.smudge',
+                        "sed 's/ghp_[a-z]*/redacted/g'"], check=True)
+        result = self.security(root)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn('SECURITY_STATUS=SECURITY_FAILED', result.stdout)
+        self.assertNotIn(value, result.stdout + result.stderr)
+
     def test_security_template_matches_runtime(self):
         self.assertEqual((ROOT / 'scripts/security-preflight.sh').read_bytes(),
                          (ROOT / 'templates/security/security-preflight.sh').read_bytes())

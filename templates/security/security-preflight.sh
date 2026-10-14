@@ -48,13 +48,46 @@ if ! git -C "$repo_root" ls-files -z >"$tracked_files"; then
 fi
 
 # Inspect the version that would be committed, including dependency manifests.
-# Materialize only index entries; never follow worktree or symlink contents.
+# Materialize raw blobs only; never invoke checkout transformations or filters.
 if ! scan_root="$(mktemp -d "${TMPDIR:-/tmp}/security-preflight-index.XXXXXX")"; then
   echo 'SECURITY_STATUS=SECURITY_UNAVAILABLE'
   echo 'SECURITY_REASON=could not allocate an index snapshot'
   exit 4
 fi
-if ! git -C "$repo_root" checkout-index --all --ignore-skip-worktree-bits --prefix="$scan_root/" >/dev/null 2>&1; then
+if ! python3 - "$repo_root" "$scan_root" <<'PY'
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+repo = sys.argv[1]
+destination = Path(sys.argv[2]).resolve()
+try:
+    entries = subprocess.check_output(['git', '-C', repo, 'ls-files', '--stage', '-z'])
+    for entry in entries.split(b'\0'):
+        if not entry:
+            continue
+        metadata, name = entry.split(b'\t', 1)
+        mode, object_id, stage = metadata.split()
+        if stage != b'0' or mode not in (b'100644', b'100755', b'120000'):
+            raise ValueError('unsupported index entry')
+        relative = Path(os.fsdecode(name))
+        if relative.is_absolute() or '..' in relative.parts:
+            raise ValueError('invalid index path')
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if destination not in (target.parent.resolve(), *target.parent.resolve().parents):
+            raise ValueError('index path escapes snapshot')
+        content = subprocess.check_output(['git', '-C', repo, 'cat-file', 'blob', object_id.decode('ascii')])
+        if mode == b'120000':
+            os.symlink(os.fsdecode(content), target)
+        else:
+            with target.open('xb') as handle:
+                handle.write(content)
+except (OSError, ValueError, subprocess.SubprocessError):
+    raise SystemExit(1)
+PY
+then
   echo 'SECURITY_STATUS=SECURITY_UNAVAILABLE'
   echo 'SECURITY_REASON=index snapshot failed; staged files were not fully inspected'
   exit 4

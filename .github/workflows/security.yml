@@ -18,6 +18,7 @@ jobs:
       statuses: write
     env:
       PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      BASE_WORKFLOW_SHA: ${{ github.workflow_sha }}
       RUN_URL: https://github.com/second-works/hermes-self-improvement/actions/runs/${{ github.run_id }}
 
     steps:
@@ -45,10 +46,37 @@ jobs:
           git -C candidate fetch --quiet --no-tags --depth=1 \
             https://github.com/second-works/hermes-self-improvement.git "$PR_HEAD_SHA"
           git -C candidate read-tree "$PR_HEAD_SHA"
+          [[ "$BASE_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]
+          git -C candidate fetch --quiet --no-tags --depth=1 \
+            https://github.com/second-works/hermes-self-improvement.git "$BASE_WORKFLOW_SHA"
 
       - name: Run trusted Security Preflight
         id: scan
-        run: bash security-tool/scripts/security-preflight.sh candidate
+        run: |
+          expected_paths="$(git -C security-tool ls-tree -r --name-only HEAD -- .github/workflows)"
+          actual_paths="$(git -C candidate ls-tree -r --name-only "$PR_HEAD_SHA" -- .github/workflows)"
+          if [[ "$actual_paths" != "$expected_paths" ]]; then
+            echo 'SECURITY_STATUS=SECURITY_FAILED'
+            echo 'SECURITY_REASON=workflow path set differs from approved pin'
+            exit 1
+          fi
+          expected_security="$(git -C candidate ls-tree "$BASE_WORKFLOW_SHA" -- .github/workflows/security.yml)"
+          actual_security="$(git -C candidate ls-tree "$PR_HEAD_SHA" -- .github/workflows/security.yml)"
+          if [[ -z "$expected_security" || "$actual_security" != "$expected_security" ]]; then
+            echo 'SECURITY_STATUS=SECURITY_FAILED'
+            echo 'SECURITY_REASON=candidate Security definition differs from trusted base'
+            exit 1
+          fi
+          for workflow in .github/workflows/ci.yml .github/workflows/codeql.yml; do
+            expected_entry="$(git -C security-tool ls-tree HEAD -- "$workflow")"
+            actual_entry="$(git -C candidate ls-tree "$PR_HEAD_SHA" -- "$workflow")"
+            if [[ -z "$expected_entry" || "$actual_entry" != "$expected_entry" ]]; then
+              echo 'SECURITY_STATUS=SECURITY_FAILED'
+              echo "SECURITY_REASON=required workflow definition differs from approved pin: $workflow"
+              exit 1
+            fi
+          done
+          bash security-tool/scripts/security-preflight.sh candidate
 
       - name: Report exact candidate result
         if: always()

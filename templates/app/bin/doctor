@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+ENV_FILE="${APP_ENV_FILE:-${ROOT_DIR}/.env}"
+
+trim() {
+  local value="$1"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "$value"
+}
+
+config_value() {
+  local key="$1"
+  local name
+  local value
+
+  if [[ ${!key+x} == x ]]; then
+    printf '%s' "${!key}"
+    return 0
+  fi
+  [[ -f "$ENV_FILE" ]] || return 1
+
+  while IFS='=' read -r name value || [[ -n "$name" ]]; do
+    name="$(trim "$name")"
+    [[ -z "$name" || "${name:0:1}" == "#" || "$name" != "$key" ]] && continue
+    value="$(trim "${value:-}")"
+    if [[ "${value:0:1}" == '"' && "${value: -1}" == '"' ]]; then
+      value="${value:1:${#value}-2}"
+    elif [[ "${value:0:1}" == "'" && "${value: -1}" == "'" ]]; then
+      value="${value:1:${#value}-2}"
+    fi
+    printf '%s' "$value"
+    return 0
+  done < "$ENV_FILE"
+  return 1
+}
+
+config_is_present() {
+  local key="$1"
+  if [[ ${!key+x} == x ]]; then
+    return 0
+  fi
+  [[ -f "$ENV_FILE" ]] && grep -Eq "^[[:space:]]*${key}[[:space:]]*=" "$ENV_FILE"
+}
+
+failures=0
+check_command() {
+  local command_name="$1"
+  if command -v "$command_name" >/dev/null 2>&1; then
+    printf '[doctor] command=%s status=PASS\n' "$command_name"
+  else
+    printf '[doctor] command=%s status=FAIL\n' "$command_name" >&2
+    failures=$((failures + 1))
+  fi
+}
+
+cd "$ROOT_DIR"
+
+if [[ ! -f "$ENV_FILE" ]]; then
+  printf '[doctor] config status=FAIL reason=%s is missing\n' "${ENV_FILE#"$ROOT_DIR"/}" >&2
+  failures=$((failures + 1))
+else
+  printf '[doctor] config status=PASS path=%s\n' "${ENV_FILE#"$ROOT_DIR"/}"
+fi
+
+required_commands="$(config_value APP_REQUIRED_COMMANDS || true)"
+required_commands="${required_commands:-git}"
+IFS=',' read -r -a command_list <<< "$required_commands"
+for command_name in "${command_list[@]}"; do
+  command_name="$(trim "$command_name")"
+  [[ -n "$command_name" ]] && check_command "$command_name"
+done
+
+if [[ -f package.json ]]; then
+  check_command node
+  check_command npm
+  if [[ ! -f package-lock.json ]]; then
+    printf '[doctor] dependencies status=FAIL reason=package.json requires package-lock.json\n' >&2
+    failures=$((failures + 1))
+  else
+    printf '[doctor] dependencies=node-lock status=PASS\n'
+  fi
+elif [[ -f requirements.txt || -f requirements-dev.txt || -f pyproject.toml ]]; then
+  check_command python3
+  if [[ -x .venv/bin/python ]]; then
+    printf '[doctor] dependencies=python-venv status=PASS\n'
+  else
+    printf '[doctor] dependencies=python-venv status=FAIL reason=.venv/bin/python is missing\n' >&2
+    failures=$((failures + 1))
+  fi
+else
+  printf '[doctor] dependencies=none status=PASS\n'
+fi
+
+data_dir="$(config_value APP_DATA_DIR || true)"
+data_dir="${data_dir:-.data}"
+if [[ "$data_dir" != /* ]]; then
+  data_dir="${ROOT_DIR}/${data_dir}"
+fi
+if [[ -d "$data_dir" ]]; then
+  printf '[doctor] data_dir status=PASS path=%s\n' "$data_dir"
+else
+  printf '[doctor] data_dir status=FAIL path=%s is missing\n' "$data_dir" >&2
+  failures=$((failures + 1))
+fi
+
+port="$(config_value APP_PORT || true)"
+port="${port:-8000}"
+if [[ ! "$port" =~ ^[0-9]+$ ]] || ((port < 1 || port > 65535)); then
+  printf '[doctor] port status=FAIL reason=APP_PORT must be between 1 and 65535\n' >&2
+  failures=$((failures + 1))
+else
+  printf '[doctor] port status=PASS value=%s\n' "$port"
+fi
+
+health_url="$(config_value APP_HEALTHCHECK_URL || true)"
+if config_is_present APP_HEALTHCHECK_REQUIRED; then
+  health_required="$(config_value APP_HEALTHCHECK_REQUIRED || true)"
+else
+  health_required=0
+fi
+if config_is_present APP_EXPECT_RUNNING; then
+  expect_running="$(config_value APP_EXPECT_RUNNING || true)"
+else
+  expect_running=0
+fi
+flags_valid=1
+for flag_name in APP_HEALTHCHECK_REQUIRED APP_EXPECT_RUNNING; do
+  if [[ "$flag_name" == "APP_HEALTHCHECK_REQUIRED" ]]; then
+    flag_value="$health_required"
+  else
+    flag_value="$expect_running"
+  fi
+  if [[ "$flag_value" != "0" && "$flag_value" != "1" ]]; then
+    printf '[doctor] config status=FAIL reason=%s must be 0 or 1\n' "$flag_name" >&2
+    failures=$((failures + 1))
+    flags_valid=0
+  fi
+done
+
+health_succeeded=0
+health_port=""
+
+if ((flags_valid)) && [[ -n "$health_url" && "$health_required" == "1" ]]; then
+  check_command curl
+  if command -v curl >/dev/null 2>&1 && curl --fail --silent --max-time 5 "$health_url" >/dev/null 2>/dev/null; then
+    printf '[doctor] health status=PASS\n'
+    health_succeeded=1
+  else
+    printf '[doctor] health status=FAIL\n' >&2
+    failures=$((failures + 1))
+  fi
+elif ((flags_valid)) && [[ -n "$health_url" ]]; then
+  printf '[doctor] health status=SKIPPED reason=APP_HEALTHCHECK_REQUIRED is not 1\n'
+elif ((flags_valid)); then
+  printf '[doctor] health status=SKIPPED reason=APP_HEALTHCHECK_URL is not configured\n'
+fi
+
+if ((flags_valid)) && [[ "$expect_running" == "1" && "$health_required" != "1" ]]; then
+  printf '[doctor] runtime status=FAIL reason=APP_EXPECT_RUNNING=1 requires APP_HEALTHCHECK_REQUIRED=1\n' >&2
+  failures=$((failures + 1))
+elif ((flags_valid)) && [[ "$expect_running" == "1" && "$health_succeeded" == "1" ]]; then
+  if [[ "$health_url" =~ ^https?://([^/@]*@)?\[[^]]+\]:([0-9]+)([/?#].*)?$ ]]; then
+    health_port="${BASH_REMATCH[2]}"
+  elif [[ "$health_url" =~ ^https?://([^/@]*@)?[^/:?#]+:([0-9]+)([/?#].*)?$ ]]; then
+    health_port="${BASH_REMATCH[2]}"
+  elif [[ "$health_url" == https://* ]]; then
+    health_port=443
+  else
+    health_port=80
+  fi
+  if [[ "$health_port" != "$port" ]]; then
+    printf '[doctor] runtime status=FAIL reason=APP_PORT does not match health endpoint port\n' >&2
+    failures=$((failures + 1))
+  else
+    printf '[doctor] runtime port=%s status=PASS health_endpoint_reachable\n' "$port"
+  fi
+elif ((flags_valid)) && [[ "$expect_running" == "1" ]]; then
+  printf '[doctor] runtime status=FAIL reason=health endpoint is unavailable\n' >&2
+  failures=$((failures + 1))
+elif ((flags_valid)); then
+  printf '[doctor] runtime status=SKIPPED reason=APP_EXPECT_RUNNING is not 1\n'
+fi
+
+if ((failures > 0)); then
+  printf '[doctor] completed status=FAIL failures=%s\n' "$failures" >&2
+  exit 1
+fi
+printf '[doctor] completed status=PASS\n'

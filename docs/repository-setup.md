@@ -1,0 +1,44 @@
+# Issue #1 導入判断・運用
+
+2026-10-14。Risk Tier: HIGH（CI・Security・レビュー運用の初期導入）。ユーザーがIssue #1の実装とPR提出を承認。Hermes本番、課金変更、自己改善の自動適用、Auto-Mergeは範囲外。復旧は本PRのrevertで行う。
+
+原本は second-works/ai-development の `b2715a76c5ab3715ccce88167c23ce12c81e85b1`。取得時点の原文とプロジェクト固有境界を照合した。既存ファイルはなく、既存の未追跡 `.bm25/` は保持・除外した。空リポジトリのPR比較先として、ファイルなしの初期コミットだけmainに配置した。
+
+| 原本 | 採用・調整 | 理由 |
+| --- | --- | --- |
+| AGENTS.md | 採用。原本自身のtests実行行を削除し、Hermes非操作・通常レーン・verify入口を追記 | 1 Issue = 1 PR、同一headの検証、人間Mergeを保持 |
+| docs/、.agents/skills/、templates/ | 参照資産として同一revisionを配置 | 原本guideの参照先保持。helperの実行許可・自動起動は意味しない |
+| .github/ISSUE_TEMPLATE/、pull_request_template.md | 採用 | Scope、Done、Risk、Evidence、Reviewを記録 |
+| templates/verification/verify.sh | scripts/verify.shに採用 | lint → typecheck → test → build。全skipと失敗は停止 |
+| templates/security/security-preflight.sh、security.yml | scripts/へ配置しworkflow参照先を調整 | 正確なPR headの既知秘密パターン検査。Bash 5必須 |
+| templates/github-actions/generic-ci.yml | CIとして採用 | アプリのない構成にも標準入口を適用 |
+| templates/github-actions/codeql.yml | Python、build-mode noneへ調整 | 今回のPythonテストと参照helperを解析。JSアプリはない |
+| templates/dependabot/ | github-actions専用設定へ調整 | runtime依存未導入。npm/pip更新は対象外 |
+| SECURITY.md | プロジェクト向けに書換え | 架空のサポートversionを除去。非公開報告とHermes境界 |
+| 原本ci.yml、tests/、scripts/ | 実行資産としては除外 | テンプレート自体の回帰検査・状態収集はこのprojectのCIではない |
+| jev-triage、decision-shadow、local-judge-smoke、slack-failure-alert | 除外 | 追加Secrets、外部送信、ローカルモデル／API依存が今回不要 |
+| node-ci、python-ci、app/setup、app/doctor | 有効化しない | アプリのセットアップや本番接続は範囲外 |
+
+## CIと費用・権限
+
+GitHub-hosted runnerのみ使用し、self-hosted runnerやHermes本番には接続しない。CIとSecurityはcontents: read、checkoutは認証情報を残さない。CodeQLだけsecurity-events: writeをjob単位で付与。workflowはPR → mainを検査し、CI/CodeQLはmain pushも検査する。CodeQLは週次実行も行う。pull_request_targetは使用しない。追加Secrets、OPENAI_API_KEY、API課金のActionsは導入しない。
+
+公開repo・admin権限・Actions有効をGitHub APIで確認。利用プランの変更は行わない。DependabotはmainへのMerge後に有効になる。ActionsとCodeQLの実発火・利用可否はPRのrunで確認する。
+
+## Codexレビュー
+
+[公式GitHub連携ドキュメント](https://learn.chatgpt.com/docs/third-party/github)に従い、Codexに接続したrepoでReview codeのAutomatic reviewとpersonal preferencesのReview triggerを設定する。設定はOpenAI側であり、workflowの追加だけでは有効にならない。GitHub連携の認証を使い、APIキーは不要。アカウントのレビュー利用枠・制限に従うため、無制限・無料と断定しない。
+
+このPRを実動テストに使う。自動発火が確認できなければ `@codex review` をPRコメントで依頼する。👀反応は受付であって完了ではない。botのreviewまたは明示的な完了コメントと対象headを照合する。認証不足、repo未接続、利用制限、無応答、途中失敗はNOT_VERIFIED / BLOCKEDとし、Merge可能と報告しない。GitHubのCI成功やレビュー要求コメント自体をCodex成功の証拠にしない。
+
+指摘は同じPR branchで修正し、head変更後にlocal → CI → Security → CodeQL → Codex Reviewをやり直す。P0/P1/BLOCKING P2は未解決で進めない。最終Mergeは人間が判断する。CIの必須チェックはCodex完了を代替しない。
+
+## 検証責務
+
+標準ライブラリのunittestで、Security成功、秘密検出の非zeroと値非表示、依存監査未対応のUNAVAILABLE、symlink非追跡、verify全skip拒否と失敗後停止、AGENTS参照先を検査する。fixtureは一時ディレクトリ内の無害な値だけを使う。`~/.hermes`は読み込まない。
+
+typecheck / buildはアプリと型検査設定がないため対象外。Security Preflightはindex登録済みのファイルを検査するため、提出内容をstageしてから実行する。共通参照helperの全回帰テスト・本番実データの検収は今回対象外。
+
+## 保護と実動証拠
+
+初期状態: main rulesetなし。必要なチェックはCI `ci`、Security `Security Preflight`、CodeQL `Analyze (python)`。PR経由、人間の承認、未解決threadの解消、最新headのチェック、force pushと削除の禁止を推奨する。設定の適用結果と本PRのCI / Security / Codex実動証拠はPRコメントへ記録する。未設定・未確認を適用済みと扱わない。

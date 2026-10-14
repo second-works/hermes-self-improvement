@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "review-comment-auto-triage-poc",
+  "main": "src/index.mjs",
+  "compatibility_date": "2026-09-18",
+  "ai": {
+    "binding": "AI"
+  },
+  "vars": {
+    "TRIAGE_MODE": "shadow",
+    "AI_GATEWAY_ID": "default"
+  }
+}

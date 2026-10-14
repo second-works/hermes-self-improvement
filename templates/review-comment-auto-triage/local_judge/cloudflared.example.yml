@@ -1,0 +1,7 @@
+# Reviewable example only. Configure a dedicated Tunnel and Access application.
+# The connector credentials file is managed outside this repository.
+ingress:
+  - hostname: judge.example.invalid
+    path: ^/triage$
+    service: http://127.0.0.1:8093
+  - service: http_status:404

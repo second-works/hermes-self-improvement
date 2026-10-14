@@ -33,10 +33,30 @@ if ! tracked_files="$(mktemp "${TMPDIR:-/tmp}/security-preflight-files.XXXXXX")"
   echo 'SECURITY_REASON=could not allocate a tracked-file list'
   exit 4
 fi
-trap 'rm -f "$tracked_files"' EXIT
+scan_root=''
+cleanup() {
+  rm -f "$tracked_files"
+  if [[ -n "$scan_root" ]]; then
+    rm -rf -- "$scan_root"
+  fi
+}
+trap cleanup EXIT
 if ! git -C "$repo_root" ls-files -z >"$tracked_files"; then
   echo 'SECURITY_STATUS=SECURITY_UNAVAILABLE'
   echo 'SECURITY_REASON=git ls-files failed; tracked files were not fully inspected'
+  exit 4
+fi
+
+# Inspect the version that would be committed, including dependency manifests.
+# Materialize only index entries; never follow worktree or symlink contents.
+if ! scan_root="$(mktemp -d "${TMPDIR:-/tmp}/security-preflight-index.XXXXXX")"; then
+  echo 'SECURITY_STATUS=SECURITY_UNAVAILABLE'
+  echo 'SECURITY_REASON=could not allocate an index snapshot'
+  exit 4
+fi
+if ! git -C "$repo_root" checkout-index --all --ignore-skip-worktree-bits --prefix="$scan_root/" >/dev/null 2>&1; then
+  echo 'SECURITY_STATUS=SECURITY_UNAVAILABLE'
+  echo 'SECURITY_REASON=index snapshot failed; staged files were not fully inspected'
   exit 4
 fi
 
@@ -75,9 +95,9 @@ scan_file() {
 }
 
 secret_status='SECURITY_PASSED'
-secret_reason='tracked files and symlink targets contained no known secret patterns'
+secret_reason='staged files and symlink targets contained no known secret patterns'
 while IFS= read -r -d '' path; do
-  if scan_file "$repo_root/$path"; then
+  if scan_file "$scan_root/$path"; then
     secret_status='SECURITY_FAILED'
     secret_reason="secret-like value detected in $(escape_path "$path")"
     break
@@ -111,6 +131,11 @@ dependency_unavailable=0
 
 for path in "${manifest_paths[@]}"; do
   manifest_name="${path##*/}"
+  if [[ -L "$scan_root/$path" ]]; then
+    dependency_unavailable=1
+    dependency_reasons+=("dependency manifest is a symlink: $(escape_path "$path")")
+    continue
+  fi
   case "$manifest_name" in
     package-lock.json|npm-shrinkwrap.json)
       dependency_manifests+=("$path")
@@ -154,9 +179,9 @@ if ((${#manifest_paths[@]} > 0)); then
 
   for path in "${dependency_manifests[@]}"; do
     if [[ "$path" == */* ]]; then
-      audit_dir="$repo_root/${path%/*}"
+      audit_dir="$scan_root/${path%/*}"
     else
-      audit_dir="$repo_root"
+      audit_dir="$scan_root"
     fi
 
     audit_output="$(mktemp "${TMPDIR:-/tmp}/security-preflight-audit.XXXXXX")"

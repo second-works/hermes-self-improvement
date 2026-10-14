@@ -40,6 +40,28 @@ class SetupTests(unittest.TestCase):
         self.assertIn('SECURITY_STATUS=SECURITY_FAILED', result.stdout)
         self.assertNotIn(value, result.stdout + result.stderr)
 
+    def test_security_scans_staged_secret_even_if_worktree_is_clean(self):
+        root = self.fixture()
+        value = 'ghp_' + 'a' * 30
+        (root / 'leak.txt').write_text(value)
+        subprocess.run(['git', '-C', str(root), 'add', '.'], check=True)
+        (root / 'leak.txt').write_text('clean\n')
+        result = subprocess.run([BASH, str(ROOT / 'scripts/security-preflight.sh'), str(root)],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn('SECURITY_STATUS=SECURITY_FAILED', result.stdout)
+        self.assertNotIn(value, result.stdout + result.stderr)
+
+    def test_security_scans_staged_manifest_even_if_worktree_is_clean(self):
+        root = self.fixture()
+        (root / 'requirements.txt').write_text('example==1.0\n')
+        subprocess.run(['git', '-C', str(root), 'add', '.'], check=True)
+        (root / 'requirements.txt').unlink()
+        result = subprocess.run([BASH, str(ROOT / 'scripts/security-preflight.sh'), str(root)],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 4, result.stdout)
+        self.assertIn('SECURITY_STATUS=SECURITY_UNAVAILABLE', result.stdout)
+
     def test_security_unsupported_dependency_is_unavailable(self):
         root = self.fixture()
         (root / 'requirements.txt').write_text('example==1.0\n')
@@ -52,6 +74,17 @@ class SetupTests(unittest.TestCase):
         (root / 'outside').symlink_to('/nonexistent/private-data')
         result = self.security(root)
         self.assertEqual(result.returncode, 0)
+
+    def test_security_dependency_symlink_is_unavailable(self):
+        root = self.fixture()
+        (root / 'package-lock.json').symlink_to('/nonexistent/private-data')
+        result = self.security(root)
+        self.assertEqual(result.returncode, 4, result.stdout)
+        self.assertIn('SECURITY_STATUS=SECURITY_UNAVAILABLE', result.stdout)
+
+    def test_security_template_matches_runtime(self):
+        self.assertEqual((ROOT / 'scripts/security-preflight.sh').read_bytes(),
+                         (ROOT / 'templates/security/security-preflight.sh').read_bytes())
 
     def verify_fixture(self):
         root = self.fixture()

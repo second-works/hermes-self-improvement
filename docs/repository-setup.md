@@ -10,7 +10,7 @@
 | docs/、.agents/skills/、templates/ | 参照資産として同一revisionを配置 | 原本guideの参照先保持。helperの実行許可・自動起動は意味しない |
 | .github/ISSUE_TEMPLATE/、pull_request_template.md | 採用 | Scope、Done、Risk、Evidence、Reviewを記録 |
 | templates/verification/verify.sh | scripts/verify.shに採用 | lint → typecheck → test → build。全skipと失敗は停止 |
-| templates/security/security-preflight.sh、security.yml | scripts/へ配置しworkflow参照先を調整 | 正確なPR headの既知秘密パターン検査。Bash 5必須 |
+| templates/security/security-preflight.sh、security.yml | scripts/へ配置しworkflow参照先を調整 | 正確なPR headのindex snapshotの既知秘密パターン検査。Bash 5必須（レビューP1修正を原本copyにも同期） |
 | templates/github-actions/generic-ci.yml | CIとして採用 | アプリのない構成にも標準入口を適用 |
 | templates/github-actions/codeql.yml | Python、build-mode noneへ調整 | 今回のPythonテストと参照helperを解析。JSアプリはない |
 | templates/dependabot/ | github-actions専用設定へ調整 | runtime依存未導入。npm/pip更新は対象外 |
@@ -35,9 +35,9 @@ GitHub-hosted runnerのみ使用し、self-hosted runnerやHermes本番には接
 
 ## 検証責務
 
-標準ライブラリのunittestで、Security成功、秘密検出の非zeroと値非表示、依存監査未対応のUNAVAILABLE、symlink非追跡、verify全skip拒否と失敗後停止、AGENTS参照先を検査する。fixtureは一時ディレクトリ内の無害な値だけを使う。`~/.hermes`は読み込まない。
+標準ライブラリのunittestで、Security成功、stage後に作業ツリーだけを消去しても提出内容を検査する回帰、秘密検出の非zeroと値非表示、依存監査未対応のUNAVAILABLE、symlink非追跡、verify全skip拒否と失敗後停止、AGENTS参照先を検査する。fixtureは一時ディレクトリ内の無害な値だけを使う。`~/.hermes`は読み込まない。
 
-typecheck / buildはアプリと型検査設定がないため対象外。Security Preflightはindex登録済みのファイルを検査するため、提出内容をstageしてから実行する。共通参照helperの全回帰テスト・本番実データの検収は今回対象外。
+typecheck / buildはアプリと型検査設定がないため対象外。Security Preflightはindex登録済みのファイルを検査するため、提出内容をstageしてから実行する。作業ツリーではなく一時領域へ展開したindexの内容を検査する。依存監査も同じsnapshotを使い、symlinkの依存manifestは外部参照せずUNAVAILABLEとして停止する。共通参照helperの全回帰テスト・本番実データの検収は今回対象外。
 
 ## 保護と実動証拠
 

@@ -1,0 +1,66 @@
+name: Security
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  security-preflight:
+    name: Trusted Security Inspection
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      statuses: write
+    env:
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      RUN_URL: https://github.com/second-works/hermes-self-improvement/actions/runs/${{ github.run_id }}
+
+    steps:
+      - name: Mark exact candidate pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$PR_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          gh api --method POST "repos/second-works/hermes-self-improvement/statuses/$PR_HEAD_SHA" \
+            -f state=pending -f context='Security Preflight' \
+            -f description='Trusted base workflow is inspecting raw candidate blobs' -f target_url="$RUN_URL"
+
+      - name: Checkout pinned scanner
+        uses: actions/checkout@v7
+        with:
+          repository: second-works/hermes-self-improvement
+          ref: 1118cc6cb996e4eddbd0347b5131fb8b271e116d
+          persist-credentials: false
+          path: security-tool
+
+      - name: Fetch candidate objects without checkout
+        run: |
+          mkdir candidate
+          git -C candidate init --quiet
+          git -C candidate fetch --quiet --no-tags --depth=1 \
+            https://github.com/second-works/hermes-self-improvement.git "$PR_HEAD_SHA"
+          git -C candidate read-tree "$PR_HEAD_SHA"
+
+      - name: Run trusted Security Preflight
+        id: scan
+        run: bash security-tool/scripts/security-preflight.sh candidate
+
+      - name: Report exact candidate result
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCAN_OUTCOME: ${{ steps.scan.outcome }}
+        run: |
+          case "$SCAN_OUTCOME" in
+            success) result=success ;;
+            failure) result=failure ;;
+            *) result=error ;;
+          esac
+          gh api --method POST "repos/second-works/hermes-self-improvement/statuses/$PR_HEAD_SHA" \
+            -f state="$result" -f context='Security Preflight' \
+            -f description='Trusted raw-blob inspection; unavailable and failed scans block merge' -f target_url="$RUN_URL"

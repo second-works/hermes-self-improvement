@@ -20,9 +20,14 @@ for entry in entries.split(b'\0'):
         continue
     source = subprocess.check_output(['git', 'cat-file', 'blob', object_id.decode('ascii')])
     if path.suffix == '.sh':
-        subprocess.run(['bash', '-n'], input=source, check=True)
+        result = subprocess.run(['bash', '-n'], input=source, capture_output=True)
+        if result.returncode:
+            raise SystemExit('staged shell syntax invalid; source values omitted')
     else:
-        ast.parse(source, filename=str(path))
+        try:
+            ast.parse(source)
+        except (SyntaxError, ValueError):
+            raise SystemExit('staged Python syntax invalid; source values omitted')
 CHECK
 git diff --check
 git diff --cached --check

@@ -57,7 +57,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: second-works/hermes-self-improvement
-          ref: f2cfc73b6e5278c14efbcc24a8e34713a5bbb6a2
+          ref: 02cab2e1798d5a6c42cea4fb2591a37f1494bfb0
           persist-credentials: false
           path: security-tool
 

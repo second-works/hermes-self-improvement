@@ -170,8 +170,12 @@ class SetupTests(unittest.TestCase):
             'test ! -e .npmrc || exit 31\n'
             'test ! -e "$HOME/.npmrc" || exit 32\n'
             'test -z "${NPM_CONFIG_REGISTRY:-}" || exit 33\n'
-            'test "$1" = "--userconfig=/dev/null" || exit 34\n'
-            'test "$2" = "--globalconfig=/dev/null" || exit 35\n'
+            'user_config="${1#--userconfig=}"\n'
+            'global_config="${2#--globalconfig=}"\n'
+            'test "$user_config" != "$global_config" || exit 34\n'
+            'test -f "$user_config" && test ! -s "$user_config" || exit 35\n'
+            'test -f "$global_config" && test ! -s "$global_config" || exit 35\n'
+            'test -f package-lock.json && test -f package.json || exit 37\n'
             'test "$3" = "--registry=https://registry.npmjs.org" || exit 36\n'
             "printf '%s\\n' '{\"auditReportVersion\":2,\"metadata\":{\"vulnerabilities\":{\"high\":1,\"critical\":0}}}'\n"
             'exit 1\n')
@@ -183,6 +187,23 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn('DEPENDENCY_STATUS=SECURITY_FAILED', result.stdout)
         self.assertIn('high or critical vulnerabilities', result.stdout)
+
+    def test_real_npm_audit_accepts_root_and_nested_lockfiles(self):
+        self.assertIsNotNone(shutil.which('npm'), 'npm is required for the supported audit contract')
+        for directory in ('', 'nested'):
+            for lockname in ('package-lock.json', 'npm-shrinkwrap.json'):
+                with self.subTest(directory=directory, lockname=lockname):
+                    root = self.fixture()
+                    project = root / directory
+                    project.mkdir(parents=True, exist_ok=True)
+                    package = {'name': 'inert-fixture', 'version': '1.0.0'}
+                    (project / 'package.json').write_text(json.dumps(package))
+                    lock = {**package, 'lockfileVersion': 3, 'packages': {'': package}}
+                    (project / lockname).write_text(json.dumps(lock))
+                    (project / '.npmrc').write_text('registry=https://attacker.example.invalid\n')
+                    result = self.security(root)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertIn('DEPENDENCY_STATUS=SECURITY_PASSED', result.stdout)
 
     def test_security_clean(self):
         root = self.fixture()

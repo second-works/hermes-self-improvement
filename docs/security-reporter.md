@@ -10,10 +10,12 @@ workflow修正は公式App token actionの固定revision `64ab729a6294000f5aa4a4
 
 関連P1の修正: workflowだけでなくscripts/verify.sh、scripts/lint.sh、scripts/test.sh、tests/test_setup.pyも固定revisionのmode/blobへ照合し、no-opへの差し替えを拒否する。これらの変更とscanner更新には検証済みpin更新が必要。検証済み固定revisionは `8c2508eb7e7970d40adbcdba9731b83038300feb`。main側への反映と実動確認は別途PRコメントへ記録する。
 
-npm監査は新しい一時directoryにmanifestとlockfileだけをコピーする。candidate .npmrcを持ち込まず、user/global configを無効化し、継承環境を分離して https://registry.npmjs.org を明示する。候補のregistryや認証設定は読まない。候補側のproxy、omit、registry設定で検査を変えない。
+npm監査は新しい一時directoryにmanifestとlockfileだけをコピーする。candidate .npmrcを持ち込まず、user/global configを別々の空ファイルへ限定し、継承環境を分離して https://registry.npmjs.org を明示する。候補のregistryや認証設定は読まない。候補側のproxy、omit、registry設定で検査を変えない。
 
 必要な実動証拠はPRへ記録する: 新しい同一headのlocal / CI / Security / CodeQL / Codex結果、専用App由来statusの成功・検査失敗・不能、main以外のEnvironment拒否、別App由来の同名successでfailureを解除できないこと、管理者保護復元、BLOCKING残件ゼロ。未観測は成功扱いしない。途中失敗時はPRをMerge不可として保持し、保護の解除やGITHUB_TOKENへのfallbackはしない。
 
 実動の負例: 無害な一時workflowを同じPRへ追加したfixture head `ead393841c515c44952a8dfcf5f5a97225f83de9` で、branch pushのrun38650620099とPR merge refのrun38650626217がEnvironment protectionにより実行前に拒否された。tag許可はAPI/UIで0、branch mainだけの型付きpolicyを確認した（tag refでの実行は行っていない）。trusted Security run38650623136は未承認workflow集合を拒否し、専用App由来のfailureを報告した。
 
 同じfixture SHAへ別送信元 second-works から同名successを追加した後も、ci / Analyze (python) / CodeQL成功・未解決thread0件の状態でPRはBLOCKEDを維持した。専用Appのfailureは別送信元のsuccessで解除できない。Merge操作は試みず、fixtureは確認後に通常commitで削除する。fixture SHAの失敗を最終headのゲート結果には使わない。
+
+追加P2のIN-SCOPE FIX: 監査時のlockfile basenameを各pathから求め、user/globalに別の空configを使用する。実npmでroot/nestedのpackage-lock.jsonとnpm-shrinkwrap.json（依存0の無害fixture）を検証し、修正前4失敗→修正後成功を確認する。

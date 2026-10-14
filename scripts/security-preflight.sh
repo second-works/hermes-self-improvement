@@ -232,6 +232,7 @@ if ((${#manifest_paths[@]} > 0)); then
   dependency_manifest="$(IFS=,; printf '%s' "${dependency_display_manifests[*]}")"
 
   for path in "${dependency_manifests[@]}"; do
+    manifest_name="${path##*/}"
     if [[ "$path" == */* ]]; then
       audit_dir="$scan_root/${path%/*}"
     else
@@ -240,6 +241,8 @@ if ((${#manifest_paths[@]} > 0)); then
 
     audit_root="$(mktemp -d "${TMPDIR:-/tmp}/security-preflight-audit.XXXXXX")"
     mkdir "$audit_root/project" "$audit_root/home"
+    : > "$audit_root/user.npmrc"
+    : > "$audit_root/global.npmrc"
     cp "$scan_root/$path" "$audit_root/project/$manifest_name"
     if [[ -f "$audit_dir/package.json" && ! -L "$audit_dir/package.json" ]]; then
       cp "$audit_dir/package.json" "$audit_root/project/package.json"
@@ -249,7 +252,7 @@ if ((${#manifest_paths[@]} > 0)); then
       dependency_unavailable=1
       dependency_reasons+=("npm is unavailable for $(escape_path "$path")")
     elif (cd "$audit_root/project" && env -i PATH="$PATH" HOME="$audit_root/home" \
-      npm --userconfig=/dev/null --globalconfig=/dev/null --registry=https://registry.npmjs.org \
+      npm --userconfig="$audit_root/user.npmrc" --globalconfig="$audit_root/global.npmrc" --registry=https://registry.npmjs.org \
       audit --json --audit-level=high --package-lock-only >"$audit_output" 2>&1); then
       dependency_reasons+=("npm audit reported no high or critical vulnerabilities for $(escape_path "$path")")
   else

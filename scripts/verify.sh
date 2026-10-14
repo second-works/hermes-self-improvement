@@ -136,11 +136,16 @@ run_generic_stages() {
   done
 }
 
+has_python_project() {
+  [[ -f pyproject.toml || -f setup.py || -f uv.lock || -f poetry.lock ]] ||
+    compgen -G 'requirements*.txt' >/dev/null
+}
+
 stack="${VERIFY_STACK:-auto}"
 if [[ "${stack}" == auto ]]; then
   if [[ -f package.json ]]; then
     stack=node
-  elif [[ -f pyproject.toml || -f requirements.txt || -f setup.py ]]; then
+  elif has_python_project; then
     stack=python
   else
     stack=generic
@@ -153,8 +158,8 @@ case "${stack}" in
     run_node_stages
     ;;
   python)
-    [[ -f pyproject.toml || -f requirements.txt || -f setup.py ]] || {
-      printf '[verify] stack=python requires pyproject.toml, requirements.txt, or setup.py\n' >&2
+    has_python_project || {
+      printf '[verify] stack=python requires a Python project marker (pyproject.toml, setup.py, requirements*.txt, uv.lock, poetry.lock)\n' >&2
       exit 2
     }
     run_python_stages

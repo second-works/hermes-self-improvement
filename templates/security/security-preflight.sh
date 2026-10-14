@@ -127,6 +127,23 @@ scan_file() {
   fi
 }
 
+# Reject secret-bearing names before any diagnostic can display file paths.
+while IFS= read -r -d '' path; do
+  if printf '%s' "$path" | grep -Eiq -- "$secret_pattern"; then
+    printf '%s\n' 'SECURITY_STATUS=SECURITY_FAILED' \
+      'SECURITY_REASON=secret-like value detected in a staged pathname (value omitted)' \
+      'SECRET_STATUS=SECURITY_FAILED' 'DEPENDENCY_STATUS=SECURITY_UNAVAILABLE' 'DEPENDENCY_MANIFEST='
+    exit 1
+  else
+    path_status=$?
+    if [[ "$path_status" -ne 1 ]]; then
+      echo 'SECURITY_STATUS=SECURITY_UNAVAILABLE'
+      echo 'SECURITY_REASON=pathname scanner failed'
+      exit 4
+    fi
+  fi
+done < "$tracked_files"
+
 secret_status='SECURITY_PASSED'
 secret_reason='staged files and symlink targets contained no known secret patterns'
 while IFS= read -r -d '' path; do

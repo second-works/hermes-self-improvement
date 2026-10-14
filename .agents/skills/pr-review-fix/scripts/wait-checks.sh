@@ -154,8 +154,12 @@ elif ci["failed"]:
 else:
     ci_status = "CI_PASSED"
 
-if security["count"] == 0:
-    security_status = fallback_status
+# Project-specific trusted Preflight is a separate required gate from CodeQL.
+preflight_present = any(run.get("name") == "Security Preflight" for run in checks) or any(
+    status.get("context") == "Security Preflight" for status in statuses
+)
+if not preflight_present:
+    security_status = "SECURITY_UNAVAILABLE"
 elif security["pending"]:
     security_status = "SECURITY_PENDING"
 elif security["failed"]:

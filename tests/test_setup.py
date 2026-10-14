@@ -24,6 +24,52 @@ class SetupTests(unittest.TestCase):
         return subprocess.run([BASH, str(ROOT / 'scripts/security-preflight.sh'), str(root)],
                               capture_output=True, text=True)
 
+    def test_security_rejects_secret_in_path_without_echoing_value(self):
+        value = 'ghp_' + 'a' * 30
+        for filename in (value, 'requirements-' + value + '.txt'):
+            with self.subTest(filename='redacted'):
+                root = self.fixture()
+                (root / filename).write_text('')
+                result = self.security(root)
+                self.assertEqual(result.returncode, 1, result.stdout)
+                self.assertIn('SECURITY_STATUS=SECURITY_FAILED', result.stdout)
+                self.assertNotIn(value, result.stdout + result.stderr)
+
+    def test_lint_rejects_invalid_staged_sources_even_if_worktree_is_clean(self):
+        for filename, invalid, valid in [('bad.sh', 'if\n', ':\n'),
+                                         ('tests/bad.py', 'if:\n', 'pass\n')]:
+            with self.subTest(filename=filename):
+                root = self.fixture()
+                path = root / filename
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(invalid)
+                subprocess.run(['git', '-C', str(root), 'add', '.'], check=True)
+                path.write_text(valid)
+                result = subprocess.run([BASH, str(ROOT / 'scripts/lint.sh')], cwd=root,
+                                        capture_output=True, text=True)
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+
+    def helper_result(self, include_preflight):
+        import json
+        root = self.fixture()
+        checks = [{'name': 'ci', 'status': 'completed', 'conclusion': 'success'},
+                  {'name': 'Analyze (python)', 'status': 'completed', 'conclusion': 'success'}]
+        statuses = [{'context': 'Security Preflight', 'state': 'success'}] if include_preflight else []
+        (root / 'checks.json').write_text(json.dumps([{'check_runs': checks}]))
+        (root / 'statuses.json').write_text(json.dumps([{'statuses': statuses}]))
+        (root / 'fallback.txt').write_text('SECURITY_STATUS=SECURITY_UNAVAILABLE\n')
+        helper = (ROOT / '.agents/skills/pr-review-fix/scripts/wait-checks.sh').read_text()
+        source = helper.split("<<'PY'\n", 1)[1].split('\nPY', 1)[0]
+        return subprocess.run(['python3', '-c', source, str(root / 'checks.json'),
+                               str(root / 'statuses.json'), str(root / 'fallback.txt')],
+                              check=True, capture_output=True, text=True).stdout
+
+    def test_helper_does_not_replace_missing_preflight_with_codeql(self):
+        self.assertIn('SECURITY_STATUS=SECURITY_UNAVAILABLE', self.helper_result(False))
+
+    def test_helper_accepts_exact_preflight_and_codeql(self):
+        self.assertIn('SECURITY_STATUS=SECURITY_PASSED', self.helper_result(True))
+
     def test_security_clean(self):
         root = self.fixture()
         (root / 'README.md').write_text('clean fixture\n')
@@ -128,6 +174,29 @@ class SetupTests(unittest.TestCase):
         return subprocess.run([BASH, str(root / 'scripts/verify.sh')],
                               env={**os.environ, 'VERIFY_STACK': 'generic'},
                               capture_output=True, text=True)
+
+    def test_verify_accepts_documented_python_markers(self):
+        for marker in ('requirements-dev.txt', 'uv.lock', 'poetry.lock'):
+            for stack in ('auto', 'python'):
+                with self.subTest(marker=marker, stack=stack):
+                    root = self.verify_fixture()
+                    (root / marker).write_text('')
+                    (root / 'tests').mkdir()
+                    (root / 'tests/test_example.py').write_text('def test_example(): pass\n')
+                    (root / 'bin').mkdir()
+                    pytest = root / 'bin/pytest'
+                    pytest.write_text('#!/bin/sh\ntouch pytest-ran\n')
+                    pytest.chmod(0o755)
+                    result = subprocess.run([BASH, str(root / 'scripts/verify.sh')], cwd=root,
+                        env={**os.environ, 'VERIFY_STACK': stack,
+                             'PATH': str(root / 'bin') + os.pathsep + os.environ['PATH']},
+                        capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertTrue((root / 'pytest-ran').exists())
+
+    def test_verify_template_matches_runtime(self):
+        self.assertEqual((ROOT / 'scripts/verify.sh').read_bytes(),
+                         (ROOT / 'templates/verification/verify.sh').read_bytes())
 
     def test_verify_all_skipped_fails(self):
         result = self.verify(self.verify_fixture())

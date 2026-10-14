@@ -8,7 +8,7 @@ Appの権限はCommit statuses: read/writeと必須Metadata: read、このrepo�
 
 workflow修正は公式App token actionの固定revision `64ab729a6294000f5aa4a4bc0b73d1f32bc45510`（v3）を使い、repoとstatuses書込だけを指定する。GITHUB_TOKENはcontents readへ縮小。App tokenはstatus報告stepだけへ渡し、候補コードは実行しない。tokenはjob終了時に公式actionで失効する。設定欠如・token発行失敗は成功へfallbackせず停止する。
 
-関連P1の修正: workflowだけでなくscripts/verify.sh、scripts/lint.sh、scripts/test.sh、tests/test_setup.pyも固定revisionのmode/blobへ照合し、no-opへの差し替えを拒否する。これらの変更とscanner更新には検証済みpin更新が必要。検証済み固定revisionは `8c2508eb7e7970d40adbcdba9731b83038300feb`。main側への反映と実動確認は別途PRコメントへ記録する。
+関連P1の修正: workflowだけでなくscripts/verify.sh、scripts/lint.sh、scripts/test.sh、tests/test_setup.pyも固定revisionのmode/blobへ照合し、no-opへの差し替えを拒否する。これらの変更とscanner更新には検証済みpin更新が必要。検証済み固定revisionは `f2cfc73b6e5278c14efbcc24a8e34713a5bbb6a2`。main側への反映と実動確認は別途PRコメントへ記録する。
 
 npm監査は新しい一時directoryにmanifestとlockfileだけをコピーする。candidate .npmrcを持ち込まず、user/global configを別々の空ファイルへ限定し、継承環境を分離して https://registry.npmjs.org を明示する。候補のregistryや認証設定は読まない。候補側のproxy、omit、registry設定で検査を変えない。
 

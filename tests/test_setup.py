@@ -348,6 +348,43 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(result.returncode, 17)
         self.assertFalse((root / 'test-ran').exists())
 
+    def test_pinned_test_entry_ignores_candidate_modules_and_pythonpath(self):
+        root = self.fixture()
+        (root / 'scripts').mkdir()
+        shutil.copy(ROOT / 'scripts/test.sh', root / 'scripts/test.sh')
+        (root / 'tests').mkdir()
+        (root / 'tests/test_setup.py').write_text(
+            'import unittest\nclass Required(unittest.TestCase):\n'
+            ' def test_required(self): self.fail("required-test-ran")\n'
+            'if __name__ == "__main__": unittest.main()\n')
+        for base in (root, root / 'tests'):
+            (base / 'unittest').mkdir()
+            (base / 'unittest/__init__.py').write_text('raise SystemExit(0)\n')
+            (base / 'unittest/__main__.py').write_text('raise SystemExit(0)\n')
+        (root / 'sitecustomize.py').write_text('pass\n')
+        result = subprocess.run([BASH, str(root / 'scripts/test.sh')], cwd=root,
+            env={**os.environ, 'PYTHONPATH': str(root)}, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('required-test-ran', result.stderr)
+
+    def test_python_tools_ignore_candidate_imports(self):
+        root = self.fixture()
+        marker = root / 'candidate-module-executed'
+        payload = 'from builtins import open\nopen(' + repr(str(marker)) + ', "w").write("bad")\n'
+        (root / 'ast.py').write_text(payload)
+        (root / 'pathlib.py').write_text(payload)
+        (root / 'bad.sh').write_text('if\n')
+        subprocess.run(['git', '-C', str(root), 'add', '.'], check=True)
+        environment = {**os.environ, 'PYTHONPATH': str(root)}
+        lint = subprocess.run([BASH, str(ROOT / 'scripts/lint.sh')], cwd=root,
+            env=environment, capture_output=True, text=True)
+        self.assertNotEqual(lint.returncode, 0)
+        self.assertFalse(marker.exists())
+        security = subprocess.run([BASH, str(ROOT / 'scripts/security-preflight.sh'), str(root)],
+            cwd=root, env=environment, capture_output=True, text=True)
+        self.assertEqual(security.returncode, 0, security.stdout + security.stderr)
+        self.assertFalse(marker.exists())
+
     def test_agent_references_are_present(self):
         import re
         text = (ROOT / 'AGENTS.md').read_text()

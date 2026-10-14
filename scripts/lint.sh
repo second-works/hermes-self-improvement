@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-python3 - <<'CHECK'
+python3 -I - <<'CHECK'
 import ast
 from pathlib import PurePosixPath
 import subprocess

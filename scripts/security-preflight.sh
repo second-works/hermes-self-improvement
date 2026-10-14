@@ -58,7 +58,7 @@ if ! scan_root="$(mktemp -d "${TMPDIR:-/tmp}/security-preflight-index.XXXXXX")";
   echo 'SECURITY_REASON=could not allocate an index snapshot'
   exit 4
 fi
-if ! python3 - "$repo_root" "$scan_root" <<'PY'
+if ! python3 -I - "$repo_root" "$scan_root" <<'PY'
 import os
 from pathlib import Path
 import subprocess
@@ -256,7 +256,7 @@ if ((${#manifest_paths[@]} > 0)); then
       audit --json --audit-level=high --package-lock-only >"$audit_output" 2>&1); then
       dependency_reasons+=("npm audit reported no high or critical vulnerabilities for $(escape_path "$path")")
   else
-      if python3 - "$audit_output" <<'PY'
+      if python3 -I - "$audit_output" <<'PY'
 import json
 import sys
 

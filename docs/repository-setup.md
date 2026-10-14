@@ -21,7 +21,11 @@
 
 ## CIと費用・権限
 
-GitHub-hosted runnerのみ使用し、self-hosted runnerやHermes本番には接続しない。CIとSecurityはcontents: read、checkoutは認証情報を残さない。Securityはmain側のpull_request_target workflowで検査対象PR headのGitオブジェクトだけをcandidateへfetch/read-treeし、実行するscannerは固定コミット `ffc843ab1f880917922a9c4fa2ece7d730afbcc2` からsecurity-toolへ別checkoutする。PR headのコードをSecurity jobで実行しない。scanner更新時は別の検証済みrevisionへpinを更新し、PRレビューで照合する。CodeQLだけsecurity-events: writeをjob単位で付与。workflowはPR → mainを検査し、CI/CodeQLはmain pushも検査する。CodeQLは週次実行も行う。pull_request_targetをSecurityだけに使う。PRコード・設定・テスト・依存installは実行せず、GH_TOKENはstatus報告stepだけへ渡す。jobはcontents: readとstatuses: writeのみ。検査結果はbase SHAではなくPR_HEAD_SHAへSecurity Preflight statusとして報告する。追加Secrets、OPENAI_API_KEY、API課金のActionsは導入しない。
+GitHub-hosted runnerのみ使用し、Hermes本番へ接続しない。CIとSecurityのGITHUB_TOKENはcontents: read、checkoutは認証情報を残さない。Securityはmain側のpull_request_targetから候補headのGitオブジェクトだけを取得し、固定revision `8c2508eb7e7970d40adbcdba9731b83038300feb` のscannerへ渡す。候補コード・設定・依存installをSecurity jobで実行しない。CI / CodeQL定義、検証入口と既存テストのblob・modeも固定revisionへ照合する。
+
+人間が承認した専用GitHub App `hermes-security-reporter` のtokenを、候補SHAのSecurity Preflight報告stepだけへ渡す。App権限はCommit statuses書込とMetadata読取、このrepoだけへinstall。秘密鍵はmain branchだけを許可するEnvironment `security-reporter` に保持し、main保護の必須送信元をApp ID5322549へ固定する。管理者のEnvironment bypassは無効。設定・認証の失敗を成功にせず、GITHUB_TOKENへfallbackしない。詳しくは docs/security-reporter.md。
+
+CodeQLだけsecurity-events: writeをjob単位で付与。CI/CodeQLはPRとmain push、CodeQLは週次も検査する。OPENAI_API_KEY、API課金のActions、自己改善の自動適用は導入しない。
 
 公開repo・admin権限・Actions有効をGitHub APIで確認。利用プランの変更は行わない。DependabotはmainへのMerge後に有効になる。ActionsとCodeQLの実発火・利用可否はPRのrunで確認する。
 
@@ -51,7 +55,7 @@ typecheck / buildはアプリと型検査設定がないため対象外。Securi
 
 ## 空mainへの信頼境界の初期配置
 
-PR-controlled workflowでrequired job名を維持しつつ検査stepだけをexit 0へ変えられるP1を受け、Security workflowをmain側へ移した。PR headのGitオブジェクトをfetch/read-treeして固定scannerに渡し、候補SHAへpending → success / failure / errorを報告する。GitHubのpull_request_target仕様と最小権限は[公式安全指針](https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target)を確認した。PUBLICデータだけを検査し、Secrets・PRコード実行・本番接続はない。
+PR-controlled workflowでrequired job名を維持しつつ検査stepだけをexit 0へ変えられるP1を受け、Security workflowをmain側へ移した。PR headのGitオブジェクトをfetch/read-treeして固定scannerに渡し、候補SHAへpending → success / failure / errorを報告する。GitHubのpull_request_target仕様と最小権限は[公式安全指針](https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target)を確認した。初期構成はPUBLICデータだけを検査し、追加Secrets・PRコード実行・本番接続を使わなかった。現在の承認済みreporter構成は下記およびdocs/security-reporter.mdを参照する。
 
 初期mainは空のコミットだったため、PRに追加しただけでは初回発火しなかった。信頼するsecurity.ymlだけのmain初期配置が必要。既存のmain保護を黙って緩めず、具体的な初期配置commitと差分を提示し、人間が一度限りの初期配置と管理者bypassの一時切替を承認するまで停止する。CI/CodeQL/local Securityの成功でこの未検証を代替しない。配置後は管理者保護を即座に戻し、PRをmainと同期して、trusted workflowの同じheadの実動結果とCodex再レビューを確認する。
 
@@ -73,4 +77,4 @@ workflow path集合も固定し、別workflowでrequired job名を複製する�
 
 2026-10-15、ユーザーがworkflow定義固定の具体差分を承認した。security.ymlだけの2a5aceba7cee7d43a17ab1be73b6acc5b826c0c2をmainへ通常pushし、finallyで管理者保護を即復元した。PR全体のMergeはしていない。CI / CodeQL定義とworkflow集合は固定revision、Security定義は実行中のmain側workflow revisionに照合する。以降の実動証拠はPRコメントへ記録する。
 
-2026-10-15、専用GitHub App送信元とmain限定Environmentによるstatus上書き対策をユーザーが承認した。作成済みEnvironment・準備中のworkflow・未完了の本人認証/Secret設定/送信元固定を docs/security-reporter.md に記録する。従前の「追加Secretsなし」は初期構成の履歴であり、今回承認済みのEnvironment Secretは未登録。新しい構成を実動確認済みとは扱わない。
+2026-10-15、専用GitHub Appとmain限定Environmentによるstatus上書き対策をユーザーが承認した。App権限・repo限定install、Environment、送信元固定を適用。ユーザーがAppに対応する新しいPEMでSecretを更新し、head40ea0860のSecurity run38649338289 attempt2でApp認証・固定scanner検査・候補SHAへのsuccess報告を確認した。診断用コードは削除し、最終headの実動証拠はPRコメントへ記録する。各Security-onlyのmain配置後に管理者保護をfinallyで即復元し、PR全体のMergeは行っていない。

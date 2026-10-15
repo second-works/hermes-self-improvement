@@ -1,0 +1,364 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hermes-self-improvement:audit-input:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "classification",
+    "source_kind",
+    "upstream_sha",
+    "baseline_sha",
+    "profile",
+    "profiles",
+    "inventory_complete",
+    "skills",
+    "tools",
+    "models",
+    "auth",
+    "delegation",
+    "observations",
+    "fixture_id",
+    "observed_at",
+    "issue_url"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "classification": {
+      "const": "PUBLIC"
+    },
+    "source_kind": {
+      "const": "synthetic-fixture"
+    },
+    "upstream_sha": {
+      "const": "f97608f178d1ffeca59860195ab7da295f7c8e5f"
+    },
+    "baseline_sha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "profile": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+    },
+    "profiles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]{0,63}$"
+      },
+      "maxItems": 32,
+      "uniqueItems": true
+    },
+    "inventory_complete": {
+      "type": "boolean"
+    },
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "origin",
+          "profile",
+          "enabled",
+          "compatible",
+          "priority",
+          "capabilities"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "origin": {
+            "enum": [
+              "builtin",
+              "local",
+              "hub"
+            ]
+          },
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "compatible": {
+            "type": "boolean"
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1024
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            },
+            "maxItems": 32,
+            "uniqueItems": true
+          }
+        }
+      },
+      "maxItems": 1024
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "state",
+          "capabilities"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "state": {
+            "enum": [
+              "ready",
+              "blocked",
+              "unknown"
+            ]
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            },
+            "maxItems": 32,
+            "uniqueItems": true
+          }
+        }
+      },
+      "maxItems": 128
+    },
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "state",
+          "capabilities"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "state": {
+            "enum": [
+              "ready",
+              "blocked",
+              "unknown"
+            ]
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            },
+            "maxItems": 32,
+            "uniqueItems": true
+          }
+        }
+      },
+      "maxItems": 128
+    },
+    "auth": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "state",
+          "capabilities"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "state": {
+            "enum": [
+              "ready",
+              "blocked",
+              "unknown"
+            ]
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            },
+            "maxItems": 32,
+            "uniqueItems": true
+          }
+        }
+      },
+      "maxItems": 128
+    },
+    "delegation": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "state",
+          "capabilities"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "state": {
+            "enum": [
+              "ready",
+              "blocked",
+              "unknown"
+            ]
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            },
+            "maxItems": 32,
+            "uniqueItems": true
+          }
+        }
+      },
+      "maxItems": 128
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "capability",
+          "outcome",
+          "selected_skill",
+          "model_id",
+          "tool_id",
+          "auth_id",
+          "delegation_id",
+          "logs"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "capability": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "outcome": {
+            "enum": [
+              "failed",
+              "succeeded"
+            ]
+          },
+          "selected_skill": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "tool_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "auth_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "delegation_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "logs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "line",
+                "code"
+              ],
+              "properties": {
+                "line": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000000
+                },
+                "code": {
+                  "enum": [
+                    "SEARCH_COMPLETE",
+                    "SELECTION_SKIPPED",
+                    "STEP_SKIPPED",
+                    "CONTEXT_LENGTH_EXCEEDED",
+                    "HTTP_401",
+                    "HTTP_403",
+                    "HTTP_429",
+                    "DEPENDENCY_UNAVAILABLE",
+                    "UNKNOWN",
+                    "SUCCESS"
+                  ]
+                }
+              }
+            },
+            "maxItems": 32
+          }
+        }
+      },
+      "maxItems": 256
+    },
+    "fixture_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+    },
+    "observed_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+    },
+    "issue_url": {
+      "const": "https://github.com/second-works/hermes-self-improvement/issues/4"
+    }
+  }
+}

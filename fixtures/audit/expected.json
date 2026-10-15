@@ -1,0 +1,16 @@
+{
+  "causes": {
+    "gap": "skill_gap",
+    "selection": "skill_not_selected",
+    "procedure": "procedure",
+    "model": "model_limit",
+    "access": "permission_api",
+    "dependency": "external_dependency",
+    "unknown": null,
+    "conflict": null,
+    "success": null,
+    "repeat-gap": "skill_gap"
+  },
+  "proposal_count": 6,
+  "skill_authoring_suggestions": 1
+}

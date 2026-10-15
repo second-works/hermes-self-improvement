@@ -146,6 +146,23 @@ class Sandbox:
     def inspect(self, name):
         return load_json(self.checked('inspect', name))[0]
 
+    def container_exists(self, name):
+        listed = self.checked('container', 'ls', '--all', '--filter', 'name=' + name,
+                              '--format', '{{.Names}}', timeout=5).strip()
+        require(listed in (b'', name.encode()), 'CONTAINER_IDENTITY_UNKNOWN')
+        return bool(listed)
+
+    def cleanup(self, name):
+        if not self.container_exists(name):
+            return
+        state = self.inspect(name)['State']
+        if state['Running']:
+            self.checked('kill', name, timeout=5)
+            state = self.inspect(name)['State']
+        require(not state['Running'], 'CONTAINER_NOT_STOPPED')
+        self.checked('rm', name, timeout=5)
+        require(not self.container_exists(name), 'CONTAINER_NOT_REMOVED')
+
     def verify_config(self, info, program):
         h, c = info['HostConfig'], info['Config']
         require(h['NetworkMode'] == 'none' and h['IpcMode'] == 'none' and c['User'] == '65532:65532' and
@@ -169,10 +186,16 @@ class Sandbox:
         program = Path(program).absolute()
         name = 'hermes-eval-' + uuid.uuid4().hex
         started = time.monotonic()
-        created = False
+        args = self.options(name, program)
+        attempted = False
         try:
-            self.checked(*self.options(name, program))
-            created = True
+            attempted = True
+            try:
+                self.checked(*args)
+            except Exception:
+                # A failed client response cannot establish that the daemon did nothing.
+                self.broken = True
+                raise
             self.verify_config(self.inspect(name), program)
             remaining = min(timeout, max(0.001, self.deadline - time.monotonic()))
             result = self.command('start', '--attach', '--interactive', name, timeout=remaining, data=data)
@@ -186,12 +209,9 @@ class Sandbox:
             result['container_exit'] = state['ExitCode']
             return result
         finally:
-            if created:
+            if attempted:
                 try:
-                    if self.inspect(name)['State']['Running']:
-                        self.checked('kill', name, timeout=5)
-                    require(not self.inspect(name)['State']['Running'], 'CONTAINER_NOT_STOPPED')
-                    self.checked('rm', name, timeout=5)
-                except (EvaluationError, OSError):
+                    self.cleanup(name)
+                except Exception:
                     self.broken = True
                     raise EvaluationError('ISOLATION_CLEANUP_FAILED') from None

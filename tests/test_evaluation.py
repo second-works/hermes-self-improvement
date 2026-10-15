@@ -191,6 +191,7 @@ class Boundaries(unittest.TestCase):
         box = Sandbox(ROOT, self.work, 'sha256:' + 'a' * 64)
         program = ROOT / 'fixtures/evaluation/isolation_probe.py'
         with patch.object(box, 'checked', return_value=b''), \
+             patch.object(box, 'container_exists', return_value=True), \
              patch.object(box, 'verify_config', side_effect=EvaluationError('CONFIG_MISMATCH')), \
              patch.object(box, 'inspect', side_effect=EvaluationError('UNAVAILABLE')):
             with self.assertRaises(EvaluationError):
@@ -198,6 +199,36 @@ class Boundaries(unittest.TestCase):
         self.assertTrue(box.broken)
         with self.assertRaises(EvaluationError):
             box.options('test', program)
+
+    def test_ambiguous_create_cleans_named_container_and_stops_sandbox(self):
+        box = Sandbox(ROOT, self.work, 'sha256:' + 'a' * 64)
+        program = ROOT / 'fixtures/evaluation/isolation_probe.py'
+        seen = {'present': False, 'name': None, 'removed': False}
+        def checked(*args, **kwargs):
+            if args[0] == 'create':
+                seen['name'] = args[args.index('--name') + 1]
+                seen['present'] = True  # daemon succeeds but the client response is lost
+                raise EvaluationError('DOCKER_COMMAND_FAILED')
+            if args[0] == 'container':
+                return (seen['name'].encode() + b'\n') if seen['present'] else b''
+            if args[0] == 'rm':
+                self.assertEqual(args[1], seen['name'])
+                seen['removed'], seen['present'] = True, False
+            return b''
+        with patch.object(box, 'checked', side_effect=checked), \
+             patch.object(box, 'inspect', return_value={'State': {'Running': False}}):
+            with self.assertRaises(EvaluationError):
+                box.run(program)
+        self.assertTrue(seen['removed'])
+        self.assertFalse(seen['present'])
+        self.assertTrue(box.broken)
+
+    def test_ambiguous_create_and_unreachable_daemon_break_sandbox(self):
+        box = Sandbox(ROOT, self.work, 'sha256:' + 'a' * 64)
+        with patch.object(box, 'checked', side_effect=EvaluationError('DOCKER_COMMAND_FAILED')):
+            with self.assertRaises(EvaluationError):
+                box.run(ROOT / 'fixtures/evaluation/isolation_probe.py')
+        self.assertTrue(box.broken)
 
     def audit_fixture(self):
         save = controller.save

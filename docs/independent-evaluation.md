@@ -59,10 +59,16 @@ python3 -I -B scripts/evaluate_fixture.py audit RUN_ID
 
 純粋な採点・判定、schema境界、symlink・特殊ファイル、出力・timeout、監査欠損/改変は`tests/test_evaluation.py`、実Dockerの拒否・資源・fixture接続は`gate`と`evaluate`が担当する。標準入口・既存テスト・CI/Security/CodeQLを置換しない。既存の固定検証資産は変更せず、新試験は明示コマンドで実行する。CI組込みが必要なら具体差分・保証を示して別確認する。
 
-2026-10-15時点で新規単体・境界試験26件（模擬transportの接続検査を含む）が成功。標準検証の既存30件とlintも直前stageで成功し、typecheck/buildは既存の未構成による理由付きskip。同stageのローカルSecurityはSECURITY_PASSED、依存manifestなしのためDEPENDENCY_STATUS=SECURITY_NOT_APPLICABLE。最終stage後にも同じ検査を行う。
+2026-10-15時点で新規単体・境界試験28件（模擬transportの接続検査を含む）が成功。標準検証の既存30件とlintも直前stageで成功し、typecheck/buildは既存の未構成による理由付きskip。同stageのローカルSecurityはSECURITY_PASSED、依存manifestなしのためDEPENDENCY_STATUS=SECURITY_NOT_APPLICABLE。最終stage後にも同じ検査を行う。
 
 Dockerの保存先変更はユーザーが実施し、`/Volumes/HD-ADU3/Docker/DockerDesktop/Docker.raw`とdaemon接続を確認した。旧バックアップは外部ディスクのBackups/Docker配下に保持し、復元・全量読取・削除はしていない。画面操作ツールのロック判定と設定ファイルの読取制限は解消を確認していないが、設定完了の人間報告と外部imageの存在を確認して再開した。
 
 実Dockerの7分類gateが初回runで成功。監査の停止理由保存を補強したため、`evaluation-20261015T111545Z-ccaf749b4602` で新しいsource hashのgateを再検証する。Python 3.12.15 / Docker 29.2.1 / Linux 6.12.76-linuxkit / arm64 / cgroup v2。image IDは `sha256:eb7d16fec874f15b584063275012ac719885a2b87574d124c0da9c156d504629`、registry digestは `python@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258`、156,922,204 bytes。実行制限値は上記を維持する。
 
 現在は評価器と基準版をcommitし、hidden/manifestを固定する前の段階。候補の作成・比較、PRのCI/Security/Codex Reviewは未実施であり成功と扱わない。GitHub書込・push・PR作成は別承認、Mergeは人間判断を維持する。
+
+## PR #13のレビュー修正
+
+Codex Reviewが、docker createのdaemon側成功後に応答が失われるとcleanupを飛ばすP2を指摘した。停止・後片付けの保証に関わるためBLOCKING P2と分類。追加した2件の模擬障害テストは修正前fail、修正後pass。createの試行前に名前を固定し、応答に関わらず名前で照会・停止・削除・消失確認する。daemon不達や名前の同一性不明はsandboxを無効化し、createの応答不明時も後続起動を禁止する。通常の成功経路でも削除後の消失を確認する。
+
+評価器のsource hashが変わるため旧runを新headの成功に流用しない。基準fixtureを元と同じartifactへ戻したcommitで新しいgateとmanifestを固定し、新hiddenで、元と同じ候補artifactを再登録して比較する。閾値・dataset生成規則・候補ロジックは変えず、候補の種類は1件のまま。旧run/hidden原本は保持して再利用しない。新run・両SHA・checkpointはPRに記録する。

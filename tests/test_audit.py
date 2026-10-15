@@ -172,6 +172,24 @@ class AuditContracts(unittest.TestCase):
         value['skills'][0]['enabled'] = False
         self.assertEqual(audit(value)['diagnoses'][0]['reason'], 'INELIGIBLE_SELECTION')
 
+    def test_success_requires_eligible_selection_and_consistent_resources(self):
+        for change in ({'enabled': False}, {'compatible': False}, {'profile': 'research'},
+                       {'capabilities': ['missing']}):
+            with self.subTest(skill=change):
+                value = sample()
+                value['observations'] = [value['observations'][8]]
+                value['skills'][0].update(change)
+                result = audit(value)['diagnoses'][0]
+                self.assertEqual(result['status'], 'HOLD')
+                self.assertEqual(result['reason'], 'INELIGIBLE_SELECTION')
+        for kind in ('tools', 'models', 'auth', 'delegation'):
+            for state in ('blocked', 'unknown'):
+                with self.subTest(resource=kind, state=state):
+                    value = sample()
+                    value['observations'] = [value['observations'][8]]
+                    value[kind][0]['state'] = state
+                    self.assertEqual(audit(value)['diagnoses'][0]['status'], 'HOLD')
+
     def test_input_contract_rejects_unknown_fields_secret_text_and_bad_references(self):
         mutations = [lambda v: v.update(schema_version=True),
                      lambda v: v.update(observed_at='2026-02-30T00:00:00Z'),

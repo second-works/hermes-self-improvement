@@ -180,20 +180,24 @@ def inventory(value):
 
 def diagnose(value, row, available):
     codes = {event['code'] for event in row['logs']}
-    if row['outcome'] == 'succeeded':
-        return None, 'NO_FAILURE' if codes == {'SUCCESS'} else 'CONFLICTING_EVIDENCE'
-    if not codes or codes & {'SUCCESS', 'UNKNOWN'}:
-        return None, 'INSUFFICIENT_EVIDENCE'
     matching = [s for s in value['skills'] if s['id'] in available and
                 row['capability'] in s['capabilities']]
     known = [s for s in value['skills'] if row['capability'] in s['capabilities']]
     selected = row['selected_skill']
     if selected is not None and selected not in {s['id'] for s in matching}:
         return None, 'INELIGIBLE_SELECTION'
-    if 'SELECTION_SKIPPED' in codes and (selected is not None or not matching):
-        return None, 'CONFLICTING_EVIDENCE'
     states = {kind: next(r['state'] for r in value[kind] if r['id'] == row[field])
               for kind, field in zip(RESOURCES, ('tool_id', 'model_id', 'auth_id', 'delegation_id'))}
+    if row['outcome'] == 'succeeded':
+        if 'blocked' in states.values():
+            return None, 'CONFLICTING_EVIDENCE'
+        if 'unknown' in states.values():
+            return None, 'INSUFFICIENT_EVIDENCE'
+        return None, 'NO_FAILURE' if codes == {'SUCCESS'} else 'CONFLICTING_EVIDENCE'
+    if not codes or codes & {'SUCCESS', 'UNKNOWN'}:
+        return None, 'INSUFFICIENT_EVIDENCE'
+    if 'SELECTION_SKIPPED' in codes and (selected is not None or not matching):
+        return None, 'CONFLICTING_EVIDENCE'
     causes = set()
     if 'STEP_SKIPPED' in codes:
         if selected is None:

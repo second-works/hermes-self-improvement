@@ -65,6 +65,8 @@ Harness判断はKEEP。発火は明示CLIによる合成の失敗観測、入力
 
 情報分類は検査済みPUBLIC fixtureと公開upstreamのみ。Readは当repoと固定公開ソース、LLM環境は追加のモデルAPIを使わず、ローカル文書圧縮もPUBLIC文書に限定する。GitHubへのWriteは当repoのIssue/PR/branchに限定し、今回の検査済み差分と提出文の人間承認後に行う。復旧は今回の機能差分を戻す人間判断であり、保存原本を削除しない。`~/.hermes`、本番、Secrets、hidden評価原本、RAG/DB、定期化、外部サービスへの新規接続は対象外。
 
-実装時のローカル確認では、追加14テスト、標準verifyの30テスト、既存独立評価の純粋契約34テスト、Memoryハーネス8テストが成功した。10観測の期待原因は全件一致し、HOLD2件、NO_FAILURE1件、6提案・authoring提案1件を確認した。Security PreflightはSECURITY_PASSED、依存manifestがないためDEPENDENCY_STATUS=SECURITY_NOT_APPLICABLE。typecheck/buildは入口未設定の理由付きskip。self-reviewでは呼出元CLI、両schema、出力例、既存監査・評価契約との境界を確認した。PR未提出のためremote CI / Security / CodeQL / Codex Reviewは未確認。
+実装時のローカル確認では、追加15テスト、標準verifyの30テスト、既存独立評価の純粋契約34テスト、Memoryハーネス8テストが成功した。10観測の期待原因は全件一致し、HOLD2件、NO_FAILURE1件、6提案・authoring提案1件を確認した。Security PreflightはSECURITY_PASSED、依存manifestがないためDEPENDENCY_STATUS=SECURITY_NOT_APPLICABLE。typecheck/buildは入口未設定の理由付きskip。self-reviewでは呼出元CLI、両schema、出力例、既存監査・評価契約との境界を確認した。remote CI / Security / CodeQL / Codex ReviewはPR #14で対象headごとに記録する。
+
+初回Codex ReviewのP2（成功ログによる選択整合検査の迂回）はBLOCKINGと分類した。成功/失敗の分岐より前で選択スキルの利用可能性を検査し、成功観測もblocked/unknown resourceならHOLDにする。無効・非互換・別profile・capability不一致の4条件と4種resourceのblocked/unknownの8条件を回帰試験に追加し、修正前12条件失敗→修正後成功を確認した。新しい安全規則や権限は追加していない。
 
 文書8点のローカルLLM圧縮は結果未取得で打ち切り、完全coverageのdigestを得られていない。圧縮結果は判断に使わず、変更・安全境界に関わる原文を直接確認した。

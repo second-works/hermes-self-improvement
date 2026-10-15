@@ -62,7 +62,7 @@ class SetupTests(unittest.TestCase):
         (root / 'fallback.txt').write_text('SECURITY_STATUS=SECURITY_UNAVAILABLE\n')
         helper = (ROOT / '.agents/skills/pr-review-fix/scripts/wait-checks.sh').read_text()
         source = helper.split("<<'PY'\n", 1)[1].split('\nPY', 1)[0]
-        return subprocess.run(['python3', '-c', source, str(root / 'checks.json'),
+        return subprocess.run(['python3', '-I', '-c', source, str(root / 'checks.json'),
                                str(root / 'statuses.json'), str(root / 'fallback.txt')],
                               check=True, capture_output=True, text=True).stdout
 
@@ -384,6 +384,36 @@ class SetupTests(unittest.TestCase):
             cwd=root, env=environment, capture_output=True, text=True)
         self.assertEqual(security.returncode, 0, security.stdout + security.stderr)
         self.assertFalse(marker.exists())
+
+    def test_ci_keeps_repository_tests_mandatory_across_stack_detection(self):
+        root = self.fixture()
+        (root / 'scripts').mkdir()
+        (root / 'tests').mkdir()
+        for name in ('verify.sh', 'test.sh'):
+            shutil.copy(ROOT / 'scripts' / name, root / 'scripts' / name)
+        (root / 'tests/test_setup.py').write_text(
+            'import unittest\nclass Required(unittest.TestCase):\n'
+            ' def test_required(self): self.fail("required-test-ran")\n'
+            'if __name__ == "__main__": unittest.main()\n')
+        (root / 'setup.py').write_text('')
+        (root / 'pytest.ini').write_text('[pytest]\ntestpaths = empty\n')
+        (root / 'empty').mkdir()
+        (root / 'empty/test_passing.py').write_text('def test_ok(): pass\n')
+        (root / 'bin').mkdir()
+        fake_pytest = root / 'bin/pytest'
+        fake_pytest.write_text('#!/bin/sh\nexit 0\n')
+        fake_pytest.chmod(0o755)
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        command = workflow.split('      - name: Standard verification\n        run:', 1)[1]
+        if command.startswith(' |\n'):
+            command = '\n'.join(line[10:] for line in command[3:].splitlines())
+        else:
+            command = command.strip()
+        result = subprocess.run([BASH, '-e', '-c', command], cwd=root,
+            env={**os.environ, 'PATH': str(root / 'bin') + os.pathsep + os.environ['PATH']},
+            capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('required-test-ran', result.stderr)
 
     def test_agent_references_are_present(self):
         import re

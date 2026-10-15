@@ -23,4 +23,6 @@ jobs:
           persist-credentials: false
 
       - name: Standard verification
-        run: ./scripts/verify.sh
+        run: |
+          ./scripts/test.sh
+          ./scripts/verify.sh

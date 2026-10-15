@@ -143,8 +143,8 @@ class Sandbox:
                 '/usr/bin/env', '-i', 'PATH=/usr/local/bin:/usr/bin:/bin', 'HOME=/run/work',
                 'TMPDIR=/run/work', 'LANG=C.UTF-8', 'python3', '-I', '-B', '/input/program.py']
 
-    def inspect(self, name):
-        return load_json(self.checked('inspect', name))[0]
+    def inspect(self, name, *, timeout=30):
+        return load_json(self.checked('inspect', name, timeout=timeout))[0]
 
     def container_exists(self, name):
         listed = self.checked('container', 'ls', '--all', '--filter', 'name=' + name,
@@ -161,10 +161,10 @@ class Sandbox:
                 time.sleep(min(0.1, remaining))
         elif not self.container_exists(name):
             return
-        state = self.inspect(name)['State']
+        state = self.inspect(name, timeout=5)['State']
         if state['Running']:
             self.checked('kill', name, timeout=5)
-            state = self.inspect(name)['State']
+            state = self.inspect(name, timeout=5)['State']
         require(not state['Running'], 'CONTAINER_NOT_STOPPED')
         self.checked('rm', name, timeout=5)
         require(not self.container_exists(name), 'CONTAINER_NOT_REMOVED')
@@ -192,25 +192,30 @@ class Sandbox:
         program = Path(program).absolute()
         name = 'hermes-eval-' + uuid.uuid4().hex
         started = time.monotonic()
+        case_deadline = min(started + timeout, self.deadline)
+        def remaining():
+            value = case_deadline - time.monotonic()
+            require(value > 0, 'CASE_DEADLINE')
+            return value
         args = self.options(name, program)
         attempted = False
         ambiguous = False
         try:
             attempted = True
             try:
-                self.checked(*args)
+                self.checked(*args, timeout=remaining())
             except Exception:
                 # A failed client response cannot establish that the daemon did nothing.
                 self.broken = True
                 ambiguous = True
                 raise
-            self.verify_config(self.inspect(name), program)
-            remaining = min(timeout, max(0.001, self.deadline - time.monotonic()))
-            result = self.command('start', '--attach', '--interactive', name, timeout=remaining, data=data)
-            state = self.inspect(name)['State']
+            self.verify_config(self.inspect(name, timeout=remaining()), program)
+            result = self.command('start', '--attach', '--interactive', name, timeout=remaining(), data=data)
+            # Safety reconciliation has its own bound even after the execution budget expires.
+            state = self.inspect(name, timeout=5)['State']
             if state['Running']:
                 self.checked('kill', name, timeout=5)
-                state = self.inspect(name)['State']
+                state = self.inspect(name, timeout=5)['State']
             require(not state['Running'], 'CONTAINER_NOT_STOPPED')
             result['wall_seconds'] = time.monotonic() - started
             result['oom'] = state['OOMKilled']

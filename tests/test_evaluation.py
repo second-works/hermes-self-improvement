@@ -176,6 +176,41 @@ class Boundaries(unittest.TestCase):
         self.assertNotIn('--privileged', options)
         self.assertNotIn(str(Path.home()), options[options.index(box.image) + 1:])
 
+    def test_creation_and_execution_share_case_and_global_deadlines(self):
+        for global_budget, creation, inspection, expected in [(100, 25, 1, 4), (3, 2, 0.5, 0.5)]:
+            clock = [100.0]
+            box = Sandbox(ROOT, self.work, 'sha256:' + 'a' * 64, deadline=100 + global_budget)
+            def checked(*args, **kwargs):
+                self.assertEqual(kwargs.get('timeout', 30), min(30, global_budget))
+                clock[0] += creation
+                return b''
+            def inspect(*args, **kwargs):
+                clock[0] += inspection
+                return {'State': {'Running': False, 'OOMKilled': False, 'ExitCode': 0}}
+            with patch('evaluation.sandbox.time.monotonic', side_effect=lambda: clock[0]), \
+                 patch.object(box, 'checked', side_effect=checked), \
+                 patch.object(box, 'inspect', side_effect=inspect), \
+                 patch.object(box, 'verify_config'), patch.object(box, 'cleanup'), \
+                 patch.object(box, 'command', return_value={}) as command:
+                box.run(ROOT / 'fixtures/evaluation/isolation_probe.py')
+            self.assertEqual(command.call_args.kwargs['timeout'], expected)
+
+    def test_deadline_exhausted_during_creation_never_starts_candidate(self):
+        clock = [100.0]
+        box = Sandbox(ROOT, self.work, 'sha256:' + 'a' * 64, deadline=103)
+        def created(*args, **kwargs):
+            clock[0] += 3
+            return b''
+        with patch('evaluation.sandbox.time.monotonic', side_effect=lambda: clock[0]), \
+             patch.object(box, 'checked', side_effect=created), \
+             patch.object(box, 'inspect', return_value={'State': {'Running': False, 'OOMKilled': False, 'ExitCode': 0}}), \
+             patch.object(box, 'verify_config'), patch.object(box, 'cleanup') as cleanup, \
+             patch.object(box, 'command') as command:
+            with self.assertRaisesRegex(EvaluationError, '^CASE_DEADLINE$'):
+                box.run(ROOT / 'fixtures/evaluation/isolation_probe.py')
+        command.assert_not_called()
+        cleanup.assert_called_once()
+
     def test_docker_configuration_mismatch_stops_before_start(self):
         box = Sandbox(ROOT, self.work, 'sha256:' + 'a' * 64)
         program = ROOT / 'fixtures/evaluation/isolation_probe.py'

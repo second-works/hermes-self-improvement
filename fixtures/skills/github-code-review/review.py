@@ -1,4 +1,4 @@
-"""Synthetic unified-patch reviewer; finite fixture only, not a production reviewer."""
+"""Deliberately limited baseline for synthetic unified patches, not a real reviewer."""
 import json
 import re
 import sys
@@ -17,9 +17,6 @@ for text in case['patch'].splitlines():
     elif text.startswith('+'):
         if re.search(r'\beval\s*\(', text[1:]) and not text[1:].lstrip().startswith('#'):
             rows.append({'path': case['path'], 'line': line, 'rule': 'dynamic-eval'})
-        if (re.search(r'\bsubprocess\.(?:run|call|Popen|check_call|check_output)\s*\(.*\bshell\s*=\s*True\b', text[1:])
-                and not text[1:].lstrip().startswith('#')):
-            rows.append({'path': case['path'], 'line': line, 'rule': 'shell-execution'})
         line += 1
     elif text.startswith(' '):
         line += 1

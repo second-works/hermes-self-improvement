@@ -1,0 +1,612 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hermes-self-improvement:audit-report:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "classification",
+    "source_kind",
+    "upstream_sha",
+    "baseline_sha",
+    "input_hash",
+    "profile",
+    "inventory_complete",
+    "inventory",
+    "diagnoses",
+    "proposals",
+    "limitations",
+    "fixture_id",
+    "observed_at",
+    "issue_url",
+    "run_id"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "classification": {
+      "const": "PUBLIC"
+    },
+    "source_kind": {
+      "const": "synthetic-fixture"
+    },
+    "upstream_sha": {
+      "const": "f97608f178d1ffeca59860195ab7da295f7c8e5f"
+    },
+    "baseline_sha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "input_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "profile": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+    },
+    "inventory_complete": {
+      "type": "boolean"
+    },
+    "inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registered_records",
+        "profile_filtered_records",
+        "available_unique_names",
+        "by_origin",
+        "excluded",
+        "available_skill_ids",
+        "resources",
+        "skill_records",
+        "profiles"
+      ],
+      "properties": {
+        "registered_records": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "profile_filtered_records": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "available_unique_names": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "by_origin": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "builtin",
+            "local",
+            "hub"
+          ],
+          "properties": {
+            "builtin": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "local": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "hub": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "excluded": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "other_profile",
+            "disabled_in_profile",
+            "incompatible_enabled_in_profile",
+            "duplicate_eligible_names"
+          ],
+          "properties": {
+            "other_profile": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "disabled_in_profile": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "incompatible_enabled_in_profile": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "duplicate_eligible_names": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "available_skill_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "maxItems": 1024
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tools",
+            "models",
+            "auth",
+            "delegation"
+          ],
+          "properties": {
+            "tools": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "state",
+                  "capabilities"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                  },
+                  "state": {
+                    "enum": [
+                      "ready",
+                      "blocked",
+                      "unknown"
+                    ]
+                  },
+                  "capabilities": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                    },
+                    "maxItems": 32,
+                    "uniqueItems": true
+                  }
+                }
+              },
+              "maxItems": 128
+            },
+            "models": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "state",
+                  "capabilities"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                  },
+                  "state": {
+                    "enum": [
+                      "ready",
+                      "blocked",
+                      "unknown"
+                    ]
+                  },
+                  "capabilities": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                    },
+                    "maxItems": 32,
+                    "uniqueItems": true
+                  }
+                }
+              },
+              "maxItems": 128
+            },
+            "auth": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "state",
+                  "capabilities"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                  },
+                  "state": {
+                    "enum": [
+                      "ready",
+                      "blocked",
+                      "unknown"
+                    ]
+                  },
+                  "capabilities": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                    },
+                    "maxItems": 32,
+                    "uniqueItems": true
+                  }
+                }
+              },
+              "maxItems": 128
+            },
+            "delegation": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "state",
+                  "capabilities"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                  },
+                  "state": {
+                    "enum": [
+                      "ready",
+                      "blocked",
+                      "unknown"
+                    ]
+                  },
+                  "capabilities": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                    },
+                    "maxItems": 32,
+                    "uniqueItems": true
+                  }
+                }
+              },
+              "maxItems": 128
+            }
+          }
+        },
+        "skill_records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name",
+              "origin",
+              "profile",
+              "enabled",
+              "compatible",
+              "priority",
+              "capabilities"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "origin": {
+                "enum": [
+                  "builtin",
+                  "local",
+                  "hub"
+                ]
+              },
+              "profile": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "compatible": {
+                "type": "boolean"
+              },
+              "priority": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1024
+              },
+              "capabilities": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                },
+                "maxItems": 32,
+                "uniqueItems": true
+              }
+            }
+          },
+          "maxItems": 1024
+        },
+        "profiles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "maxItems": 32,
+          "uniqueItems": true
+        }
+      }
+    },
+    "diagnoses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "observation_id",
+          "cause",
+          "status",
+          "reason",
+          "confidence",
+          "evidence"
+        ],
+        "properties": {
+          "observation_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "cause": {
+            "enum": [
+              null,
+              "skill_gap",
+              "skill_not_selected",
+              "procedure",
+              "model_limit",
+              "permission_api",
+              "external_dependency"
+            ]
+          },
+          "status": {
+            "enum": [
+              "DIAGNOSED",
+              "HOLD",
+              "NO_FAILURE"
+            ]
+          },
+          "reason": {
+            "enum": [
+              "RULE_SUPPORTED",
+              "NO_FAILURE",
+              "CONFLICTING_EVIDENCE",
+              "INSUFFICIENT_EVIDENCE",
+              "INELIGIBLE_SELECTION"
+            ]
+          },
+          "confidence": {
+            "enum": [
+              "MEDIUM",
+              "LOW"
+            ]
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "input_hash",
+                "pointer",
+                "line",
+                "code"
+              ],
+              "properties": {
+                "input_hash": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "pointer": {
+                  "type": "string",
+                  "pattern": "^/observations/[0-9]+/logs/[0-9]+$"
+                },
+                "line": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000000
+                },
+                "code": {
+                  "enum": [
+                    "SEARCH_COMPLETE",
+                    "SELECTION_SKIPPED",
+                    "STEP_SKIPPED",
+                    "CONTEXT_LENGTH_EXCEEDED",
+                    "HTTP_401",
+                    "HTTP_403",
+                    "HTTP_429",
+                    "DEPENDENCY_UNAVAILABLE",
+                    "UNKNOWN",
+                    "SUCCESS"
+                  ]
+                }
+              }
+            },
+            "maxItems": 32
+          }
+        }
+      },
+      "maxItems": 256
+    },
+    "proposals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "proposal_hash",
+          "cause",
+          "capability",
+          "profile",
+          "observation_ids",
+          "baseline_sha",
+          "change_allowlist",
+          "public_evaluation_id",
+          "budget",
+          "dependencies",
+          "approval",
+          "state",
+          "action",
+          "authoring_suggestion",
+          "confidence",
+          "expected_effect",
+          "acceptance",
+          "input_hash"
+        ],
+        "properties": {
+          "proposal_hash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "cause": {
+            "enum": [
+              "skill_gap",
+              "skill_not_selected",
+              "procedure",
+              "model_limit",
+              "permission_api",
+              "external_dependency"
+            ]
+          },
+          "capability": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "observation_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            },
+            "maxItems": 256
+          },
+          "baseline_sha": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "change_allowlist": {
+            "enum": [
+              [
+                "fixtures/skills/"
+              ],
+              [
+                "fixtures/audit/"
+              ]
+            ]
+          },
+          "public_evaluation_id": {
+            "type": "string",
+            "pattern": "^audit-v1-[a-z][a-z0-9-]{0,63}$"
+          },
+          "budget": {
+            "const": {
+              "api_calls": 0,
+              "api_cost_usd": 0,
+              "max_candidates": 1
+            }
+          },
+          "dependencies": {
+            "const": {
+              "design": "merged-pr-11",
+              "memory": "merged-pr-12"
+            }
+          },
+          "approval": {
+            "const": "NOT_REQUESTED"
+          },
+          "state": {
+            "const": "PROPOSED"
+          },
+          "action": {
+            "enum": [
+              "propose_isolated_skill",
+              "improve_selection",
+              "repair_procedure",
+              "review_model_limit",
+              "review_access_error",
+              "isolate_dependency"
+            ]
+          },
+          "authoring_suggestion": {
+            "enum": [
+              null,
+              "hermes-agent-skill-authoring"
+            ]
+          },
+          "confidence": {
+            "const": "MEDIUM"
+          },
+          "expected_effect": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "acceptance": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "input_hash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "maxItems": 256
+    },
+    "limitations": {
+      "const": [
+        "synthetic fixture only",
+        "rule confidence is not calibrated causal probability",
+        "historical 123/124 cause and production inventory not verified",
+        "proposals do not authorize execution or installation"
+      ]
+    },
+    "fixture_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+    },
+    "observed_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+    },
+    "issue_url": {
+      "const": "https://github.com/second-works/hermes-self-improvement/issues/4"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^audit-[a-f0-9]{12}$"
+    }
+  }
+}

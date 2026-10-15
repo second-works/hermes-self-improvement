@@ -1,0 +1,276 @@
+{
+  "schema_version": 1,
+  "classification": "PUBLIC",
+  "source_kind": "synthetic-fixture",
+  "upstream_sha": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "baseline_sha": "fe81a5c17e2ad2832e8f5d7a7190b86019e17262",
+  "profile": "default",
+  "profiles": [
+    "default",
+    "research"
+  ],
+  "inventory_complete": true,
+  "skills": [
+    {
+      "id": "review-builtin",
+      "name": "review",
+      "origin": "builtin",
+      "profile": "default",
+      "enabled": true,
+      "compatible": true,
+      "priority": 10,
+      "capabilities": [
+        "review"
+      ]
+    },
+    {
+      "id": "review-hub",
+      "name": "review",
+      "origin": "hub",
+      "profile": "default",
+      "enabled": true,
+      "compatible": true,
+      "priority": 20,
+      "capabilities": [
+        "review"
+      ]
+    },
+    {
+      "id": "other-local",
+      "name": "other",
+      "origin": "local",
+      "profile": "research",
+      "enabled": true,
+      "compatible": true,
+      "priority": 0,
+      "capabilities": [
+        "review"
+      ]
+    }
+  ],
+  "observations": [
+    {
+      "id": "gap",
+      "capability": "missing",
+      "outcome": "failed",
+      "selected_skill": null,
+      "model_id": "model",
+      "tool_id": "tool",
+      "auth_id": "auth",
+      "delegation_id": "delegation",
+      "logs": [
+        {
+          "line": 1,
+          "code": "SEARCH_COMPLETE"
+        }
+      ]
+    },
+    {
+      "id": "selection",
+      "capability": "review",
+      "outcome": "failed",
+      "selected_skill": null,
+      "model_id": "model",
+      "tool_id": "tool",
+      "auth_id": "auth",
+      "delegation_id": "delegation",
+      "logs": [
+        {
+          "line": 1,
+          "code": "SEARCH_COMPLETE"
+        },
+        {
+          "line": 2,
+          "code": "SELECTION_SKIPPED"
+        }
+      ]
+    },
+    {
+      "id": "procedure",
+      "capability": "review",
+      "outcome": "failed",
+      "selected_skill": "review-builtin",
+      "model_id": "model",
+      "tool_id": "tool",
+      "auth_id": "auth",
+      "delegation_id": "delegation",
+      "logs": [
+        {
+          "line": 1,
+          "code": "STEP_SKIPPED"
+        }
+      ]
+    },
+    {
+      "id": "model",
+      "capability": "model",
+      "outcome": "failed",
+      "selected_skill": null,
+      "model_id": "model",
+      "tool_id": "tool",
+      "auth_id": "auth",
+      "delegation_id": "delegation",
+      "logs": [
+        {
+          "line": 1,
+          "code": "CONTEXT_LENGTH_EXCEEDED"
+        }
+      ]
+    },
+    {
+      "id": "access",
+      "capability": "access",
+      "outcome": "failed",
+      "selected_skill": null,
+      "model_id": "model",
+      "tool_id": "tool",
+      "auth_id": "auth",
+      "delegation_id": "delegation",
+      "logs": [
+        {
+          "line": 1,
+          "code": "HTTP_403"
+        }
+      ]
+    },
+    {
+      "id": "dependency",
+      "capability": "dependency",
+      "outcome": "failed",
+      "selected_skill": null,
+      "model_id": "model",
+      "tool_id": "tool",
+      "auth_id": "auth",
+      "delegation_id": "delegation",
+      "logs": [
+        {
+          "line": 1,
+          "code": "DEPENDENCY_UNAVAILABLE"
+        }
+      ]
+    },
+    {
+      "id": "unknown",
+      "capability": "review",
+      "outcome": "failed",
+      "selected_skill": null,
+      "model_id": "model",
+      "tool_id": "tool",
+      "auth_id": "auth",
+      "delegation_id": "delegation",
+      "logs": [
+        {
+          "line": 1,
+          "code": "UNKNOWN"
+        }
+      ]
+    },
+    {
+      "id": "conflict",
+      "capability": "review",
+      "outcome": "failed",
+      "selected_skill": "review-builtin",
+      "model_id": "model",
+      "tool_id": "tool",
+      "auth_id": "auth",
+      "delegation_id": "delegation",
+      "logs": [
+        {
+          "line": 1,
+          "code": "STEP_SKIPPED"
+        },
+        {
+          "line": 2,
+          "code": "HTTP_401"
+        }
+      ]
+    },
+    {
+      "id": "success",
+      "capability": "review",
+      "outcome": "succeeded",
+      "selected_skill": "review-builtin",
+      "model_id": "model",
+      "tool_id": "tool",
+      "auth_id": "auth",
+      "delegation_id": "delegation",
+      "logs": [
+        {
+          "line": 1,
+          "code": "SUCCESS"
+        }
+      ]
+    },
+    {
+      "id": "repeat-gap",
+      "capability": "missing",
+      "outcome": "failed",
+      "selected_skill": null,
+      "model_id": "model",
+      "tool_id": "tool",
+      "auth_id": "auth",
+      "delegation_id": "delegation",
+      "logs": [
+        {
+          "line": 1,
+          "code": "SEARCH_COMPLETE"
+        }
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "id": "tool",
+      "state": "ready",
+      "capabilities": [
+        "review",
+        "missing",
+        "model",
+        "access",
+        "dependency"
+      ]
+    }
+  ],
+  "models": [
+    {
+      "id": "model",
+      "state": "ready",
+      "capabilities": [
+        "review",
+        "missing",
+        "model",
+        "access",
+        "dependency"
+      ]
+    }
+  ],
+  "auth": [
+    {
+      "id": "auth",
+      "state": "ready",
+      "capabilities": [
+        "review",
+        "missing",
+        "model",
+        "access",
+        "dependency"
+      ]
+    }
+  ],
+  "delegation": [
+    {
+      "id": "delegation",
+      "state": "ready",
+      "capabilities": [
+        "review",
+        "missing",
+        "model",
+        "access",
+        "dependency"
+      ]
+    }
+  ],
+  "fixture_id": "audit-sample-v1",
+  "observed_at": "2026-10-16T00:00:00Z",
+  "issue_url": "https://github.com/second-works/hermes-self-improvement/issues/4"
+}

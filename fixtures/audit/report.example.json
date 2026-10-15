@@ -1,0 +1,488 @@
+{
+  "schema_version": 1,
+  "classification": "PUBLIC",
+  "source_kind": "synthetic-fixture",
+  "run_id": "audit-4e7ec2e14142",
+  "fixture_id": "audit-sample-v1",
+  "observed_at": "2026-10-16T00:00:00Z",
+  "issue_url": "https://github.com/second-works/hermes-self-improvement/issues/4",
+  "upstream_sha": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "baseline_sha": "fe81a5c17e2ad2832e8f5d7a7190b86019e17262",
+  "input_hash": "4e7ec2e14142fb6b8563eb157f077c99457083ab09cb61174004871fd9f32250",
+  "profile": "default",
+  "inventory_complete": true,
+  "inventory": {
+    "registered_records": 3,
+    "profile_filtered_records": 2,
+    "available_unique_names": 1,
+    "by_origin": {
+      "builtin": 1,
+      "local": 1,
+      "hub": 1
+    },
+    "excluded": {
+      "other_profile": 1,
+      "disabled_in_profile": 0,
+      "incompatible_enabled_in_profile": 0,
+      "duplicate_eligible_names": 1
+    },
+    "available_skill_ids": [
+      "review-builtin"
+    ],
+    "skill_records": [
+      {
+        "id": "other-local",
+        "name": "other",
+        "origin": "local",
+        "profile": "research",
+        "enabled": true,
+        "compatible": true,
+        "priority": 0,
+        "capabilities": [
+          "review"
+        ]
+      },
+      {
+        "id": "review-builtin",
+        "name": "review",
+        "origin": "builtin",
+        "profile": "default",
+        "enabled": true,
+        "compatible": true,
+        "priority": 10,
+        "capabilities": [
+          "review"
+        ]
+      },
+      {
+        "id": "review-hub",
+        "name": "review",
+        "origin": "hub",
+        "profile": "default",
+        "enabled": true,
+        "compatible": true,
+        "priority": 20,
+        "capabilities": [
+          "review"
+        ]
+      }
+    ],
+    "profiles": [
+      "default",
+      "research"
+    ],
+    "resources": {
+      "tools": [
+        {
+          "id": "tool",
+          "state": "ready",
+          "capabilities": [
+            "review",
+            "missing",
+            "model",
+            "access",
+            "dependency"
+          ]
+        }
+      ],
+      "models": [
+        {
+          "id": "model",
+          "state": "ready",
+          "capabilities": [
+            "review",
+            "missing",
+            "model",
+            "access",
+            "dependency"
+          ]
+        }
+      ],
+      "auth": [
+        {
+          "id": "auth",
+          "state": "ready",
+          "capabilities": [
+            "review",
+            "missing",
+            "model",
+            "access",
+            "dependency"
+          ]
+        }
+      ],
+      "delegation": [
+        {
+          "id": "delegation",
+          "state": "ready",
+          "capabilities": [
+            "review",
+            "missing",
+            "model",
+            "access",
+            "dependency"
+          ]
+        }
+      ]
+    }
+  },
+  "diagnoses": [
+    {
+      "observation_id": "access",
+      "cause": "permission_api",
+      "status": "DIAGNOSED",
+      "reason": "RULE_SUPPORTED",
+      "confidence": "MEDIUM",
+      "evidence": [
+        {
+          "input_hash": "4e7ec2e14142fb6b8563eb157f077c99457083ab09cb61174004871fd9f32250",
+          "pointer": "/observations/4/logs/0",
+          "line": 1,
+          "code": "HTTP_403"
+        }
+      ]
+    },
+    {
+      "observation_id": "conflict",
+      "cause": null,
+      "status": "HOLD",
+      "reason": "CONFLICTING_EVIDENCE",
+      "confidence": "LOW",
+      "evidence": [
+        {
+          "input_hash": "4e7ec2e14142fb6b8563eb157f077c99457083ab09cb61174004871fd9f32250",
+          "pointer": "/observations/7/logs/0",
+          "line": 1,
+          "code": "STEP_SKIPPED"
+        },
+        {
+          "input_hash": "4e7ec2e14142fb6b8563eb157f077c99457083ab09cb61174004871fd9f32250",
+          "pointer": "/observations/7/logs/1",
+          "line": 2,
+          "code": "HTTP_401"
+        }
+      ]
+    },
+    {
+      "observation_id": "dependency",
+      "cause": "external_dependency",
+      "status": "DIAGNOSED",
+      "reason": "RULE_SUPPORTED",
+      "confidence": "MEDIUM",
+      "evidence": [
+        {
+          "input_hash": "4e7ec2e14142fb6b8563eb157f077c99457083ab09cb61174004871fd9f32250",
+          "pointer": "/observations/5/logs/0",
+          "line": 1,
+          "code": "DEPENDENCY_UNAVAILABLE"
+        }
+      ]
+    },
+    {
+      "observation_id": "gap",
+      "cause": "skill_gap",
+      "status": "DIAGNOSED",
+      "reason": "RULE_SUPPORTED",
+      "confidence": "MEDIUM",
+      "evidence": [
+        {
+          "input_hash": "4e7ec2e14142fb6b8563eb157f077c99457083ab09cb61174004871fd9f32250",
+          "pointer": "/observations/0/logs/0",
+          "line": 1,
+          "code": "SEARCH_COMPLETE"
+        }
+      ]
+    },
+    {
+      "observation_id": "model",
+      "cause": "model_limit",
+      "status": "DIAGNOSED",
+      "reason": "RULE_SUPPORTED",
+      "confidence": "MEDIUM",
+      "evidence": [
+        {
+          "input_hash": "4e7ec2e14142fb6b8563eb157f077c99457083ab09cb61174004871fd9f32250",
+          "pointer": "/observations/3/logs/0",
+          "line": 1,
+          "code": "CONTEXT_LENGTH_EXCEEDED"
+        }
+      ]
+    },
+    {
+      "observation_id": "procedure",
+      "cause": "procedure",
+      "status": "DIAGNOSED",
+      "reason": "RULE_SUPPORTED",
+      "confidence": "MEDIUM",
+      "evidence": [
+        {
+          "input_hash": "4e7ec2e14142fb6b8563eb157f077c99457083ab09cb61174004871fd9f32250",
+          "pointer": "/observations/2/logs/0",
+          "line": 1,
+          "code": "STEP_SKIPPED"
+        }
+      ]
+    },
+    {
+      "observation_id": "repeat-gap",
+      "cause": "skill_gap",
+      "status": "DIAGNOSED",
+      "reason": "RULE_SUPPORTED",
+      "confidence": "MEDIUM",
+      "evidence": [
+        {
+          "input_hash": "4e7ec2e14142fb6b8563eb157f077c99457083ab09cb61174004871fd9f32250",
+          "pointer": "/observations/9/logs/0",
+          "line": 1,
+          "code": "SEARCH_COMPLETE"
+        }
+      ]
+    },
+    {
+      "observation_id": "selection",
+      "cause": "skill_not_selected",
+      "status": "DIAGNOSED",
+      "reason": "RULE_SUPPORTED",
+      "confidence": "MEDIUM",
+      "evidence": [
+        {
+          "input_hash": "4e7ec2e14142fb6b8563eb157f077c99457083ab09cb61174004871fd9f32250",
+          "pointer": "/observations/1/logs/0",
+          "line": 1,
+          "code": "SEARCH_COMPLETE"
+        },
+        {
+          "input_hash": "4e7ec2e14142fb6b8563eb157f077c99457083ab09cb61174004871fd9f32250",
+          "pointer": "/observations/1/logs/1",
+          "line": 2,
+          "code": "SELECTION_SKIPPED"
+        }
+      ]
+    },
+    {
+      "observation_id": "success",
+      "cause": null,
+      "status": "NO_FAILURE",
+      "reason": "NO_FAILURE",
+      "confidence": "LOW",
+      "evidence": [
+        {
+          "input_hash": "4e7ec2e14142fb6b8563eb157f077c99457083ab09cb61174004871fd9f32250",
+          "pointer": "/observations/8/logs/0",
+          "line": 1,
+          "code": "SUCCESS"
+        }
+      ]
+    },
+    {
+      "observation_id": "unknown",
+      "cause": null,
+      "status": "HOLD",
+      "reason": "INSUFFICIENT_EVIDENCE",
+      "confidence": "LOW",
+      "evidence": [
+        {
+          "input_hash": "4e7ec2e14142fb6b8563eb157f077c99457083ab09cb61174004871fd9f32250",
+          "pointer": "/observations/6/logs/0",
+          "line": 1,
+          "code": "UNKNOWN"
+        }
+      ]
+    }
+  ],
+  "proposals": [
+    {
+      "proposal_hash": "6ed7dd5546b68fc51225dc4244e5ecc145e7313c6fa83e05f4557fa91f01016d",
+      "cause": "external_dependency",
+      "capability": "dependency",
+      "profile": "default",
+      "observation_ids": [
+        "dependency"
+      ],
+      "baseline_sha": "fe81a5c17e2ad2832e8f5d7a7190b86019e17262",
+      "change_allowlist": [
+        "fixtures/audit/"
+      ],
+      "public_evaluation_id": "audit-v1-dependency",
+      "budget": {
+        "api_calls": 0,
+        "api_cost_usd": 0,
+        "max_candidates": 1
+      },
+      "dependencies": {
+        "design": "merged-pr-11",
+        "memory": "merged-pr-12"
+      },
+      "approval": "NOT_REQUESTED",
+      "state": "PROPOSED",
+      "action": "isolate_dependency",
+      "authoring_suggestion": null,
+      "confidence": "MEDIUM",
+      "expected_effect": "Use a deterministic dependency fixture and explicit failure reporting.",
+      "acceptance": "Unavailable dependencies stop explicitly and recovery passes in the fixture.",
+      "input_hash": "4e7ec2e14142fb6b8563eb157f077c99457083ab09cb61174004871fd9f32250"
+    },
+    {
+      "proposal_hash": "5a874a8396fb407e7f26532d5ceb7beca57846f5dbf87645e7285e577a6e6d1a",
+      "cause": "model_limit",
+      "capability": "model",
+      "profile": "default",
+      "observation_ids": [
+        "model"
+      ],
+      "baseline_sha": "fe81a5c17e2ad2832e8f5d7a7190b86019e17262",
+      "change_allowlist": [
+        "fixtures/audit/"
+      ],
+      "public_evaluation_id": "audit-v1-model",
+      "budget": {
+        "api_calls": 0,
+        "api_cost_usd": 0,
+        "max_candidates": 1
+      },
+      "dependencies": {
+        "design": "merged-pr-11",
+        "memory": "merged-pr-12"
+      },
+      "approval": "NOT_REQUESTED",
+      "state": "PROPOSED",
+      "action": "review_model_limit",
+      "authoring_suggestion": null,
+      "confidence": "MEDIUM",
+      "expected_effect": "Reduce fixture context within the declared model limit.",
+      "acceptance": "The same task passes within the fixed context and zero API budget.",
+      "input_hash": "4e7ec2e14142fb6b8563eb157f077c99457083ab09cb61174004871fd9f32250"
+    },
+    {
+      "proposal_hash": "1b0c20fb7b271aa5c0fd1597cd3cb2519670db920fa0be262a7ddd3293875b71",
+      "cause": "permission_api",
+      "capability": "access",
+      "profile": "default",
+      "observation_ids": [
+        "access"
+      ],
+      "baseline_sha": "fe81a5c17e2ad2832e8f5d7a7190b86019e17262",
+      "change_allowlist": [
+        "fixtures/audit/"
+      ],
+      "public_evaluation_id": "audit-v1-access",
+      "budget": {
+        "api_calls": 0,
+        "api_cost_usd": 0,
+        "max_candidates": 1
+      },
+      "dependencies": {
+        "design": "merged-pr-11",
+        "memory": "merged-pr-12"
+      },
+      "approval": "NOT_REQUESTED",
+      "state": "PROPOSED",
+      "action": "review_access_error",
+      "authoring_suggestion": null,
+      "confidence": "MEDIUM",
+      "expected_effect": "Diagnose the API denial in an inert fixture; request human review.",
+      "acceptance": "Denied and allowed fixture responses are distinguished without retrying credentials.",
+      "input_hash": "4e7ec2e14142fb6b8563eb157f077c99457083ab09cb61174004871fd9f32250"
+    },
+    {
+      "proposal_hash": "dc7c1c2a342e9edcc9148319b68b207f3ba42205fd22fd89e96ce234be1346b9",
+      "cause": "procedure",
+      "capability": "review",
+      "profile": "default",
+      "observation_ids": [
+        "procedure"
+      ],
+      "baseline_sha": "fe81a5c17e2ad2832e8f5d7a7190b86019e17262",
+      "change_allowlist": [
+        "fixtures/skills/"
+      ],
+      "public_evaluation_id": "audit-v1-review",
+      "budget": {
+        "api_calls": 0,
+        "api_cost_usd": 0,
+        "max_candidates": 1
+      },
+      "dependencies": {
+        "design": "merged-pr-11",
+        "memory": "merged-pr-12"
+      },
+      "approval": "NOT_REQUESTED",
+      "state": "PROPOSED",
+      "action": "repair_procedure",
+      "authoring_suggestion": null,
+      "confidence": "MEDIUM",
+      "expected_effect": "Repair the skipped step in the selected fixture skill.",
+      "acceptance": "The missing step executes and the task and regression cases pass.",
+      "input_hash": "4e7ec2e14142fb6b8563eb157f077c99457083ab09cb61174004871fd9f32250"
+    },
+    {
+      "proposal_hash": "639198fbccbd954ceafca59a919522b2e68a9692e6221eff77b2b1aa4872014d",
+      "cause": "skill_gap",
+      "capability": "missing",
+      "profile": "default",
+      "observation_ids": [
+        "gap",
+        "repeat-gap"
+      ],
+      "baseline_sha": "fe81a5c17e2ad2832e8f5d7a7190b86019e17262",
+      "change_allowlist": [
+        "fixtures/skills/"
+      ],
+      "public_evaluation_id": "audit-v1-missing",
+      "budget": {
+        "api_calls": 0,
+        "api_cost_usd": 0,
+        "max_candidates": 1
+      },
+      "dependencies": {
+        "design": "merged-pr-11",
+        "memory": "merged-pr-12"
+      },
+      "approval": "NOT_REQUESTED",
+      "state": "PROPOSED",
+      "action": "propose_isolated_skill",
+      "authoring_suggestion": "hermes-agent-skill-authoring",
+      "confidence": "MEDIUM",
+      "expected_effect": "Add an isolated fixture skill for the missing capability.",
+      "acceptance": "The new fixture passes the failing case and existing regression cases.",
+      "input_hash": "4e7ec2e14142fb6b8563eb157f077c99457083ab09cb61174004871fd9f32250"
+    },
+    {
+      "proposal_hash": "7a902eada60e1118f2bb4ef8f2102ab8be7a4bf1dc0ab3db04163506038bb9ca",
+      "cause": "skill_not_selected",
+      "capability": "review",
+      "profile": "default",
+      "observation_ids": [
+        "selection"
+      ],
+      "baseline_sha": "fe81a5c17e2ad2832e8f5d7a7190b86019e17262",
+      "change_allowlist": [
+        "fixtures/audit/"
+      ],
+      "public_evaluation_id": "audit-v1-review",
+      "budget": {
+        "api_calls": 0,
+        "api_cost_usd": 0,
+        "max_candidates": 1
+      },
+      "dependencies": {
+        "design": "merged-pr-11",
+        "memory": "merged-pr-12"
+      },
+      "approval": "NOT_REQUESTED",
+      "state": "PROPOSED",
+      "action": "improve_selection",
+      "authoring_suggestion": null,
+      "confidence": "MEDIUM",
+      "expected_effect": "Select an existing eligible skill before creating another.",
+      "acceptance": "The same task selects the existing skill and passes without a new skill.",
+      "input_hash": "4e7ec2e14142fb6b8563eb157f077c99457083ab09cb61174004871fd9f32250"
+    }
+  ],
+  "limitations": [
+    "synthetic fixture only",
+    "rule confidence is not calibrated causal probability",
+    "historical 123/124 cause and production inventory not verified",
+    "proposals do not authorize execution or installation"
+  ]
+}

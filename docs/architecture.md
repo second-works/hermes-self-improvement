@@ -58,8 +58,8 @@ PRのMergeは `APPROVED` の証跡にできるが、`ADOPTED` には配備先の
 | proposal | 基準SHA、変更allowlist、原因・確度、Done、公開評価ID、budget、依存状態、承認参照 | 候補作成仕様。hidden情報なし |
 | candidate | run_id、親proposalのhash、基準SHA、候補SHA、diff hash、環境image digest、変更パス、単体検証結果 | immutableな候補と公開trace |
 | evaluation | 両SHA、dataset hash、環境・model revision、seed、件数、各指標、PASS/FAIL/HOLD、理由、評価者ID | 検査済み集計。hiddenの個別結果は非公開 |
-| approval | 人間ID、UTC日時、対象SHA・評価hash、操作、対象環境、許可期限 | Merge承認と採用承認を別レコードにする |
-| adoption / rollback | 採用前後SHA、対象のhash、バックアップ参照、承認参照、実施・確認結果 | 検証済み基準版と監査履歴 |
+| approval | 人間ID、UTC日時、候補SHA・評価hash、操作、対象環境、許可期限。採用承認には期待する基準SHAと採用前artifact hash、候補artifact hashも固定 | Merge承認と採用承認を別レコードにする |
+| adoption / rollback | 基準SHA・候補SHA、採用前後artifact hash、バックアップ参照、承認参照、実施・確認結果。復旧承認には期待する現在版hashと復旧先の基準SHA・artifact hashを固定 | 検証済み基準版と監査履歴 |
 
 SHAは完全なGit commit SHA、データ・diff・レコードはSHA-256で識別する。候補SHA変更で評価と承認は失効する。情報分類は `PUBLIC / INTERNAL / CONFIDENTIAL`、未確定は厳しい側に扱う。
 artifact pathは指定runディレクトリ内の通常ファイルだけを受理する。絶対パス、`..`、symlink、特殊ファイル、予期しないサイズ・文字列を拒否する。候補の任意コマンドを制御側で実行しない。

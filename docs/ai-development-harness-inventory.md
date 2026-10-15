@@ -87,6 +87,16 @@ Security、権限、Productionなどの既知重大リスクは、実際の事�
 
 ## 台帳
 
+### HSI-05 独立fixture評価
+
+- **ETCSLV分類 / 判定**: Lifecycle Hooks / KEEP。
+- **失敗モード / 発火条件**: Issue #5の改善候補を主観や公開例だけで採用すること、候補が評価器・hidden・監査を書換えること。fixture候補比較のとき発火。
+- **入力 / Context**: commit固定の基準・候補、公開10件/hidden10件、事前固定policy、image digest、既存承認境界。
+- **出力 / State**: PASS/FAIL/HOLDのJSON・日本語集計、hash連鎖。PASSもAWAITING_APPROVALまで。採用権限なし。
+- **決定論 / コスト / 重複**: finding完全一致と判定は決定論。各入力3回、逐次Docker、全体20分、API費用0。既存CI/Security/Codex Reviewは代替しない。
+- **安全上の必要性 / 再評価条件**: 候補と評価・本番の隔離が必須。同じ拒否保証・独立評価を持つ実装へ置換する際に再評価し、検証成功前に旧保証を消さない。
+- **正本**: [独立評価](independent-evaluation.md)、[Issue #5](https://github.com/second-works/hermes-self-improvement/issues/5)。実Docker未確認を成功扱いしない。
+
 ### E-01 IssueからPRまでの実行単位
 
 - **ETCSLV分類**：Execution

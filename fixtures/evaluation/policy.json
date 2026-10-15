@@ -1,0 +1,1 @@
+{"api_calls":0,"api_cost_usd":0,"candidate_count":1,"case_timeout_seconds":30,"claim":"finite deterministic fixture only","hidden_cases":10,"maximum_cost_ratio":1.2,"maximum_latency_ratio":1.2,"minimum_gain":1,"public_cases":10,"quality":"exact finding set; case median; no regression","repeats":3,"run_timeout_seconds":1200,"version":1}

@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hermes-self-improvement:fixture-evaluation-report:v1",
+  "title": "独立fixture評価のPUBLIC集計",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "classification", "status", "baseline_sha", "candidate_sha", "artifact_hashes", "manifest_hash", "image", "dataset_commitments", "metrics", "decisions", "control_verified", "safety", "violation_codes", "permission_violations", "state", "limitations", "utc", "private_metrics_hash"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "pattern": "^evaluation-[0-9]{8}T[0-9]{6}Z-[a-f0-9]{12}$"},
+    "classification": {"const": "PUBLIC"},
+    "status": {"enum": ["PASS", "FAIL", "HOLD"]},
+    "baseline_sha": {"$ref": "#/$defs/sha1"},
+    "candidate_sha": {"$ref": "#/$defs/sha1"},
+    "artifact_hashes": {"$ref": "#/$defs/artifacts"},
+    "manifest_hash": {"$ref": "#/$defs/hash"},
+    "private_metrics_hash": {"$ref": "#/$defs/hash"},
+    "image": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "repo_digests", "bytes", "architecture", "os"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "repo_digests": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"type": "string", "pattern": "^(docker.io/library/)?python@sha256:[a-f0-9]{64}$"}},
+        "bytes": {"type": "integer", "minimum": 1, "exclusiveMaximum": 314572800},
+        "architecture": {"const": "arm64"}, "os": {"const": "linux"}
+      }
+    },
+    "dataset_commitments": {
+      "type": "object", "additionalProperties": false, "required": ["public", "hidden"],
+      "properties": {"public": {"$ref": "#/$defs/hash"}, "hidden": {"$ref": "#/$defs/hash"}}
+    },
+    "metrics": {
+      "type": "object", "additionalProperties": false, "required": ["baseline", "candidate", "degraded"],
+      "properties": {"baseline": {"$ref": "#/$defs/metric"}, "candidate": {"$ref": "#/$defs/metric"}, "degraded": {"$ref": "#/$defs/metric"}}
+    },
+    "decisions": {
+      "type": "object", "additionalProperties": false, "required": ["baseline", "candidate", "degraded"],
+      "properties": {"baseline": {"$ref": "#/$defs/decision"}, "candidate": {"$ref": "#/$defs/decision"}, "degraded": {"$ref": "#/$defs/decision"}}
+    },
+    "control_verified": {"type": "boolean"},
+    "safety": {"enum": ["VERIFIED", "FAILED"]},
+    "violation_codes": {"type": "array", "uniqueItems": true, "items": {"enum": ["EXECUTION_LIMIT"]}},
+    "permission_violations": {"type": "integer", "minimum": 0},
+    "state": {"enum": ["AWAITING_APPROVAL", "REJECTED", "HELD"]},
+    "limitations": {"const": ["finite deterministic fixture", "no real LLM or production acceptance"]},
+    "utc": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "sha1": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+    "hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "artifacts": {
+      "type": "object", "additionalProperties": false, "required": ["baseline", "candidate", "degraded"],
+      "properties": {"baseline": {"$ref": "#/$defs/hash"}, "candidate": {"$ref": "#/$defs/hash"}, "degraded": {"$ref": "#/$defs/hash"}}
+    },
+    "decision": {
+      "type": "object", "additionalProperties": false, "required": ["status", "reasons"],
+      "properties": {
+        "status": {"enum": ["PASS", "FAIL", "HOLD"]},
+        "reasons": {"type": "array", "maxItems": 12, "uniqueItems": true, "items": {"enum": ["SAFETY_VIOLATION", "SAFETY_NOT_VERIFIED", "METRICS_MISSING", "METRICS_INVALID", "REGRESSION", "FAILURE_RATE_INCREASE", "LATENCY_LIMIT", "COST_LIMIT", "INSUFFICIENT_GAIN", "UNCHANGED_ARTIFACT", "EVALUATION_CONTAMINATED"]}}
+      }
+    },
+    "metric": {
+      "type": "object", "additionalProperties": false,
+      "required": ["public_correct", "hidden_correct", "cases", "executions", "failures", "failure_rate", "median_wall_seconds", "api_calls", "tokens", "api_cost_usd", "inference"],
+      "properties": {
+        "public_correct": {"type": "integer", "minimum": 0, "maximum": 10},
+        "hidden_correct": {"type": "integer", "minimum": 0, "maximum": 10},
+        "cases": {"const": 20}, "executions": {"const": 60},
+        "failures": {"type": "integer", "minimum": 0, "maximum": 60},
+        "failure_rate": {"type": "number", "minimum": 0, "maximum": 1},
+        "median_wall_seconds": {"type": "number", "exclusiveMinimum": 0},
+        "api_calls": {"const": 0}, "tokens": {"const": 0}, "api_cost_usd": {"const": 0},
+        "inference": {"const": "not_applicable"}
+      }
+    }
+  }
+}

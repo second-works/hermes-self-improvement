@@ -108,6 +108,16 @@ class Decisions(unittest.TestCase):
             with self.assertRaises(EvaluationError):
                 load_json(raw)
 
+    def test_oversized_cpu_json_integer_is_a_rejected_sample(self):
+        for cpu in (10**1000, -(10**1000), True, float('inf'), float('-inf'), float('nan')):
+            payload = {'findings': [], 'cpu_seconds': cpu}
+            if type(cpu) is int:
+                payload = load_json(canonical(payload))
+            with self.assertRaisesRegex(EvaluationError, '^OUTPUT_CPU$'):
+                findings(payload)
+        for cpu in (0, 0.0, 30, 30.0):
+            self.assertEqual(findings({'findings': [], 'cpu_seconds': cpu}), ([], cpu))
+
     def test_repeat_instability_is_evidence_for_hold(self):
         rows = [[{'answer_hash': 'a', 'correct': True, 'failed': False, 'wall_seconds': 1},
                  {'answer_hash': 'b', 'correct': False, 'failed': False, 'wall_seconds': 1}]] * 20

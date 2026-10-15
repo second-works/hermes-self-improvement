@@ -70,7 +70,8 @@ def load_json(data):
 def findings(value):
     require(type(value) is dict and set(value) == {'findings', 'cpu_seconds'}, 'OUTPUT_SCHEMA')
     cpu = value['cpu_seconds']
-    require(type(cpu) in (int, float) and math.isfinite(cpu) and 0 <= cpu <= 30, 'OUTPUT_CPU')
+    # Bounded comparisons also reject NaN/infinity without converting arbitrary JSON ints to float.
+    require(type(cpu) in (int, float) and 0 <= cpu <= 30, 'OUTPUT_CPU')
     rows = value['findings']
     require(type(rows) is list and len(rows) <= 32, 'OUTPUT_FINDINGS')
     result = []

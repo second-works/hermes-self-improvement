@@ -59,7 +59,7 @@ python3 -I -B scripts/evaluate_fixture.py audit RUN_ID
 
 純粋な採点・判定、schema境界、symlink・特殊ファイル、出力・timeout、監査欠損/改変は`tests/test_evaluation.py`、実Dockerの拒否・資源・fixture接続は`gate`と`evaluate`が担当する。標準入口・既存テスト・CI/Security/CodeQLを置換しない。既存の固定検証資産は変更せず、新試験は明示コマンドで実行する。CI組込みが必要なら具体差分・保証を示して別確認する。
 
-2026-10-15時点で新規単体・境界試験33件（模擬transportの接続検査を含む）が成功。標準検証の既存30件とlintも直前stageで成功し、typecheck/buildは既存の未構成による理由付きskip。同stageのローカルSecurityはSECURITY_PASSED、依存manifestなしのためDEPENDENCY_STATUS=SECURITY_NOT_APPLICABLE。最終stage後にも同じ検査を行う。
+2026-10-16時点で新規単体・境界試験34件（模擬transportの接続検査を含む）が成功。標準検証の既存30件とlintも直前stageで成功し、typecheck/buildは既存の未構成による理由付きskip。同stageのローカルSecurityはSECURITY_PASSED、依存manifestなしのためDEPENDENCY_STATUS=SECURITY_NOT_APPLICABLE。最終stage後にも同じ検査を行う。
 
 Dockerの保存先変更はユーザーが実施し、`/Volumes/HD-ADU3/Docker/DockerDesktop/Docker.raw`とdaemon接続を確認した。旧バックアップは外部ディスクのBackups/Docker配下に保持し、復元・全量読取・削除はしていない。画面操作ツールのロック判定と設定ファイルの読取制限は解消を確認していないが、設定完了の人間報告と外部imageの存在を確認して再開した。
 
@@ -78,3 +78,5 @@ Codex Reviewが、docker createのdaemon側成功後に応答が失われるとc
 追加レビューでは、create応答不明時の最初の空照会直後にコンテナが可視化されるP2も対応した。遅延可視化と最後まで不可視の2件を修正前fail→修正後passで検証。応答不明時は5秒を基準に再照会し（各照会は別に5秒上限）、、可視化された名前を回収する。5秒経過は未作成・消失の証明とは扱わずISOLATION_CLEANUP_FAILEDで停止し、pending_containerへ対象名を保存して後続を禁止する。5秒後もdaemon処理が終了したとは断定せず、自動再開しない。通常の成功したcreate経路は応答による完了確認後に回収する。
 
 追加のP2では、遅いcreate後にstartへ再び30秒を与えていたため、作成前にcase/globalの早い方の期限を固定し、create・設定inspect・startで残り時間を共有するよう修正した。予算消費済みなら候補を起動しない。遅いcreateとglobal期限の2境界は修正前fail→修正後pass。起動・稼働の予算と、期限後も必須となる停止確認・回収を分離し、後者の各Docker照会・kill・rmは5秒上限として失敗時は後続を禁止する。
+
+CPU自己申告値へ巨大なJSON整数を返すとfloat変換でOverflowErrorとなるP2は、外部出力の検証契約に関わるためBLOCKINGと分類した。CPU値は厳密なint/float型と0〜30の比較で検証し、変換せずOUTPUT_CPUとして試行失敗へ渡す。巨大な正負整数・bool・NaN/無限大を拒否し、有効境界0/30を受け入れる回帰を修正前fail→修正後passで確認した。

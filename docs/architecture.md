@@ -38,15 +38,20 @@ stateDiagram-v2
     EVALUATING --> REJECTED: 劣化または違反
     AWAITING_APPROVAL --> APPROVED: 人間が同じSHAを承認
     AWAITING_APPROVAL --> REJECTED: 人間が棄却
-    APPROVED --> ADOPTED: 別承認の採用作業と確認
-    ADOPTED --> ROLLED_BACK: 劣化検知・復旧承認
+    APPROVED --> ADOPTING: 対象照合・別承認・適用開始記録
+    ADOPTING --> ADOPTED: 配備先hash確認
+    ADOPTING --> RECOVERY_REQUIRED: 部分適用・結果不明
+    ADOPTED --> RECOVERY_REQUIRED: 劣化検知
+    RECOVERY_REQUIRED --> ROLLING_BACK: 対象隔離・現在状態確認・人間復旧承認
+    ROLLING_BACK --> ROLLED_BACK: 元版hashと回帰確認
+    ROLLING_BACK --> RECOVERY_REQUIRED: 復旧失敗・結果不明
     ADOPTED --> OBSERVED: 次サイクルを明示承認
 ```
 
-すべての非終端状態から、予算・期限・隔離違反・取消・異常終了で `STOPPED` へ移る。`STOPPED / HELD / REJECTED / ROLLED_BACK` は自動再開しない。
-PRのMergeは `APPROVED` の証跡にできるが、`ADOPTED` には配備先の実体確認が必要。今回のIssue #2は文書作成だけで、状態機械を実行しない。後続の候補作成・評価段階（#5/#7）はPASS時の `AWAITING_APPROVAL` まで、#8の承認・模擬採用段階は人間承認後にfixture配備先のhash確認を経て `ADOPTED` まで進む。#9の最小fixtureサイクルはこれらを接続した `OBSERVED` → `ADOPTED` の1サイクルとする。採用成功後の別の故障注入・復旧試験は `ROLLED_BACK` で終了する。本番採用はすべてのfixture再現試験の対象外。
+対象への書込開始前の非終端状態では、予算・期限・隔離違反・取消・異常終了で `STOPPED` へ移る。`ADOPTING / ROLLING_BACK` の書込開始後または書込有無が不明な失敗は `RECOVERY_REQUIRED` にする。制御側は書込前に状態と対象・元版snapshotを永続化し、再起動後に未完了の採用/復旧intentを見つけた場合も `RECOVERY_REQUIRED` とする。対象を隔離して新規採用を禁止し、人間が現在状態と復旧元を確認・承認するまで復旧を実行しない。`STOPPED / HELD / REJECTED / ROLLED_BACK / RECOVERY_REQUIRED` は自動再開しない。
+PRのMergeは `APPROVED` の証跡にできるが、`ADOPTED` には配備先の実体確認が必要。今回のIssue #2は文書作成だけで、状態機械を実行しない。後続の候補作成・評価段階（#5/#7）はPASS時の `AWAITING_APPROVAL` まで。#8では別々の必須試験として、承認・模擬採用シナリオを `ADOPTED`、故障注入・復旧シナリオを `ROLLED_BACK` まで検証する。#8全体のDoneは両試験の成功であり、単一状態で表さない。#9の最小fixtureサイクルは `OBSERVED` → `ADOPTED` の1サイクルとし、別の故障注入・復旧試験を `ROLLED_BACK` まで再検証する。本番採用はすべてのfixture再現試験の対象外。
 
-最小例は、匿名のPRパッチから問題を抽出するテスト用スキル。失敗fixture1件を観測し、手順不足を診断し、仕様を固定して候補1件を作る。独立評価者が同じ環境の基準と候補を比較し、PASSなら差分・結果・未確認事項をPRに添えて人間判断へ渡す。劣化版も評価し、必ず棄却できることを確認する。fixture用の承認・模擬採用は#8で検査し、#9で観測から模擬採用まで接続する。復旧は採用後の独立した故障注入試験とし、いずれも本番を使わない。
+最小例は、匿名のPRパッチから問題を抽出するテスト用スキル。失敗fixture1件を観測し、手順不足を診断し、仕様を固定して候補1件を作る。独立評価者が同じ環境の基準と候補を比較し、PASSなら差分・結果・未確認事項をPRに添えて人間判断へ渡す。劣化版も評価し、必ず棄却できることを確認する。fixture用の承認・模擬採用と別の復旧試験は#8で検査し、#9で観測から模擬採用まで接続して復旧試験も再検証する。復旧試験は採用後劣化と部分適用失敗の両方を扱い、いずれも本番を使わない。
 
 ## 入出力契約
 
@@ -58,11 +63,11 @@ PRのMergeは `APPROVED` の証跡にできるが、`ADOPTED` には配備先の
 | proposal | 基準SHA、変更allowlist、原因・確度、Done、公開評価ID、budget、依存状態、承認参照 | 候補作成仕様。hidden情報なし |
 | candidate | run_id、親proposalのhash、基準SHA、候補SHA、diff hash、環境image digest、変更パス、単体検証結果 | immutableな候補と公開trace |
 | evaluation | 両SHA、dataset hash、環境・model revision、seed、件数、各指標、PASS/FAIL/HOLD、理由、評価者ID | 検査済み集計。hiddenの個別結果は非公開 |
-| approval | 人間ID、UTC日時、候補SHA・評価hash、操作、対象環境、許可期限。採用承認には期待する基準SHAと採用前artifact hash、候補artifact hashも固定 | Merge承認と採用承認を別レコードにする |
-| adoption / rollback | 基準SHA・候補SHA、採用前後artifact hash、バックアップ参照、承認参照、実施・確認結果。復旧承認には期待する現在版hashと復旧先の基準SHA・artifact hashを固定 | 検証済み基準版と監査履歴 |
+| approval | 人間ID、UTC日時、候補SHA・評価hash、操作、environment_id、target_id、制御側登録root内の正規化済みartifact相対path、許可期限。採用承認には期待する基準SHAと採用前artifact hash、候補artifact hashも固定 | Merge承認と採用承認を別レコードにする。承認targetとlock・実配備先の一致必須 |
+| adoption / rollback | approvalと同じenvironment_id・target_id・artifact path、基準SHA・候補SHA、採用前後artifact hash、バックアップ参照、承認参照、実施・確認結果。復旧承認には観測済みの現在状態（通常ファイルのhash、または欠如）と復旧先の基準SHA・artifact hashを固定 | 検証済み基準版と監査履歴。不明な現在状態のまま復旧しない |
 
 SHAは完全なGit commit SHA、データ・diff・レコードはSHA-256で識別する。候補SHA変更で評価と承認は失効する。情報分類は `PUBLIC / INTERNAL / CONFIDENTIAL`、未確定は厳しい側に扱う。
-artifact pathは指定runディレクトリ内の通常ファイルだけを受理する。絶対パス、`..`、symlink、特殊ファイル、予期しないサイズ・文字列を拒否する。候補の任意コマンドを制御側で実行しない。
+候補artifact pathは指定runディレクトリ内の通常ファイルだけを受理する。配備先は制御側に登録したfixture rootとtarget_idで決まり、承認票のenvironment_id・target_id・正規化済み相対pathがlockと実配備先の全項目に一致することを必須とする。同じ配備先を別target_idで登録せず、同一hashでも別targetの承認を流用しない。絶対パス、`..`、symlink、特殊ファイル、予期しないサイズ・文字列を拒否し、書込直前にも配備先の境界を確認する。候補の任意コマンドを制御側で実行しない。
 出力欠如・不正JSON・終了code不一致は失敗。stdoutの「成功」文だけで状態を進めない。
 
 ## 制御上限の提案
@@ -77,8 +82,8 @@ artifact pathは指定runディレクトリ内の通常ファイルだけを受�
 | API呼出数 | 承認後も最大20/run（評価・再試行含む） | 費用上限との先着停止。見積り不能なら呼び出さない |
 
 API実験では呼出前に最大入力/output token費用を予約し、並列・retryも含め精算する。単価または使用量不明はHOLD。上限値は公式の推奨値ではなく、このprojectの未承認提案。
-run開始時に `(target_id, baseline_sha, proposal_hash)` の排他lockを原子的に確保し、run_id・所有者・期限を記録する。同一キーは既存結果を返し二重起動しない。採用もtarget単位で排他する。
-再起動で生存不明・期限切れlockを検出したらSTOPPEDとして人間確認へ渡す。lockを自動削除して再実行せず、記録済みartifactの整合性を検証して新runを承認する。
+run開始時に `(target_id, baseline_sha, proposal_hash)` の排他lockを原子的に確保し、run_id・所有者・期限を記録する。同一キーは既存結果を返し二重起動しない。採用・復旧は登録済みenvironment_id/target_idと配備先path単位で排他し、承認票と同じ対象だけを許可する。
+再起動で生存不明・期限切れlockを検出したら、対象書込前はSTOPPED、未完了の採用/復旧intentがある場合はRECOVERY_REQUIREDとして人間確認へ渡す。lockを自動削除して再実行せず、復旧と記録済みartifactの整合性を確認してから新runを承認する。
 
 ## 独立評価
 

@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hermes-self-improvement:improvement-log:1",
+  "title": "自己改善ログの最小参照レコード（承認票ではない）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "recorded_at", "classification", "iteration", "baseline", "candidate", "metrics", "approval", "rollback"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,80}$"},
+    "recorded_at": {"type": "string", "format": "date-time", "pattern": "Z$"},
+    "classification": {"const": "PUBLIC"},
+    "iteration": {"type": "integer", "minimum": 1},
+    "baseline": {"$ref": "#/$defs/artifact"},
+    "candidate": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/artifact"}]},
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "evidence_sha256", "values"],
+      "properties": {
+        "status": {"enum": ["VERIFIED", "FAILED", "NOT_VERIFIED", "BLOCKED"]},
+        "evidence_sha256": {"$ref": "#/$defs/optional_hash"},
+        "values": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "value", "unit"],
+            "properties": {
+              "name": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$"},
+              "value": {"type": "number", "minimum": 0},
+              "unit": {"enum": ["count", "seconds", "usd", "ratio"]}
+            }
+          }
+        }
+      },
+      "allOf": [{"if": {"properties": {"status": {"const": "VERIFIED"}}}, "then": {"properties": {"evidence_sha256": {"$ref": "#/$defs/hash"}, "values": {"minItems": 1}}}}]
+    },
+    "approval": {"$ref": "#/$defs/reference"},
+    "rollback": {"$ref": "#/$defs/reference"}
+  },
+  "allOf": [{
+    "if": {"properties": {"candidate": {"type": "null"}}},
+    "then": {"properties": {
+      "approval": {"properties": {"status": {"const": "NOT_REQUESTED"}}},
+      "rollback": {"properties": {"status": {"const": "NOT_REQUESTED"}}}
+    }}
+  }],
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "optional_hash": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/hash"}]},
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit_sha", "artifact_sha256"],
+      "properties": {
+        "commit_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "artifact_sha256": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "record_sha256"],
+      "properties": {
+        "status": {"enum": ["NOT_REQUESTED", "PENDING", "RECORDED"]},
+        "record_sha256": {"$ref": "#/$defs/optional_hash"}
+      },
+      "allOf": [
+        {"if": {"properties": {"status": {"const": "RECORDED"}}}, "then": {"properties": {"record_sha256": {"$ref": "#/$defs/hash"}}}},
+        {"if": {"properties": {"status": {"const": "NOT_REQUESTED"}}}, "then": {"properties": {"record_sha256": {"type": "null"}}}}
+      ]
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "schema-design-example",
+  "recorded_at": "2026-10-15T00:00:00Z",
+  "classification": "PUBLIC",
+  "iteration": 1,
+  "baseline": {
+    "commit_sha": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+    "artifact_sha256": "e2ec877774234c52605025e20931af5690ad14c9300fb5a936973db27578a65f"
+  },
+  "candidate": null,
+  "metrics": {
+    "status": "NOT_VERIFIED",
+    "evidence_sha256": null,
+    "values": []
+  },
+  "approval": {
+    "status": "NOT_REQUESTED",
+    "record_sha256": null
+  },
+  "rollback": {
+    "status": "NOT_REQUESTED",
+    "record_sha256": null
+  }
+}

@@ -151,7 +151,8 @@ def gate(work):
     except Exception as error:
         code = str(error) if isinstance(error, EvaluationError) else 'CONTROLLER_ERROR'
         save(work, 'gate.json', {'status': 'FAILED', 'probes': results, 'failed_mode': mode,
-                                'reason': code, 'utc': stamp()})
+                                'reason': code, 'pending_container': getattr(error, 'pending_container', None),
+                                'utc': stamp()})
         event(work, 'ISOLATION_FAILED', digest(regular(work / 'gate.json', RUNS)))
         raise
 
@@ -349,6 +350,7 @@ def evaluate(work, baseline_sha, candidate_sha):
     except Exception as error:
         code = str(error) if isinstance(error, EvaluationError) else 'CONTROLLER_ERROR'
         save(work, 'stopped.json', {'status': 'STOPPED', 'reason': code,
+             'pending_container': getattr(error, 'pending_container', None),
              'completed_executions': sum(len(item) for rows in records.values() for item in rows),
              'manifest_hash': digest(regular(work / 'manifest.json', RUNS)), 'utc': stamp()})
         event(work, 'EVALUATION_STOPPED', digest(regular(work / 'stopped.json', RUNS)))

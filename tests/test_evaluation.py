@@ -240,6 +240,46 @@ class Boundaries(unittest.TestCase):
                 box.run(ROOT / 'fixtures/evaluation/isolation_probe.py')
         self.assertTrue(box.broken)
 
+    def test_ambiguous_create_reconciles_a_late_visible_container(self):
+        box = Sandbox(ROOT, self.work, 'sha256:' + 'a' * 64)
+        seen = {'name': '', 'lookups': 0, 'removed': False}
+        clock = [0.0]
+        def checked(*args, **kwargs):
+            if args[0] == 'create':
+                seen['name'] = args[args.index('--name') + 1]
+                raise EvaluationError('DOCKER_COMMAND_FAILED')
+            if args[0] == 'container':
+                seen['lookups'] += 1
+                return (seen['name'].encode() + b'\n') if seen['lookups'] >= 3 and not seen['removed'] else b''
+            if args[0] == 'rm':
+                seen['removed'] = True
+            return b''
+        with patch.object(box, 'checked', side_effect=checked), \
+             patch.object(box, 'inspect', return_value={'State': {'Running': False}}), \
+             patch('evaluation.sandbox.time.monotonic', side_effect=lambda: clock[0]), \
+             patch('evaluation.sandbox.time.sleep', side_effect=lambda delay: clock.__setitem__(0, clock[0] + delay)):
+            with self.assertRaises(EvaluationError):
+                box.run(ROOT / 'fixtures/evaluation/isolation_probe.py')
+        self.assertTrue(seen['removed'])
+        self.assertGreaterEqual(seen['lookups'], 4)
+        self.assertTrue(box.broken)
+
+    def test_ambiguous_create_never_visible_is_unknown_after_bounded_wait(self):
+        box = Sandbox(ROOT, self.work, 'sha256:' + 'a' * 64)
+        clock = [0.0]
+        def checked(*args, **kwargs):
+            if args[0] == 'create':
+                raise EvaluationError('DOCKER_COMMAND_FAILED')
+            return b''
+        with patch.object(box, 'checked', side_effect=checked), \
+             patch('evaluation.sandbox.time.monotonic', side_effect=lambda: clock[0]), \
+             patch('evaluation.sandbox.time.sleep', side_effect=lambda delay: clock.__setitem__(0, clock[0] + delay)):
+            with self.assertRaisesRegex(EvaluationError, '^ISOLATION_CLEANUP_FAILED$') as raised:
+                box.run(ROOT / 'fixtures/evaluation/isolation_probe.py')
+        self.assertGreaterEqual(clock[0], 5)
+        self.assertTrue(box.broken)
+        self.assertTrue(raised.exception.pending_container.startswith('hermes-eval-'))
+
     def audit_fixture(self):
         save = controller.save
         save(self.work, 'environment.json', {'fixture': True})

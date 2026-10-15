@@ -152,8 +152,14 @@ class Sandbox:
         require(listed in (b'', name.encode()), 'CONTAINER_IDENTITY_UNKNOWN')
         return bool(listed)
 
-    def cleanup(self, name):
-        if not self.container_exists(name):
+    def cleanup(self, name, *, ambiguous=False):
+        if ambiguous:
+            until = time.monotonic() + 5
+            while not self.container_exists(name):
+                remaining = until - time.monotonic()
+                require(remaining > 0, 'CREATE_OUTCOME_UNKNOWN')
+                time.sleep(min(0.1, remaining))
+        elif not self.container_exists(name):
             return
         state = self.inspect(name)['State']
         if state['Running']:
@@ -188,6 +194,7 @@ class Sandbox:
         started = time.monotonic()
         args = self.options(name, program)
         attempted = False
+        ambiguous = False
         try:
             attempted = True
             try:
@@ -195,6 +202,7 @@ class Sandbox:
             except Exception:
                 # A failed client response cannot establish that the daemon did nothing.
                 self.broken = True
+                ambiguous = True
                 raise
             self.verify_config(self.inspect(name), program)
             remaining = min(timeout, max(0.001, self.deadline - time.monotonic()))
@@ -211,7 +219,9 @@ class Sandbox:
         finally:
             if attempted:
                 try:
-                    self.cleanup(name)
+                    self.cleanup(name, ambiguous=ambiguous)
                 except Exception:
                     self.broken = True
-                    raise EvaluationError('ISOLATION_CLEANUP_FAILED') from None
+                    error = EvaluationError('ISOLATION_CLEANUP_FAILED')
+                    error.pending_container = name
+                    raise error from None

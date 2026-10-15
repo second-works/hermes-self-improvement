@@ -59,7 +59,7 @@ python3 -I -B scripts/evaluate_fixture.py audit RUN_ID
 
 純粋な採点・判定、schema境界、symlink・特殊ファイル、出力・timeout、監査欠損/改変は`tests/test_evaluation.py`、実Dockerの拒否・資源・fixture接続は`gate`と`evaluate`が担当する。標準入口・既存テスト・CI/Security/CodeQLを置換しない。既存の固定検証資産は変更せず、新試験は明示コマンドで実行する。CI組込みが必要なら具体差分・保証を示して別確認する。
 
-2026-10-15時点で新規単体・境界試験29件（模擬transportの接続検査を含む）が成功。標準検証の既存30件とlintも直前stageで成功し、typecheck/buildは既存の未構成による理由付きskip。同stageのローカルSecurityはSECURITY_PASSED、依存manifestなしのためDEPENDENCY_STATUS=SECURITY_NOT_APPLICABLE。最終stage後にも同じ検査を行う。
+2026-10-15時点で新規単体・境界試験31件（模擬transportの接続検査を含む）が成功。標準検証の既存30件とlintも直前stageで成功し、typecheck/buildは既存の未構成による理由付きskip。同stageのローカルSecurityはSECURITY_PASSED、依存manifestなしのためDEPENDENCY_STATUS=SECURITY_NOT_APPLICABLE。最終stage後にも同じ検査を行う。
 
 Dockerの保存先変更はユーザーが実施し、`/Volumes/HD-ADU3/Docker/DockerDesktop/Docker.raw`とdaemon接続を確認した。旧バックアップは外部ディスクのBackups/Docker配下に保持し、復元・全量読取・削除はしていない。画面操作ツールのロック判定と設定ファイルの読取制限は解消を確認していないが、設定完了の人間報告と外部imageの存在を確認して再開した。
 
@@ -74,3 +74,5 @@ Codex Reviewが、docker createのdaemon側成功後に応答が失われるとc
 評価器のsource hashが変わるため旧runを新headの成功に流用しない。基準fixtureを元と同じartifactへ戻したcommitで新しいgateとmanifestを固定し、新hiddenで、元と同じ候補artifactを再登録して比較する。閾値・dataset生成規則・候補ロジックは変えず、候補の種類は1件のまま。旧run/hidden原本は保持して再利用しない。新run・両SHA・checkpointはPRに記録する。
 
 再レビューでは、同一findingの成功回・失敗回が混在すると不安定性を検知できないP2もBLOCKINGと分類した。hiddenの安全ケースで基準が1回だけ失敗し、全回の正規化findingが[]になる再現テストは修正前PASS（期待HOLD）でfail、修正後HOLDでpass。反復の一致判定へfinding hashと失敗状態の組を使い、混在時はEVALUATION_CONTAMINATEDとしてHOLDにする。head変更に伴い、新しいgate・manifest・hiddenで同じ基準と候補を再検証し、旧結果は流用しない。
+
+追加レビューでは、create応答不明時の最初の空照会直後にコンテナが可視化されるP2も対応した。遅延可視化と最後まで不可視の2件を修正前fail→修正後passで検証。応答不明時は最大5秒の照会を行い、可視化された名前を回収する。5秒経過は未作成・消失の証明とは扱わずISOLATION_CLEANUP_FAILEDで停止し、pending_containerへ対象名を保存して後続を禁止する。5秒後もdaemon処理が終了したとは断定せず、自動再開しない。通常の成功したcreate経路は応答による完了確認後に回収する。

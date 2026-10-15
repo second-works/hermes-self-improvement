@@ -21,7 +21,7 @@
 
 ## CIと費用・権限
 
-GitHub-hosted runnerのみ使用し、Hermes本番へ接続しない。CIとSecurityのGITHUB_TOKENはcontents: read、checkoutは認証情報を残さない。Securityはmain側のpull_request_targetから候補headのGitオブジェクトだけを取得し、固定revision `02cab2e1798d5a6c42cea4fb2591a37f1494bfb0` のscannerへ渡す。候補コード・設定・依存installをSecurity jobで実行しない。CI / CodeQL定義、検証入口と既存テストのblob・modeも固定revisionへ照合する。
+GitHub-hosted runnerのみ使用し、Hermes本番へ接続しない。CIとSecurityのGITHUB_TOKENはcontents: read、checkoutは認証情報を残さない。Securityはmain側のpull_request_targetから候補headのGitオブジェクトだけを取得し、固定revision `fd2bbbbd6a41c5cfeebdb8e6a8338d7c2ba675e7` のscannerへ渡す。候補コード・設定・依存installをSecurity jobで実行しない。CI / CodeQL定義、検証入口と既存テストのblob・modeも固定revisionへ照合する。
 
 人間が承認した専用GitHub App `hermes-security-reporter` のtokenを、候補SHAのSecurity Preflight報告stepだけへ渡す。App権限はCommit statuses書込とMetadata読取、このrepoだけへinstall。秘密鍵はmain branchだけを許可するEnvironment `security-reporter` に保持し、main保護の必須送信元をApp ID5322549へ固定する。管理者のEnvironment bypassは無効。設定・認証の失敗を成功にせず、GITHUB_TOKENへfallbackしない。詳しくは docs/security-reporter.md。
 

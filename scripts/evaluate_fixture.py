@@ -243,7 +243,7 @@ def compare_records(records):
     for label, rows in records.items():
         correct = []
         for item in rows:
-            unstable |= len(set(sample['answer_hash'] for sample in item)) != 1
+            unstable |= len({(sample['answer_hash'], sample['failed']) for sample in item}) != 1
             correct.append(all(sample['correct'] for sample in item))
         result[label] = {'correct': correct,
                          'failures': sum(sample['failed'] for item in rows for sample in item),

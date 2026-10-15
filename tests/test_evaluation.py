@@ -114,6 +114,16 @@ class Decisions(unittest.TestCase):
         _, unstable = controller.compare_records({'baseline': rows})
         self.assertTrue(unstable)
 
+    def test_mixed_repeat_failures_with_identical_empty_answer_force_hold(self):
+        ok = {'answer_hash': digest(canonical([])), 'correct': True, 'failed': False, 'wall_seconds': 1}
+        baseline = [[dict(ok) for _ in range(3)] for _ in range(20)]
+        candidate = [[dict(ok) for _ in range(3)] for _ in range(20)]
+        baseline[16][1] = {**ok, 'correct': False, 'failed': True}
+        metrics, unstable = controller.compare_records({'baseline': baseline, 'candidate': candidate})
+        decision = judge(metrics['baseline'], metrics['candidate'], safety=True, contaminated=unstable)
+        self.assertEqual(decision['status'], 'HOLD')
+        self.assertIn('EVALUATION_CONTAMINATED', decision['reasons'])
+
 
 class Boundaries(unittest.TestCase):
     def setUp(self):

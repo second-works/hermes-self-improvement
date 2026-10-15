@@ -280,7 +280,8 @@ def evaluate(work, baseline_sha, candidate_sha):
     try:
         for index, case in enumerate(data):
             for repeat in range(3):
-                order = ('baseline', 'candidate', 'degraded') if repeat % 2 == 0 else ('degraded', 'candidate', 'baseline')
+                labels = ('baseline', 'candidate', 'degraded')
+                order = labels[repeat:] + labels[:repeat]
                 for label in order:
                     outcome = box.run(work / (label + '.py'), canonical(case['input']))
                     failed = bool(outcome['error'] or outcome['exit'] or outcome['stderr'] or outcome['oom'] or outcome['container_exit'])

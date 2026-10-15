@@ -8,7 +8,7 @@ Decision: 匿名のgithub-code-review fixtureで基準版・候補1件・劣化�
 
 公開10件と評価者専用hidden10件を候補生成前に固定する。期待findingのpath / line / rule集合の完全一致を採点し、回帰0、hidden正答+1件以上、失敗率増加0、安全試験全件成功、起動込みwall time median比1.2以下、費用比1.2以下でPASSとする。基準費用0なら候補も0が必要。基準と同一は改善不足のHOLD、劣化版はFAILとなることをcontrolとして確認する。
 
-同じ入力を各版3回実行し、各ケースmedianの全ケースmedianで時間を比較する。品質の非決定性、指標欠如、サンプル不足、未知の環境、hidden汚染はHOLD。既知の安全違反・回帰・上限超過はFAILを優先する。閾値は[policy](../fixtures/evaluation/policy.json)に固定し、一般品質の統計的有意差を表さない。
+同じ入力を各版3回実行し、各版が1番目・2番目・3番目を1回ずつ担当するよう順序を回し、各ケースmedianの全ケースmedianで時間を比較する。品質の非決定性、指標欠如、サンプル不足、未知の環境、hidden汚染はHOLD。既知の安全違反・回帰・上限超過はFAILを優先する。閾値は[policy](../fixtures/evaluation/policy.json)に固定し、一般品質の統計的有意差を表さない。
 
 推論/APIを使わず、呼出・token・API費用は0、`inference=not_applicable`。workerのCPU時間は自己申告値として内部記録し、独立したwall timeやAPI費用の証拠に代用しない。静的な有限fixtureの機能確認であり、実LLMの性能・推論費用は未検証。
 
@@ -80,3 +80,5 @@ Codex Reviewが、docker createのdaemon側成功後に応答が失われるとc
 追加のP2では、遅いcreate後にstartへ再び30秒を与えていたため、作成前にcase/globalの早い方の期限を固定し、create・設定inspect・startで残り時間を共有するよう修正した。予算消費済みなら候補を起動しない。遅いcreateとglobal期限の2境界は修正前fail→修正後pass。起動・稼働の予算と、期限後も必須となる停止確認・回収を分離し、後者の各Docker照会・kill・rmは5秒上限として失敗時は後続を禁止する。
 
 CPU自己申告値へ巨大なJSON整数を返すとfloat変換でOverflowErrorとなるP2は、外部出力の検証契約に関わるためBLOCKINGと分類した。CPU値は厳密なint/float型と0〜30の比較で検証し、変換せずOUTPUT_CPUとして試行失敗へ渡す。巨大な正負整数・bool・NaN/無限大を拒否し、有効境界0/30を受け入れる回帰を修正前fail→修正後passで確認した。
+
+実行順序のP2は、候補が常に2番目で起動位置の影響が時間比へ混入するためBLOCKINGと分類した。3回の順序を循環させ、各版を各位置へ1回ずつ割り当てる。固定位置差1.3/1.0/1.1秒を模擬transportへ与える既存の接続試験を強化し、修正前は位置配分が不均等でfail、修正後は全ケースで均等かつ全版median1.1秒でpassを確認した。

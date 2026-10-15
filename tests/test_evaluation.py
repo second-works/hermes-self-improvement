@@ -404,10 +404,13 @@ class Boundaries(unittest.TestCase):
         for state, name in [('ENVIRONMENT_PINNED', 'environment'), ('ISOLATION_VERIFIED', 'gate'),
                             ('EVALUATION_FROZEN', 'manifest')]:
             controller.event(self.work, state, digest(regular(self.work / (name + '.json'), ROOT / 'runs')))
+        calls = []
         class InertTransport:
             def run(self, path, data):
                 if fail:
                     raise EvaluationError('TRANSPORT_FAILURE')
+                wall_seconds = (1.3, 1.0, 1.1)[len(calls) % 3]
+                calls.append(path.stem)
                 case = load_json(data)
                 index = int(case['path'][5:21], 16)
                 correct = cases[index]['expected']
@@ -415,7 +418,7 @@ class Boundaries(unittest.TestCase):
                     correct = []
                 rows = [{'path': p, 'line': n, 'rule': r} for p, n, r in correct]
                 return {'exit': 0, 'stdout': canonical({'findings': rows, 'cpu_seconds': 0}),
-                        'stderr': b'', 'error': None, 'oom': False, 'container_exit': 0, 'wall_seconds': 1}
+                        'stderr': b'', 'error': None, 'oom': False, 'container_exit': 0, 'wall_seconds': wall_seconds}
         def artifact(sha):
             return b'baseline inert marker' if sha == 'a' * 40 else b'candidate inert marker'
         with patch.object(controller, 'source_hashes', return_value=sources), \
@@ -433,6 +436,11 @@ class Boundaries(unittest.TestCase):
                 return
             controller.evaluate(self.work, 'a' * 40, 'b' * 40)
             report = controller.read(self.work, 'report.json')
+            for start in range(0, 180, 9):
+                for position in range(3):
+                    self.assertEqual(set(calls[start + position:start + 9:3]),
+                                     {'baseline', 'candidate', 'degraded'})
+            self.assertTrue(all(value['median_wall_seconds'] == 1.1 for value in report['metrics'].values()))
             self.assertEqual({k: v['status'] for k, v in report['decisions'].items()},
                              {'baseline': 'HOLD', 'candidate': 'PASS', 'degraded': 'FAIL'})
             self.assertNotIn('case_', json.dumps(report))

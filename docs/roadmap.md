@@ -18,7 +18,7 @@ Issue番号は実行順を意味しない。依存を満たしてから、1子Is
 | 2 | [#6 公式隔離spike](https://github.com/second-works/hermes-self-improvement/issues/6) | #2/#5。固定upstream/依存、CLIと候補変化を実証 | logs、lock、実コマンド、副作用、費用、採否理由 |
 | 3 | [#7 候補委任](https://github.com/second-works/hermes-self-improvement/issues/7) | #4/#5。単一workerと候補1件、予算・timeout・限定パス | diff、単体検証、認証不能時の停止。hidden/本番/Secret権限なし |
 | 4 | [#8 PR承認・復旧](https://github.com/second-works/hermes-self-improvement/issues/8) | #1/#5/#7。通常レーンのPR、SHA別承認、模擬採用/復旧 | 同一headの全Gate、人間承認、fixture復旧のhash一致 |
-| 5 | [#9 手動ループ・Cron](https://github.com/second-works/hermes-self-improvement/issues/9) | #3/#4/#5/#6/#7/#8 | 最小1サイクル、上限停止/排他/復旧/通知、継続と定期化の承認 |
+| 5 | [#9 手動ループ・Cron](https://github.com/second-works/hermes-self-improvement/issues/9) | #3/#4/#5/#6/#7/#8 | fixtureのOBSERVED→ADOPTEDを1回接続。復旧は別試験でROLLED_BACK、上限停止/排他/通知、継続と定期化の承認 |
 
 #3と#5、#4と#6は依存上別系統だが、重要ファイル競合と優先順位を確認せず並列着手しない。この表は委任や複数agentを起動する許可ではない。
 #6が不採用でも調査と人間の採否判断を完了証拠にし、未検証のまま#9へ進めない。#9の実装は採用された方式を使う。
@@ -42,12 +42,14 @@ Issue番号は実行順を意味しない。依存を満たしてから、1子Is
 
 ## 最小サイクルの検収手順案
 
+終了境界は、#5/#7の候補作成・評価段階が `AWAITING_APPROVAL`、#8の人間承認・模擬採用段階が `ADOPTED`。#9では両段階を接続し、fixtureで `OBSERVED` → `ADOPTED` の1サイクルを検収する。成功後に別の故障注入・復旧試験を行い、`ROLLED_BACK` を確認する。すべてfixture配備先に限定し、本番採用を含めない。
+
 1. #5で隔離と評価を先に実証する。基準、意図的劣化版、安全違反版を固定し、分類の期待値を確認する。
 2. #3/#4で合成の失敗観測から根拠付きproposalを作る。基準SHA、公開データ、予算、allowlistを固定する。
 3. #7で1候補だけ作成し、単体検証とdiffを保存する。#6の方式が未採用なら公式CLIに依存しない。
 4. 独立評価者が未知データで基準と候補を比較する。FAIL/HOLDは停止、PASSだけ承認待ちへ進む。
 5. #8で検査済みの評価・差分・未確認を対応PRにまとめ、local→CI→Security→CodeQL→Codex Reviewを同一headで確認する。Mergeは人間が判断する。
-6. fixtureだけで人間の承認票→模擬採用→劣化→承認付き復旧を検査し、元版のhashを確認する。#9では手動1サイクルと上限停止を再現する。
+6. #8でfixtureだけの人間承認票→模擬採用（ADOPTED）を検査する。#9で観測から模擬採用までの手動1サイクルと上限停止を再現する。採用成功後の別試験として劣化を注入し、承認付き復旧（ROLLED_BACK）で元版のhashを確認する。
 
 初期の品質差はfixtureでの結果として報告し、本番性能や汎用的な改善と呼ばない。API実験・本番採用・Cron運転はこの検収から分離する。
 

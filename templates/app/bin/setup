@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+ENV_FILE="${APP_ENV_FILE:-${ROOT_DIR}/.env}"
+
+trim() {
+  local value="$1"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "$value"
+}
+
+config_value() {
+  local key="$1"
+  local name
+  local value
+
+  if [[ ${!key+x} == x ]]; then
+    printf '%s' "${!key}"
+    return 0
+  fi
+  [[ -f "$ENV_FILE" ]] || return 1
+
+  while IFS='=' read -r name value || [[ -n "$name" ]]; do
+    name="$(trim "$name")"
+    [[ -z "$name" || "${name:0:1}" == "#" || "$name" != "$key" ]] && continue
+    value="$(trim "${value:-}")"
+    if [[ "${value:0:1}" == '"' && "${value: -1}" == '"' ]]; then
+      value="${value:1:${#value}-2}"
+    elif [[ "${value:0:1}" == "'" && "${value: -1}" == "'" ]]; then
+      value="${value:1:${#value}-2}"
+    fi
+    printf '%s' "$value"
+    return 0
+  done < "$ENV_FILE"
+  return 1
+}
+
+require_command() {
+  local command_name="$1"
+  command -v "$command_name" >/dev/null 2>&1 || {
+    printf '[setup] failed reason=required command %s is not installed\n' "$command_name" >&2
+    exit 127
+  }
+}
+
+cd "$ROOT_DIR"
+require_command git
+
+if [[ ! -f "$ENV_FILE" ]]; then
+  [[ -f .env.example ]] || {
+    printf '[setup] failed reason=.env.example is missing\n' >&2
+    exit 2
+  }
+  umask 077
+  cp .env.example "$ENV_FILE"
+  printf '[setup] env=created path=%s\n' "${ENV_FILE#"$ROOT_DIR"/}"
+else
+  printf '[setup] env=preserved path=%s\n' "${ENV_FILE#"$ROOT_DIR"/}"
+fi
+
+data_dir="$(config_value APP_DATA_DIR || true)"
+data_dir="${data_dir:-.data}"
+if [[ "$data_dir" != /* ]]; then
+  data_dir="${ROOT_DIR}/${data_dir}"
+fi
+mkdir -p "$data_dir"
+
+if [[ -f package.json ]]; then
+  require_command npm
+  if [[ -f package-lock.json ]]; then
+    npm ci
+  else
+    printf '[setup] failed reason=package.json requires package-lock.json for reproducible setup\n' >&2
+    exit 2
+  fi
+elif [[ -f requirements.txt || -f requirements-dev.txt || -f pyproject.toml ]]; then
+  require_command python3
+  if [[ ! -x .venv/bin/python ]]; then
+    python3 -m venv .venv
+  fi
+  if [[ -f requirements.txt ]]; then
+    .venv/bin/python -m pip install -r requirements.txt
+  fi
+  if [[ -f requirements-dev.txt ]]; then
+    .venv/bin/python -m pip install -r requirements-dev.txt
+  fi
+  if [[ -f pyproject.toml && ! -f requirements.txt ]]; then
+    .venv/bin/python -m pip install -e .
+  fi
+else
+  printf '[setup] dependencies=none detected\n'
+fi
+
+printf '[setup] data_dir=created path=%s\n' "$data_dir"
+printf '[setup] completed\n'

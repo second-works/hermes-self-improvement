@@ -1,0 +1,426 @@
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+BASH = shutil.which('bash')
+if Path('/opt/homebrew/bin/bash').exists():
+    BASH = '/opt/homebrew/bin/bash'
+
+
+class SetupTests(unittest.TestCase):
+    def fixture(self):
+        context = tempfile.TemporaryDirectory()
+        self.addCleanup(context.cleanup)
+        root = Path(context.name)
+        subprocess.run(['git', 'init', '-q', str(root)], check=True)
+        return root
+
+    def security(self, root):
+        subprocess.run(['git', '-C', str(root), 'add', '.'], check=True)
+        return subprocess.run([BASH, str(ROOT / 'scripts/security-preflight.sh'), str(root)],
+                              capture_output=True, text=True)
+
+    def test_security_rejects_secret_in_path_without_echoing_value(self):
+        value = 'ghp_' + 'a' * 30
+        for filename in (value, 'requirements-' + value + '.txt'):
+            with self.subTest(filename='redacted'):
+                root = self.fixture()
+                (root / filename).write_text('')
+                result = self.security(root)
+                self.assertEqual(result.returncode, 1, result.stdout)
+                self.assertIn('SECURITY_STATUS=SECURITY_FAILED', result.stdout)
+                self.assertNotIn(value, result.stdout + result.stderr)
+
+    def test_lint_rejects_invalid_staged_sources_even_if_worktree_is_clean(self):
+        for filename, invalid, valid in [('bad.sh', 'if\n', ':\n'),
+                                         ('tests/bad.py', 'if:\n', 'pass\n')]:
+            with self.subTest(filename=filename):
+                root = self.fixture()
+                path = root / filename
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(invalid)
+                subprocess.run(['git', '-C', str(root), 'add', '.'], check=True)
+                path.write_text(valid)
+                result = subprocess.run([BASH, str(ROOT / 'scripts/lint.sh')], cwd=root,
+                                        capture_output=True, text=True)
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+
+    def helper_result(self, include_preflight, include_codeql=True, include_ci=True):
+        root = self.fixture()
+        checks = [{'name': 'ci' if include_ci else 'other-check',
+                   'status': 'completed', 'conclusion': 'success'}]
+        if include_codeql:
+            checks.append({'name': 'Analyze (python)', 'status': 'completed', 'conclusion': 'success'})
+        statuses = [{'context': 'Security Preflight', 'state': 'success'}] if include_preflight else []
+        (root / 'checks.json').write_text(json.dumps([{'check_runs': checks}]))
+        (root / 'statuses.json').write_text(json.dumps([{'statuses': statuses}]))
+        (root / 'fallback.txt').write_text('SECURITY_STATUS=SECURITY_UNAVAILABLE\n')
+        helper = (ROOT / '.agents/skills/pr-review-fix/scripts/wait-checks.sh').read_text()
+        source = helper.split("<<'PY'\n", 1)[1].split('\nPY', 1)[0]
+        return subprocess.run(['python3', '-I', '-c', source, str(root / 'checks.json'),
+                               str(root / 'statuses.json'), str(root / 'fallback.txt')],
+                              check=True, capture_output=True, text=True).stdout
+
+    def test_helper_does_not_replace_missing_preflight_with_codeql(self):
+        self.assertIn('SECURITY_STATUS=SECURITY_UNAVAILABLE', self.helper_result(False))
+
+    def test_helper_rejects_missing_required_codeql(self):
+        self.assertIn('SECURITY_STATUS=SECURITY_UNAVAILABLE',
+                      self.helper_result(True, include_codeql=False))
+
+    def test_helper_rejects_other_ci_as_replacement(self):
+        self.assertIn('CI_STATUS=CI_UNAVAILABLE', self.helper_result(True, include_ci=False))
+
+    def test_helper_accepts_exact_preflight_and_codeql(self):
+        self.assertIn('SECURITY_STATUS=SECURITY_PASSED', self.helper_result(True))
+
+    def test_reporter_missing_configuration_fails_without_exposing_key(self):
+        workflow = (ROOT / '.github/workflows/security.yml').read_text()
+        code = workflow.split('        run: |\n', 1)[1].split('\n      - name:', 1)[0]
+        code = '\n'.join(line[10:] for line in code.splitlines())
+        for app_id, client_id, key, expected in [('', '', '', 2), ('wrong', 'client', 'fixture-key', 2),
+                                                ('123', 'client', '', 2), ('123', 'client', 'fixture-key', 0)]:
+            result = subprocess.run([BASH, '-e', '-c', code], capture_output=True, text=True,
+                env={**os.environ, 'SECURITY_APP_ID': app_id, 'SECURITY_APP_CLIENT_ID': client_id,
+                     'REPORTER_PRIVATE_KEY': key})
+            self.assertEqual(result.returncode, expected)
+            self.assertNotIn('fixture-key', result.stdout + result.stderr)
+            if expected:
+                self.assertIn('SECURITY_STATUS=SECURITY_UNAVAILABLE', result.stdout)
+
+    def test_reporter_does_not_turn_missing_or_failed_scan_into_success(self):
+        workflow = (ROOT / '.github/workflows/security.yml').read_text()
+        code = workflow.split('      - name: Report exact candidate result', 1)[1].split('        run: |\n', 1)[1]
+        code = '\n'.join(line[10:] for line in code.splitlines())
+        root = self.fixture()
+        fake = root / 'gh'
+        fake.write_text('#!/bin/sh\nprintf "%s\\n" "$@"\n')
+        fake.chmod(0o755)
+        for outcome, expected in [('success', 'success'), ('failure', 'failure'), ('skipped', 'error'),
+                                  ('cancelled', 'error'), ('', 'error')]:
+            result = subprocess.run([BASH, '-e', '-c', code], capture_output=True, text=True,
+                env={**os.environ, 'PATH': str(root) + os.pathsep + os.environ['PATH'],
+                     'SCAN_OUTCOME': outcome, 'PR_HEAD_SHA': 'a' * 40, 'RUN_URL': 'https://example.invalid'})
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('state=' + expected, result.stdout)
+
+    def test_trusted_gate_rejects_modified_or_missing_ci_definitions(self):
+        workflow = (ROOT / '.github/workflows/security.yml').read_text()
+        guard = workflow.split('        id: scan\n        run: |\n', 1)[1].split(
+            '          bash security-tool/scripts/security-preflight.sh candidate', 1)[0]
+        guard = '\n'.join(line[10:] for line in guard.splitlines())
+        for modified in (None, 'ci.yml', 'codeql.yml', 'missing', 'mode', 'extra', 'security', 'verifier', 'lint', 'runner', 'tests'):
+            with self.subTest(modified=modified):
+                root = self.fixture()
+                for dirname in ('security-tool', 'candidate'):
+                    repo = root / dirname
+                    subprocess.run(['git', 'init', '-q', str(repo)], check=True)
+                    workflows = repo / '.github/workflows'
+                    workflows.mkdir(parents=True)
+                    for name in ('ci.yml', 'codeql.yml', 'security.yml'):
+                        (workflows / name).write_text('name: Trusted fixture\n')
+                    for asset in ('scripts/verify.sh', 'scripts/lint.sh', 'scripts/test.sh', 'tests/test_setup.py'):
+                        target = repo / asset
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        target.write_text('trusted fixture\n')
+                    mapping = {'verifier': 'scripts/verify.sh', 'lint': 'scripts/lint.sh',
+                               'runner': 'scripts/test.sh', 'tests': 'tests/test_setup.py'}
+                    if dirname == 'candidate' and modified in mapping:
+                        (repo / mapping[modified]).write_text('no-op replacement\n')
+                    if dirname == 'candidate' and modified in ('ci.yml', 'codeql.yml'):
+                        (workflows / modified).write_text('name: Trusted fixture\n# no-op replacement\n')
+                    if dirname == 'candidate' and modified == 'missing':
+                        (workflows / 'codeql.yml').unlink()
+                    if dirname == 'candidate' and modified == 'extra':
+                        (workflows / 'fake.yml').write_text('name: Duplicate no-op fixture\n')
+                    if dirname == 'candidate' and modified == 'security':
+                        (workflows / 'security.yml').write_text('name: No-op Security fixture\n')
+                    if dirname == 'candidate' and modified == 'mode':
+                        (workflows / 'codeql.yml').chmod(0o755)
+                    subprocess.run(['git', '-C', str(repo), 'add', '.'], check=True)
+                    subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Fixture',
+                        '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'fixture'], check=True)
+                base = subprocess.check_output(['git', '-C', str(root / 'security-tool'),
+                                                 'rev-parse', 'HEAD'], text=True).strip()
+                subprocess.run(['git', '-C', str(root / 'candidate'), 'fetch', '-q',
+                                str(root / 'security-tool'), base], check=True)
+                head = subprocess.check_output(['git', '-C', str(root / 'candidate'),
+                                                 'rev-parse', 'HEAD'], text=True).strip()
+                result = subprocess.run([BASH, '-e', '-c', guard], cwd=root,
+                    env={**os.environ, 'PR_HEAD_SHA': head, 'BASE_WORKFLOW_SHA': base}, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0 if modified is None else 1,
+                                 result.stdout + result.stderr)
+                if modified:
+                    self.assertIn('SECURITY_STATUS=SECURITY_FAILED', result.stdout)
+
+    def test_npm_audit_ignores_candidate_registry_and_inherited_configuration(self):
+        root = self.fixture()
+        (root / 'package.json').write_text('{"name":"fixture","version":"1.0.0"}')
+        (root / 'package-lock.json').write_text('{"lockfileVersion":3,"packages":{}}')
+        (root / '.npmrc').write_text('registry=https://attacker.example.invalid\nomit=dev\n')
+        bindir = root / 'fixture-bin'
+        bindir.mkdir()
+        npm = bindir / 'npm'
+        npm.write_text('#!/bin/sh\n'
+            'test ! -e .npmrc || exit 31\n'
+            'test ! -e "$HOME/.npmrc" || exit 32\n'
+            'test -z "${NPM_CONFIG_REGISTRY:-}" || exit 33\n'
+            'user_config="${1#--userconfig=}"\n'
+            'global_config="${2#--globalconfig=}"\n'
+            'test "$user_config" != "$global_config" || exit 34\n'
+            'test -f "$user_config" && test ! -s "$user_config" || exit 35\n'
+            'test -f "$global_config" && test ! -s "$global_config" || exit 35\n'
+            'test -f package-lock.json && test -f package.json || exit 37\n'
+            'test "$3" = "--registry=https://registry.npmjs.org" || exit 36\n'
+            "printf '%s\\n' '{\"auditReportVersion\":2,\"metadata\":{\"vulnerabilities\":{\"high\":1,\"critical\":0}}}'\n"
+            'exit 1\n')
+        npm.chmod(0o755)
+        subprocess.run(['git', '-C', str(root), 'add', '.'], check=True)
+        result = subprocess.run([BASH, str(ROOT / 'scripts/security-preflight.sh'), str(root)],
+            env={**os.environ, 'PATH': str(bindir) + os.pathsep + os.environ['PATH'],
+                 'NPM_CONFIG_REGISTRY': 'https://attacker.example.invalid'}, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('DEPENDENCY_STATUS=SECURITY_FAILED', result.stdout)
+        self.assertIn('high or critical vulnerabilities', result.stdout)
+
+    def test_real_npm_audit_accepts_root_and_nested_lockfiles(self):
+        self.assertIsNotNone(shutil.which('npm'), 'npm is required for the supported audit contract')
+        for directory in ('', 'nested'):
+            for lockname in ('package-lock.json', 'npm-shrinkwrap.json'):
+                with self.subTest(directory=directory, lockname=lockname):
+                    root = self.fixture()
+                    project = root / directory
+                    project.mkdir(parents=True, exist_ok=True)
+                    package = {'name': 'inert-fixture', 'version': '1.0.0'}
+                    (project / 'package.json').write_text(json.dumps(package))
+                    lock = {**package, 'lockfileVersion': 3, 'packages': {'': package}}
+                    (project / lockname).write_text(json.dumps(lock))
+                    (project / '.npmrc').write_text('registry=https://attacker.example.invalid\n')
+                    result = self.security(root)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertIn('DEPENDENCY_STATUS=SECURITY_PASSED', result.stdout)
+
+    def test_security_clean(self):
+        root = self.fixture()
+        (root / 'README.md').write_text('clean fixture\n')
+        result = self.security(root)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn('SECURITY_STATUS=SECURITY_PASSED', result.stdout)
+
+    def test_security_rejects_secret_without_echoing_value(self):
+        root = self.fixture()
+        value = 'ghp_' + 'a' * 30
+        (root / 'leak.txt').write_text(value)
+        result = self.security(root)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('SECURITY_STATUS=SECURITY_FAILED', result.stdout)
+        self.assertNotIn(value, result.stdout + result.stderr)
+
+    def test_security_scans_staged_secret_even_if_worktree_is_clean(self):
+        root = self.fixture()
+        value = 'ghp_' + 'a' * 30
+        (root / 'leak.txt').write_text(value)
+        subprocess.run(['git', '-C', str(root), 'add', '.'], check=True)
+        (root / 'leak.txt').write_text('clean\n')
+        result = subprocess.run([BASH, str(ROOT / 'scripts/security-preflight.sh'), str(root)],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn('SECURITY_STATUS=SECURITY_FAILED', result.stdout)
+        self.assertNotIn(value, result.stdout + result.stderr)
+
+    def test_security_scans_staged_manifest_even_if_worktree_is_clean(self):
+        root = self.fixture()
+        (root / 'requirements.txt').write_text('example==1.0\n')
+        subprocess.run(['git', '-C', str(root), 'add', '.'], check=True)
+        (root / 'requirements.txt').unlink()
+        result = subprocess.run([BASH, str(ROOT / 'scripts/security-preflight.sh'), str(root)],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 4, result.stdout)
+        self.assertIn('SECURITY_STATUS=SECURITY_UNAVAILABLE', result.stdout)
+
+    def test_security_unsupported_dependency_is_unavailable(self):
+        root = self.fixture()
+        (root / 'requirements.txt').write_text('example==1.0\n')
+        result = self.security(root)
+        self.assertEqual(result.returncode, 4)
+        self.assertIn('SECURITY_STATUS=SECURITY_UNAVAILABLE', result.stdout)
+
+    def test_security_does_not_follow_symlink(self):
+        root = self.fixture()
+        (root / 'outside').symlink_to('/nonexistent/private-data')
+        result = self.security(root)
+        self.assertEqual(result.returncode, 0)
+
+    def test_security_dependency_symlink_is_unavailable(self):
+        root = self.fixture()
+        (root / 'package-lock.json').symlink_to('/nonexistent/private-data')
+        result = self.security(root)
+        self.assertEqual(result.returncode, 4, result.stdout)
+        self.assertIn('SECURITY_STATUS=SECURITY_UNAVAILABLE', result.stdout)
+
+    def test_security_does_not_apply_checkout_filters(self):
+        root = self.fixture()
+        value = 'ghp_' + 'a' * 30
+        (root / '.gitattributes').write_text('leak.txt filter=redact\n')
+        (root / 'leak.txt').write_text(value)
+        subprocess.run(['git', '-C', str(root), 'config', 'filter.redact.clean', 'cat'], check=True)
+        subprocess.run(['git', '-C', str(root), 'config', 'filter.redact.smudge',
+                        "sed 's/ghp_[a-z]*/redacted/g'"], check=True)
+        result = self.security(root)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn('SECURITY_STATUS=SECURITY_FAILED', result.stdout)
+        self.assertNotIn(value, result.stdout + result.stderr)
+
+    def test_security_can_scan_index_without_candidate_checkout(self):
+        root = self.fixture()
+        (root / 'leak.txt').write_text('ghp_' + 'a' * 30)
+        subprocess.run(['git', '-C', str(root), 'add', '.'], check=True)
+        (root / 'leak.txt').unlink()
+        result = subprocess.run([BASH, str(ROOT / 'scripts/security-preflight.sh'), str(root)],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn('SECURITY_STATUS=SECURITY_FAILED', result.stdout)
+
+    def test_security_does_not_execute_candidate_scanner(self):
+        root = self.fixture()
+        (root / 'scripts').mkdir()
+        (root / 'scripts/security-preflight.sh').write_text('#!/bin/sh\nexit 0\n')
+        (root / 'leak.txt').write_text('ghp_' + 'a' * 30)
+        result = self.security(root)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn('SECURITY_STATUS=SECURITY_FAILED', result.stdout)
+
+    def test_security_template_matches_runtime(self):
+        self.assertEqual((ROOT / 'scripts/security-preflight.sh').read_bytes(),
+                         (ROOT / 'templates/security/security-preflight.sh').read_bytes())
+
+    def verify_fixture(self):
+        root = self.fixture()
+        (root / 'scripts').mkdir()
+        shutil.copy(ROOT / 'scripts/verify.sh', root / 'scripts/verify.sh')
+        return root
+
+    def verify(self, root):
+        return subprocess.run([BASH, str(root / 'scripts/verify.sh')],
+                              env={**os.environ, 'VERIFY_STACK': 'generic'},
+                              capture_output=True, text=True)
+
+    def test_verify_accepts_documented_python_markers(self):
+        for marker in ('requirements-dev.txt', 'uv.lock', 'poetry.lock'):
+            for stack in ('auto', 'python'):
+                with self.subTest(marker=marker, stack=stack):
+                    root = self.verify_fixture()
+                    (root / marker).write_text('')
+                    (root / 'tests').mkdir()
+                    (root / 'tests/test_example.py').write_text('def test_example(): pass\n')
+                    (root / 'bin').mkdir()
+                    pytest = root / 'bin/pytest'
+                    pytest.write_text('#!/bin/sh\ntouch pytest-ran\n')
+                    pytest.chmod(0o755)
+                    result = subprocess.run([BASH, str(root / 'scripts/verify.sh')], cwd=root,
+                        env={**os.environ, 'VERIFY_STACK': stack,
+                             'PATH': str(root / 'bin') + os.pathsep + os.environ['PATH']},
+                        capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertTrue((root / 'pytest-ran').exists())
+
+    def test_verify_template_matches_runtime(self):
+        self.assertEqual((ROOT / 'scripts/verify.sh').read_bytes(),
+                         (ROOT / 'templates/verification/verify.sh').read_bytes())
+
+    def test_verify_all_skipped_fails(self):
+        result = self.verify(self.verify_fixture())
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('no applicable verification stages', result.stderr)
+
+    def test_verify_failure_stops_before_test(self):
+        root = self.verify_fixture()
+        (root / 'scripts/lint.sh').write_text('#!/bin/sh\nexit 17\n')
+        (root / 'scripts/test.sh').write_text('#!/bin/sh\ntouch test-ran\n')
+        for path in root.glob('scripts/*.sh'):
+            path.chmod(0o755)
+        result = self.verify(root)
+        self.assertEqual(result.returncode, 17)
+        self.assertFalse((root / 'test-ran').exists())
+
+    def test_pinned_test_entry_ignores_candidate_modules_and_pythonpath(self):
+        root = self.fixture()
+        (root / 'scripts').mkdir()
+        shutil.copy(ROOT / 'scripts/test.sh', root / 'scripts/test.sh')
+        (root / 'tests').mkdir()
+        (root / 'tests/test_setup.py').write_text(
+            'import unittest\nclass Required(unittest.TestCase):\n'
+            ' def test_required(self): self.fail("required-test-ran")\n'
+            'if __name__ == "__main__": unittest.main()\n')
+        for base in (root, root / 'tests'):
+            (base / 'unittest').mkdir()
+            (base / 'unittest/__init__.py').write_text('raise SystemExit(0)\n')
+            (base / 'unittest/__main__.py').write_text('raise SystemExit(0)\n')
+        (root / 'sitecustomize.py').write_text('pass\n')
+        result = subprocess.run([BASH, str(root / 'scripts/test.sh')], cwd=root,
+            env={**os.environ, 'PYTHONPATH': str(root)}, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('required-test-ran', result.stderr)
+
+    def test_python_tools_ignore_candidate_imports(self):
+        root = self.fixture()
+        marker = root / 'candidate-module-executed'
+        payload = 'from builtins import open\nopen(' + repr(str(marker)) + ', "w").write("bad")\n'
+        (root / 'ast.py').write_text(payload)
+        (root / 'pathlib.py').write_text(payload)
+        (root / 'bad.sh').write_text('if\n')
+        subprocess.run(['git', '-C', str(root), 'add', '.'], check=True)
+        environment = {**os.environ, 'PYTHONPATH': str(root)}
+        lint = subprocess.run([BASH, str(ROOT / 'scripts/lint.sh')], cwd=root,
+            env=environment, capture_output=True, text=True)
+        self.assertNotEqual(lint.returncode, 0)
+        self.assertFalse(marker.exists())
+        security = subprocess.run([BASH, str(ROOT / 'scripts/security-preflight.sh'), str(root)],
+            cwd=root, env=environment, capture_output=True, text=True)
+        self.assertEqual(security.returncode, 0, security.stdout + security.stderr)
+        self.assertFalse(marker.exists())
+
+    def test_ci_keeps_repository_tests_mandatory_across_stack_detection(self):
+        root = self.fixture()
+        (root / 'scripts').mkdir()
+        (root / 'tests').mkdir()
+        for name in ('verify.sh', 'test.sh'):
+            shutil.copy(ROOT / 'scripts' / name, root / 'scripts' / name)
+        (root / 'tests/test_setup.py').write_text(
+            'import unittest\nclass Required(unittest.TestCase):\n'
+            ' def test_required(self): self.fail("required-test-ran")\n'
+            'if __name__ == "__main__": unittest.main()\n')
+        (root / 'setup.py').write_text('')
+        (root / 'pytest.ini').write_text('[pytest]\ntestpaths = empty\n')
+        (root / 'empty').mkdir()
+        (root / 'empty/test_passing.py').write_text('def test_ok(): pass\n')
+        (root / 'bin').mkdir()
+        fake_pytest = root / 'bin/pytest'
+        fake_pytest.write_text('#!/bin/sh\nexit 0\n')
+        fake_pytest.chmod(0o755)
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        command = workflow.split('      - name: Standard verification\n        run:', 1)[1]
+        if command.startswith(' |\n'):
+            command = '\n'.join(line[10:] for line in command[3:].splitlines())
+        else:
+            command = command.strip()
+        result = subprocess.run([BASH, '-e', '-c', command], cwd=root,
+            env={**os.environ, 'PATH': str(root / 'bin') + os.pathsep + os.environ['PATH']},
+            capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('required-test-ran', result.stderr)
+
+    def test_agent_references_are_present(self):
+        import re
+        text = (ROOT / 'AGENTS.md').read_text()
+        for path in re.findall(r'(?<![A-Za-z0-9_/])(?:docs|\.agents|templates)/[A-Za-z0-9_./-]+\.(?:md|sh)', text):
+            self.assertTrue((ROOT / path).is_file(), path)
+
+
+if __name__ == '__main__':
+    unittest.main()

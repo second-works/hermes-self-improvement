@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Review Comment Auto-Triage Decision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "comment_id",
+    "model",
+    "mode",
+    "decision",
+    "category",
+    "priority",
+    "auto_fixable",
+    "high_risk",
+    "confidence",
+    "suggested_route",
+    "routed_to",
+    "final_result",
+    "fallback_reason",
+    "latency_ms",
+    "usage",
+    "neuron_usage",
+    "comparison"
+  ],
+  "properties": {
+    "comment_id": { "type": "string", "minLength": 1 },
+    "model": { "type": "string", "const": "typesafe/jev" },
+    "mode": { "enum": ["shadow", "limited_automation"] },
+    "decision": { "enum": ["action_required", "no_action", "undecided"] },
+    "category": {
+      "type": ["string", "null"],
+      "enum": ["security", "bug", "test", "style", "docs", "other", null]
+    },
+    "priority": {
+      "type": ["string", "null"],
+      "enum": ["p0", "p1", "p2", "p3", null]
+    },
+    "auto_fixable": { "type": ["boolean", "null"] },
+    "high_risk": { "type": ["boolean", "null"] },
+    "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+    "suggested_route": { "enum": ["codex", "human", "record_only"] },
+    "routed_to": { "enum": ["codex", "human", "record_only"] },
+    "final_result": { "enum": ["shadow_observation", "recorded", "routed", "fallback"] },
+    "fallback_reason": {
+      "type": ["string", "null"],
+      "enum": ["invalid_comment_id", "invalid_body", "comment_too_large", "invalid_comment", "invalid_existing_decision", "invalid_route_config", "unparseable_response", "credits_exhausted", "spend_limit", "rate_limited", "billing_unavailable", "api_failure", "high_risk", "low_confidence", null]
+    },
+    "latency_ms": { "type": "number", "minimum": 0 },
+    "usage": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["input_tokens", "output_tokens"],
+      "properties": {
+        "input_tokens": { "type": ["integer", "null"], "minimum": 0 },
+        "output_tokens": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "neuron_usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reason"],
+      "properties": {
+        "status": { "const": "unavailable" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "comparison": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["baseline_present", "disagreement_count", "disagreements"],
+      "properties": {
+        "baseline_present": { "const": true },
+        "disagreement_count": { "type": "integer", "minimum": 0 },
+        "disagreements": {
+          "type": "array",
+          "items": { "enum": ["decision", "category", "priority", "auto_fixable"] }
+        }
+      }
+    }
+  }
+}

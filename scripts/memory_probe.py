@@ -168,11 +168,22 @@ def worker(work, mode):
     return {'status': 'VERIFIED', 'phase': mode}
 
 
-def append_event(work, run_id, state, previous, output_hash=ZERO, reason=None):
+def read_manifest_hash(work):
+    try:
+        manifest = json.loads(safe_path(work / 'manifest.json').read_bytes())
+        if not isinstance(manifest, dict) or manifest.get('run_id') != work.name:
+            raise ProbeError('audit_manifest_invalid')
+        return digest(canonical(manifest))
+    except (OSError, ValueError, UnicodeError):
+        raise ProbeError('audit_manifest_missing_or_invalid') from None
+
+
+def append_event(work, run_id, state, previous, output_hash=ZERO, reason=None, manifest_sha256=None):
     event = {'run_id': run_id, 'utc': utc(), 'actor': 'storage-probe', 'state': state,
              'input_hash': digest(LOCK.read_bytes()), 'output_hash': output_hash,
              'api_cost_usd': 0, 'approval_ref': 'human-chat-2026-10-15-storage-retention',
-             'previous_hash': previous, 'reason': reason}
+             'previous_hash': previous, 'reason': reason,
+             'manifest_sha256': manifest_sha256 or read_manifest_hash(work)}
     event['hash'] = digest(canonical(event))
     with (work / 'events.jsonl').open('ab') as stream:
         stream.write(canonical(event) + b'\n')
@@ -183,13 +194,15 @@ def append_event(work, run_id, state, previous, output_hash=ZERO, reason=None):
 
 def verify_events(work):
     safe_path(work)
+    manifest_sha256 = read_manifest_hash(work)
     previous = ZERO
     count = 0
     states = []
     for line in (safe_path(work / 'events.jsonl')).read_bytes().splitlines():
         event = json.loads(line)
         claimed = event.pop('hash')
-        if event['previous_hash'] != previous or digest(canonical(event)) != claimed or event['run_id'] != work.name:
+        if (event['previous_hash'] != previous or digest(canonical(event)) != claimed
+                or event['run_id'] != work.name or event.get('manifest_sha256') != manifest_sha256):
             raise ProbeError('audit_chain_mismatch')
         previous, count = claimed, count + 1
         states.append(event['state'])
@@ -223,16 +236,19 @@ def run(lock):
                 'not_verified': ['full_agent_integration', 'model_API', 'production_root_cause',
                                  'OS_restart', 'automatic_prune_scheduling', 'adversarial_OS_sandbox']}
     (work / 'manifest.json').write_bytes(canonical(manifest) + b'\n')
-    previous = append_event(work, run_id, 'STARTED', ZERO)
+    manifest_sha256 = digest(canonical(manifest))
+    previous = append_event(work, run_id, 'STARTED', ZERO, manifest_sha256=manifest_sha256)
     phases, reason, status, failed_cases = [], None, 'BLOCKED', []
     try:
         verify_source(lock)
-        previous = append_event(work, run_id, 'SOURCE_VERIFIED', previous)
+        previous = append_event(work, run_id, 'SOURCE_VERIFIED', previous, manifest_sha256=manifest_sha256)
         phases.append(worker(work, 'seed'))
         with ThreadPoolExecutor(max_workers=2) as pool:
             phases.extend(pool.map(lambda mode: worker(work, mode), ['one', 'two']))
         phases.append(worker(work, 'check'))
         verify_source(lock)
+        if read_manifest_hash(work) != manifest_sha256:
+            raise ProbeError('audit_manifest_mismatch')
         status = 'VERIFIED'
     except ProbeError as error:
         reason = str(error)
@@ -246,7 +262,7 @@ def run(lock):
               'secret_masking': 'NOT_GUARANTEED_BY_UPSTREAM_STORAGE', 'api_cost_usd': 0}
     raw = canonical(report) + b'\n'
     (work / 'report.json').write_bytes(raw)
-    append_event(work, run_id, status, previous, digest(raw), reason)
+    append_event(work, run_id, status, previous, digest(raw), reason, manifest_sha256)
     audit_result = verify_events(work)
     print(json.dumps({'status': status, 'reason': reason, 'run_id': run_id,
                       'tests': len(expected_cases()) if status == 'VERIFIED' else None,

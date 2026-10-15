@@ -60,6 +60,7 @@ class HarnessTests(unittest.TestCase):
         work.mkdir()
         lock = self.root / 'lock.json'
         lock.write_text('{}')
+        (work / 'manifest.json').write_bytes(probe.canonical({'run_id': work.name, 'retention_days': 30}) + b'\n')
         with patch.object(probe, 'LOCK', lock):
             prev = probe.append_event(work, work.name, 'STARTED', probe.ZERO)
             prev = probe.append_event(work, work.name, 'SOURCE_VERIFIED', prev)
@@ -82,6 +83,20 @@ class HarnessTests(unittest.TestCase):
         path.write_bytes(before)
         (work / 'report.json').write_bytes(b'{}')
         with self.assertRaises((probe.ProbeError, KeyError)):
+            probe.verify_events(work)
+
+    def test_manifest_tampering_and_missing_manifest_are_rejected(self):
+        work = self.audit_fixture()
+        manifest = work / 'manifest.json'
+        original = manifest.read_bytes()
+        self.assertEqual(probe.verify_events(work)['status'], 'VERIFIED')
+        manifest.write_bytes(original.replace(b'30', b'90'))
+        with self.assertRaises(probe.ProbeError):
+            probe.verify_events(work)
+        # Preserve the original fixture; simulate a missing name by moving it.
+        manifest.write_bytes(original)
+        manifest.rename(work / 'manifest.preserved.json')
+        with self.assertRaises(probe.ProbeError):
             probe.verify_events(work)
 
     def test_worker_output_is_reconstructed_and_env_does_not_inherit_secrets(self):

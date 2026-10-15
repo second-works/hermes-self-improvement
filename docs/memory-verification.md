@@ -68,13 +68,13 @@ MemoryStore自体の永続ファイルには、この試験でTTLによる自動
 - 期限後も自動削除しない。人間が対象run・分類・保存期間・保持すべき証拠を確認し、個別に承認してから削除する。削除機能は今回実装しない。
 - 原データに実Secret・本番会話を使わない。Git管理と将来のGitHub提出は検査済みPUBLIC要約・再現手順だけとし、提出承認は別に得る。
 
-`manifest.json` は固定source / lock / runner / workerのhash、Python・SQLite version、保持方針と未検証項目を記録する。`report.json` は件数・case名・状態・固定理由codeだけを許可し、workerのstdout/stderr・検索内容・例外messageは保存しない。予期しないstderrがあれば内容を出さず失敗にする。`events.jsonl` はrun_id、UTC、actor、状態、入出力hash、費用0、承認参照、終了理由code、前イベントhashを追記する。試験失敗・未完了runを再利用せず、新runでやり直す。既存原本を削除してからの再実行は不要。
+`manifest.json` は固定source / lock / runner / workerのhash、Python・SQLite version、保持方針と未検証項目を記録する。canonical JSONのSHA-256をSTARTED以降の全イベントに固定し、検査時にはmanifestの存在・run ID・hash一致を必須とする。`report.json` は件数・case名・状態・固定理由codeだけを許可し、workerのstdout/stderr・検索内容・例外messageは保存しない。予期しないstderrがあれば内容を出さず失敗にする。`events.jsonl` はrun_id、UTC、actor、状態、入出力hash、費用0、承認参照、終了理由code、前イベントhashを追記する。試験失敗・未完了runを再利用せず、新runでやり直す。既存原本を削除してからの再実行は不要。
 
 ```bash
 python3 -I -B scripts/memory_probe.py verify-events memory-YYYYMMDDTHHMMSSZ-xxxxxxxx
 ```
 
-上記は実際に出力されたrun IDに置き換える。連鎖、終端、report hashを検査する。全記録と連鎖を同時に書き換えられる主体にはhashだけで対抗できない。検査済みのreport hash・最終event hashを別のレビュー済み記録へ固定して照合する。今回の保存方針は、将来の候補workerに監査原本の編集・削除権限を与える承認ではない。
+上記は実際に出力されたrun IDに置き換える。manifest、連鎖、終端、report hashを検査する。manifest hashを持たない旧試験runも原本は保持するが、現行検査では成功扱いしない。全記録と連鎖を同時に書き換えられる主体にはhashだけで対抗できない。検査済みのreport hash・最終event hashを別のレビュー済み記録へ固定して照合する。今回の保存方針は、将来の候補workerに監査原本の編集・削除権限を与える承認ではない。
 
 [最小schema](../schemas/improvement-log.schema.json) と [未検証の設計例](../fixtures/memory/improvement-log.example.json) は `iteration / baseline / candidate / metrics / approval / rollback` を明示する。候補未作成は `candidate=null`、未計測は `metrics.status=NOT_VERIFIED`、未申請は `NOT_REQUESTED` として成功を推定しない。自由文のprompt・会話・tokenを格納するfieldを設けない。Git commit SHAとartifact SHA-256を別に保存する。
 
@@ -82,14 +82,16 @@ python3 -I -B scripts/memory_probe.py verify-events memory-YYYYMMDDTHHMMSSZ-xxxx
 
 ## 今回の証拠
 
-2026-10-15、Python **3.14.5** / SQLite **3.53.1** / macOS arm64で、保存・検索13項目とharness 7項目が成功した。FTS5経路と正常なread-only検索も確認した。標準検証は既存30テストとlintが成功。typecheck / buildは既存の未構成による理由付きskipで、全工程skipではない。Bash 5以上のローカルSecurity Preflightは `SECURITY_PASSED`、追加package manifestなしのため依存監査は `SECURITY_NOT_APPLICABLE`。
+2026-10-15、Python **3.14.5** / SQLite **3.53.1** / macOS arm64で、保存・検索13項目とharness 8項目が成功した。FTS5経路と正常なread-only検索も確認した。標準検証は既存30テストとlintが成功。typecheck / buildは既存の未構成による理由付きskipで、全工程skipではない。Bash 5以上のローカルSecurity Preflightは `SECURITY_PASSED`、追加package manifestなしのため依存監査は `SECURITY_NOT_APPLICABLE`。
 
-保存・検索の記録済みrunは `memory-20261015T055332Z-e5b5a211`。原本はGit管理外の同名runに保持する。
+保存・検索の記録済みrunは `memory-20261015T060518Z-671c568d`。原本はGit管理外の同名runに保持する。
 
-- report SHA-256: `17d72eebf848fea5248cd4452e824d2714a95c398ef1a61dcd5d3986a83d006e`
-- 最終event SHA-256: `0805acf9f4e0ee935817e61c628e274d2acaef68ec6248fc8f4cb8c556c1faa6`
+- report SHA-256: `4676e066989ef67457c9141cc71bfa624092d5e67cc689e9e0129715398ec6f1`
+- 最終event SHA-256: `eecd3530aa2bbccd61b79757a2dbda7b8e1ffd76d3de5c4b581993f0bcfc2691`
 - 3イベントの連鎖・終端・report hashを `verify-events` で検査する。これは今回の検査済みcheckpointであり、原本のアクセス制御の代替ではない。
 
 schemaと例のJSON構文・内部参照を確認した。JSON Schema validatorによる動的検証と実行系への接続は未実施。self-reviewでSQLite URIの隔離判定を修正し、read-only成功とDatabaseError / OperationalErrorを区別する試験を追加した。残る制約はAST sliceを使う限定統合、通常CLI・本番原因・OS再起動・自動prune・悪意あるnative codeの隔離・新試験のCI組込みである。
+
+PR #12の初回Codex Reviewは、manifestが監査チェーンに結び付いていないP2をBLOCKINGと判定した。改変時にも検査が成功することを追加テストで再現し、STARTEDを含む全イベントへのcanonical manifest hashの固定と検査時の照合を追加した。改変・欠如の拒否は修正前fail→修正後pass。新headのCI / Security / Codex再レビューの結果はPRで確認する。
 
 Risk Tierと作業境界のIssue追記は、初回はGitHub掲載本文の明示承認不足として自動承認レビューに拒否された。掲載予定文を提示した後、2026-10-15にユーザーがIssue追記・commit・push・PR作成を明示承認し、Issue #3へ記録した。Mergeと本番操作は承認範囲に含めない。CI / remote Security / Codex Reviewは、同じPR headの証拠をPRへ別途記録する。未確認を成功扱いせず、本番のProduct Acceptanceとも分けて扱う。

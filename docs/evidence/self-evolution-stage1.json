@@ -1,0 +1,206 @@
+{
+  "acceptance": "NOT_VERIFIED: no real model optimization or production compatibility test",
+  "classification": "PUBLIC",
+  "cli": {
+    "dry-run": {
+      "status": "VERIFIED"
+    },
+    "help": {
+      "status": "VERIFIED"
+    }
+  },
+  "contracts": {
+    "body_constraints": {
+      "non_empty": true,
+      "size_limit": true,
+      "skill_structure": false
+    },
+    "extraction_fixture": {
+      "kind": "manual-predictor-mutation-not-optimizer",
+      "predictor_changed": true,
+      "saved_skill_unchanged": true
+    },
+    "fixture_sha256": "7afb0ea3ea8312b1b5eb68770d1e5ef2c921b1f918826a4e8b787bd5e44b6a27",
+    "gepa_cli_constructor": {
+      "message": "GEPA.__init__() got an unexpected keyword argument 'max_steps'",
+      "status": "ERROR",
+      "type": "TypeError"
+    },
+    "gepa_signature": "(metric: dspy.teleprompt.gepa.gepa.GEPAFeedbackMetric, *, auto: Optional[Literal['light', 'medium', 'heavy']] = None, max_full_evals: int | None = None, max_metric_calls: int | None = None, reflection_minibatch_size: int = 3, candidate_selection_strategy: Literal['pareto', 'current_best'] = 'pareto', reflection_lm: dspy.clients.lm.LM | None = None, skip_perfect_score: bool = True, add_format_failure_as_feedback: bool = False, instruction_proposer: 'ProposalFn | None' = None, code_proposer: 'CodeProposalFn | None' = None, component_selector: 'ReflectionComponentSelector | str' = 'round_robin', use_merge: bool = True, max_merge_invocations: int | None = 5, num_threads: int | None = None, failure_score: float = 0.0, perfect_score: float = 1.0, log_dir: str | None = None, track_stats: bool = False, use_wandb: bool = False, wandb_api_key: str | None = None, wandb_init_kwargs: dict[str, typing.Any] | None = None, track_best_outputs: bool = False, warn_on_score_mismatch: bool = True, use_mlflow: bool = False, seed: int | None = 0, gepa_kwargs: dict | None = None)",
+    "model_api_calls": 0,
+    "python": "3.12.15",
+    "raw_constraints": {
+      "non_empty": true,
+      "size_limit": true,
+      "skill_structure": true
+    },
+    "versions": {
+      "click": "8.5.0",
+      "dspy": "3.4.1",
+      "openai": "2.54.0",
+      "pyyaml": "6.0.3",
+      "rich": "15.0.0"
+    }
+  },
+  "cost_usd": 0,
+  "dependency_lock_sha256": "75965493b291b761dcae2724fa77cc8770abfe9aa9ff36462b990f51f10d408f",
+  "dependency_packages": 70,
+  "elapsed_seconds": 58.987,
+  "environment": {
+    "Architecture": "aarch64",
+    "CgroupVersion": "2",
+    "KernelVersion": "7.0.14-linuxkit",
+    "MemTotal": 6210043904,
+    "NCPU": 8,
+    "ServerVersion": "29.8.2"
+  },
+  "fixture_unchanged": true,
+  "gate": {
+    "boundaries": {
+      "checks": [
+        "canary_unmounted",
+        "capabilities",
+        "cpu_quota",
+        "deps_readonly",
+        "env",
+        "fixture_readonly",
+        "hidden_unmounted",
+        "lock_readonly",
+        "memory_limit",
+        "network_denied",
+        "no_new_privileges",
+        "no_shared_memory",
+        "non_root",
+        "pids_limit",
+        "root_readonly",
+        "seccomp",
+        "skill_readonly",
+        "socket_unmounted",
+        "source_readonly",
+        "swap_limit",
+        "tmpfs_size",
+        "work_writable"
+      ],
+      "python": "3.12.15",
+      "status": "VERIFIED"
+    },
+    "cpu": {
+      "checks": [
+        "cpu_throttled"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "disk": {
+      "checks": [
+        "disk_denied"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "memory": {
+      "checks": [
+        "memory_denied"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "output": {
+      "probe_started": true,
+      "reason": "OUTPUT_LIMIT",
+      "status": "VERIFIED"
+    },
+    "pids": {
+      "checks": [
+        "pids_denied"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "timeout": {
+      "probe_started": true,
+      "reason": "TIMEOUT",
+      "status": "VERIFIED"
+    }
+  },
+  "harness_sources": {
+    "fixtures/self-evolution/hermes-agent/skills/github-code-review/SKILL.md": "7afb0ea3ea8312b1b5eb68770d1e5ef2c921b1f918826a4e8b787bd5e44b6a27",
+    "fixtures/self-evolution/isolation_probe.py": "c3bef46648bc131b8ecf61811685e50be5c15b4d349138557cdc16101ff9a9ab",
+    "fixtures/self-evolution/requirements.lock": "75965493b291b761dcae2724fa77cc8770abfe9aa9ff36462b990f51f10d408f",
+    "fixtures/self-evolution/worker.py": "5aeea74af55bc90fcbf88472f00440878a6bbe9e3fbae01354a39b35bff1d084",
+    "scripts/self_evolution_spike.py": "b507ee9d91784730fcf718e5349108990065d99f42ff969d75680c88cae28686",
+    "src/evaluation/core.py": "71f2648fc05790f58a571571c9fafc42c121b4a6f6f1693dd5e5c2f0dcd53fdb",
+    "src/evaluation/sandbox.py": "d136d5d46e6bafa4939560595fe8ccd52958ea7363fd18a36ce29a29735f8cc5",
+    "src/self_evolution/__init__.py": "314c132b6813a65bd4c90dba2aeb50f9c97b6067db3be8d36da5b92d25f9c281",
+    "src/self_evolution/sandbox.py": "ffdb480773bc331f24e425a91a966461ea56e2eac8f7b5f132081a14d28812a3"
+  },
+  "hermes_target": "minimal-synthetic-repo; production/v0.21.5 compatibility not verified",
+  "image": {
+    "architecture": "arm64",
+    "bytes": 156922204,
+    "id": "sha256:eb7d16fec874f15b584063275012ac719885a2b87574d124c0da9c156d504629",
+    "os": "linux",
+    "repo_digests": [
+      "python@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258"
+    ]
+  },
+  "injected_failure_path": {
+    "calls": {
+      "compile": 1,
+      "tests": 0
+    },
+    "candidate_body_unchanged": true,
+    "constraint_failure_reported": true,
+    "exit": 0,
+    "failed_artifact_sha256": "7afb0ea3ea8312b1b5eb68770d1e5ef2c921b1f918826a4e8b787bd5e44b6a27",
+    "failed_artifact_written": true,
+    "kind": "injected-dataset-and-optimizer-not-improvement",
+    "model_api_calls": 0
+  },
+  "kind": "offline-compatibility-observation-not-model-improvement",
+  "logs": {
+    "gate-timeout.stdout.txt": "61f8c50a9d38811befe4013b71ee3618e5d2cae1c6dee5030c0e59a54c55577b",
+    "probe-contracts.stdout.txt": "7f7252787750af87304f5b0275f64bcb9ae02b07e2edeb308a5c42000ee4944a",
+    "probe-dry-run.stdout.txt": "8d39c5c7868c99477e1318ee0c9633ffedb641161b6f216617da24c1d6b9fdef",
+    "probe-failure-path.stdout.txt": "0c4520ab2f57413405f559b872a6c03b0846f2c9d806790b5bdd92ed1089006e",
+    "probe-help.stdout.txt": "06f58e9258b490c982e9864cef54d985106d73d87e351b002d8d49b6c1db6125"
+  },
+  "model_api_calls": 0,
+  "published_logs": {
+    "self-evolution-dry-run.txt": {
+      "normalization": "strip trailing whitespace",
+      "sha256": "73ed96184ad784c9c44fc08264f73f7733ca08013f09a122214f9dcf00db3800"
+    },
+    "self-evolution-help.txt": {
+      "normalization": "none",
+      "sha256": "06f58e9258b490c982e9864cef54d985106d73d87e351b002d8d49b6c1db6125"
+    }
+  },
+  "raw_report_sha256": "88c03c219c6c005ac1b0d5a34ac577b2b297c0cfce5e1eebe29daece97cd033b",
+  "run_id": "self-evolution-20261016T073435Z-bb20be7da5bc",
+  "schema_version": 1,
+  "status": "OBSERVATIONS_RECORDED",
+  "stored_bytes": 295124143,
+  "timeout_handshake": {
+    "parent_pid": 1,
+    "pid": 7,
+    "probe": "timeout-child-started"
+  },
+  "upstream": "0a929e3aa20e15cf04dc7c28492a7d41a5139125",
+  "upstream_sources": {
+    "evolution/__init__.py": "beb510cf7ece3c962ec21cf2114b8e6a54937ab523b06dd2db7afc7c49d84d10",
+    "evolution/code/__init__.py": "a17003501b67692eba46327c9e0ddd4bb2446652cb67a5ab032da1a769bd1688",
+    "evolution/core/__init__.py": "e38a0ce69a05958d1d18f249015545877b8a61dd47f02a3c293a1ca9fb3589ef",
+    "evolution/core/config.py": "d7ada3aef336109f6045206119d17c174f39a57d01369d439a94f1c5faca0384",
+    "evolution/core/constraints.py": "d1b60fd178210a7906c8eaaa984838b9159af886971c80cfc7c3a3fab7d0cb12",
+    "evolution/core/dataset_builder.py": "7817095bd06e160825a257a68623b6cf5355d954f9ee3bd8bbdc461949b4cfbb",
+    "evolution/core/external_importers.py": "9e59daaa62b7001febc1210f88bb924dd36a4587d12cbee85a723bfe71f71262",
+    "evolution/core/fitness.py": "e3e6ac5cd8129fc41994c310172f24bc4acadb9ea173bb829a49da0bd5139bda",
+    "evolution/monitor/__init__.py": "9de7d977ef14a8d92bf3917584449e3cf43d7df533064a2df2946c55f0a660c7",
+    "evolution/prompts/__init__.py": "27b51c8227bd93453ee95d3ceff982d82068e245f5144655d9494a46e93e11b0",
+    "evolution/skills/__init__.py": "60df88d2c850fc541bb4b5c5b1ef3b5d4468bc32eca4dd83dbf16a3604d32137",
+    "evolution/skills/evolve_skill.py": "54067fff8d78592918593067f15b5c490b1acef8c036a3ab482c9d190b83dc79",
+    "evolution/skills/skill_module.py": "ead45034696edb3ff0aef906c305489a2bb552f83c51b3d288f44d2593f1f46a",
+    "evolution/tools/__init__.py": "6f1cfd09b4d0c4a3183fa69ffacf67f399bd3837910f3abaaaac2401b1e528ce"
+  }
+}

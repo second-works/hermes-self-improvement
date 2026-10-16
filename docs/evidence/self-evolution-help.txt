@@ -1,0 +1,16 @@
+Usage: -c [OPTIONS]
+
+  Evolve a Hermes Agent skill using DSPy + GEPA optimization.
+
+Options:
+  --skill TEXT                    Name of the skill to evolve  [required]
+  --iterations INTEGER            Number of GEPA iterations
+  --eval-source [synthetic|golden|sessiondb]
+                                  Source for evaluation dataset
+  --dataset-path TEXT             Path to existing eval dataset (JSONL)
+  --optimizer-model TEXT          Model for GEPA reflections
+  --eval-model TEXT               Model for evaluations
+  --hermes-repo TEXT              Path to hermes-agent repo
+  --run-tests                     Run full pytest suite as constraint gate
+  --dry-run                       Validate setup without running optimization
+  --help                          Show this message and exit.

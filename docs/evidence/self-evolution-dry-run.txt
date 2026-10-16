@@ -1,0 +1,13 @@
+
+🧬 Hermes Agent Self-Evolution — Evolving skill: github-code-review
+
+  Loaded: skills/github-code-review/SKILL.md
+  Name: github-code-review
+  Size: 335 chars
+  Description: Review a synthetic Python diff for unsafe eval and shell
+execution....
+
+DRY RUN — setup validated successfully.
+  Would generate eval dataset (source: synthetic)
+  Would run GEPA optimization (10 iterations)
+  Would validate constraints and create PR

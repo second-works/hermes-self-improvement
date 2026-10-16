@@ -93,7 +93,9 @@ elif mode == 'cpu':
         child.wait(timeout=10)
     result['cpu_throttled'] = throttled() > before
 elif mode == 'timeout':
-    subprocess.Popen([sys.executable, '-I', '-c', 'import time; time.sleep(60)'])
+    subprocess.Popen([sys.executable, '-I', '-c',
+        'import json,os,time; print(json.dumps({"probe":"timeout-child-started",'
+        '"pid":os.getpid(),"parent_pid":os.getppid()}), flush=True); time.sleep(60)'])
     time.sleep(60)
 elif mode == 'output':
     os.write(1, b'x' * (1048576 + 65536))

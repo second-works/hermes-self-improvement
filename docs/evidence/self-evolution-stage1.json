@@ -45,7 +45,7 @@
   "cost_usd": 0,
   "dependency_lock_sha256": "75965493b291b761dcae2724fa77cc8770abfe9aa9ff36462b990f51f10d408f",
   "dependency_packages": 70,
-  "elapsed_seconds": 50.46,
+  "elapsed_seconds": 58.987,
   "environment": {
     "Architecture": "aarch64",
     "CgroupVersion": "2",
@@ -106,6 +106,7 @@
       "status": "VERIFIED"
     },
     "output": {
+      "probe_started": true,
       "reason": "OUTPUT_LIMIT",
       "status": "VERIFIED"
     },
@@ -117,16 +118,17 @@
       "status": "VERIFIED"
     },
     "timeout": {
+      "probe_started": true,
       "reason": "TIMEOUT",
       "status": "VERIFIED"
     }
   },
   "harness_sources": {
     "fixtures/self-evolution/hermes-agent/skills/github-code-review/SKILL.md": "7afb0ea3ea8312b1b5eb68770d1e5ef2c921b1f918826a4e8b787bd5e44b6a27",
-    "fixtures/self-evolution/isolation_probe.py": "f869a2f56708c62161b00512bf72204623306252db99c1803bdcb31e1c980d85",
+    "fixtures/self-evolution/isolation_probe.py": "c3bef46648bc131b8ecf61811685e50be5c15b4d349138557cdc16101ff9a9ab",
     "fixtures/self-evolution/requirements.lock": "75965493b291b761dcae2724fa77cc8770abfe9aa9ff36462b990f51f10d408f",
     "fixtures/self-evolution/worker.py": "5aeea74af55bc90fcbf88472f00440878a6bbe9e3fbae01354a39b35bff1d084",
-    "scripts/self_evolution_spike.py": "431c57e46890f5d8422fb58ebfb96023e19b0153b55063fa2a536f4a91b8fe12",
+    "scripts/self_evolution_spike.py": "b507ee9d91784730fcf718e5349108990065d99f42ff969d75680c88cae28686",
     "src/evaluation/core.py": "71f2648fc05790f58a571571c9fafc42c121b4a6f6f1693dd5e5c2f0dcd53fdb",
     "src/evaluation/sandbox.py": "d136d5d46e6bafa4939560595fe8ccd52958ea7363fd18a36ce29a29735f8cc5",
     "src/self_evolution/__init__.py": "314c132b6813a65bd4c90dba2aeb50f9c97b6067db3be8d36da5b92d25f9c281",
@@ -157,6 +159,7 @@
   },
   "kind": "offline-compatibility-observation-not-model-improvement",
   "logs": {
+    "gate-timeout.stdout.txt": "61f8c50a9d38811befe4013b71ee3618e5d2cae1c6dee5030c0e59a54c55577b",
     "probe-contracts.stdout.txt": "7f7252787750af87304f5b0275f64bcb9ae02b07e2edeb308a5c42000ee4944a",
     "probe-dry-run.stdout.txt": "8d39c5c7868c99477e1318ee0c9633ffedb641161b6f216617da24c1d6b9fdef",
     "probe-failure-path.stdout.txt": "0c4520ab2f57413405f559b872a6c03b0846f2c9d806790b5bdd92ed1089006e",
@@ -173,11 +176,16 @@
       "sha256": "06f58e9258b490c982e9864cef54d985106d73d87e351b002d8d49b6c1db6125"
     }
   },
-  "raw_report_sha256": "e7eded912b7da6c3ff6f3e629ff5157f1afa11b5ea757df6259ecab9774b0053",
-  "run_id": "self-evolution-20261015T221545Z-788921933356",
+  "raw_report_sha256": "88c03c219c6c005ac1b0d5a34ac577b2b297c0cfce5e1eebe29daece97cd033b",
+  "run_id": "self-evolution-20261016T073435Z-bb20be7da5bc",
   "schema_version": 1,
   "status": "OBSERVATIONS_RECORDED",
-  "stored_bytes": 295124039,
+  "stored_bytes": 295124143,
+  "timeout_handshake": {
+    "parent_pid": 1,
+    "pid": 7,
+    "probe": "timeout-child-started"
+  },
   "upstream": "0a929e3aa20e15cf04dc7c28492a7d41a5139125",
   "upstream_sources": {
     "evolution/__init__.py": "beb510cf7ece3c962ec21cf2114b8e6a54937ab523b06dd2db7afc7c49d84d10",

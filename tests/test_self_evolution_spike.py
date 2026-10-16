@@ -1,6 +1,9 @@
 """Issue #6 controller failure and isolation contracts; no upstream code runs here."""
 import copy
 import importlib.util
+import contextlib
+import io
+import json
 from pathlib import Path
 import sys
 import tempfile
@@ -36,6 +39,46 @@ class GateContracts(unittest.TestCase):
         for mode in ('timeout', 'output'):
             with self.assertRaises(EvaluationError):
                 controller.validate_gate(mode, outcome({}))
+
+    def test_startup_timeout_without_child_handshake_is_not_verified(self):
+        result = outcome({})
+        result['error'] = 'TIMEOUT'
+        result['stdout'] = b''
+        with self.assertRaises(EvaluationError):
+            controller.validate_gate('timeout', result)
+
+    def test_timeout_requires_well_formed_child_start_evidence(self):
+        result = outcome({'probe': 'timeout-child-started', 'pid': 8, 'parent_pid': 1})
+        result['error'] = 'TIMEOUT'
+        self.assertEqual(controller.validate_gate('timeout', result)['status'], 'VERIFIED')
+        for payload in ({'probe': 'timeout-child-started', 'pid': True, 'parent_pid': 1},
+                        {'probe': 'timeout-child-started', 'pid': 1, 'parent_pid': 1},
+                        {'probe': 'parent-started', 'pid': 8, 'parent_pid': 1}):
+            with self.assertRaises(EvaluationError):
+                controller.validate_gate('timeout', {**result, 'stdout': canonical(payload)})
+
+    def test_output_limit_requires_probe_output_not_daemon_error(self):
+        result = {'exit': -9, 'error': 'OUTPUT_LIMIT', 'stdout': b'x' * 1024, 'stderr': b''}
+        self.assertEqual(controller.validate_gate('output', result)['status'], 'VERIFIED')
+        with self.assertRaises(EvaluationError):
+            controller.validate_gate('output', {**result, 'stdout': b'', 'stderr': b'error' * 1024})
+
+    def test_initialization_and_source_hash_failures_leave_blocked_reports(self):
+        for reason in ('docker', 'source'):
+            with tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                with patch.object(controller, 'ROOT', root), \
+                     patch.object(controller, 'SOURCES', [] if reason == 'docker' else ['missing.py']), \
+                     patch.object(controller, 'SpikeSandbox', side_effect=EvaluationError('DOCKER_UNAVAILABLE')), \
+                     contextlib.redirect_stdout(io.StringIO()):
+                    with self.assertRaises((EvaluationError, OSError)):
+                        controller.run(root / 'public-source')
+                reports = list((root / 'runs').glob('*/report.json'))
+                self.assertEqual(len(reports), 1)
+                report = json.loads(reports[0].read_text())
+                self.assertEqual(report['status'], 'BLOCKED')
+                self.assertTrue(report['reason'])
+                self.assertEqual(report['probes'], {})
 
     def test_probe_crash_or_error_cannot_pass_on_valid_payload(self):
         for field, value in [('exit', 1), ('error', 'TIMEOUT'), ('stderr', b'error')]:

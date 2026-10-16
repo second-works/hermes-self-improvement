@@ -77,12 +77,12 @@ push / PR提出 / Mergeもこの実験承認には含めない。
 
 ## 実行結果・再現手順
 
-実行原本: `runs/self-evolution-20261015T221545Z-788921933356/`（Git管理外）。
+現行harnessの実行原本: `runs/self-evolution-20261016T073435Z-bb20be7da5bc/`（Git管理外）。初回検証の `runs/self-evolution-20261015T221545Z-788921933356/` も保持し、新headの証拠へ流用していない。
 検査済みPUBLIC抜粋: [構造化証拠](evidence/self-evolution-stage1.json)、[実help](evidence/self-evolution-help.txt)、[実dry-run](evidence/self-evolution-dry-run.txt)。原本は上書き・削除していない。
 
 Python 3.12.15 / linux arm64 / cgroup v2、Docker 29.8.2、Linux 7.0.14-linuxkit。
 公式image ID `sha256:eb7d16fec874f15b584063275012ac719885a2b87574d124c0da9c156d504629`、registry digest `python@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258`。
-実測50.460秒、保存量295,124,039 bytes（report書込前）。モデルAPI 0呼出、0 USD。全試験後に今回のコンテナが残っていないことも確認した。
+現行harnessは実測58.987秒、保存量295,124,143 bytes（report書込前）。モデルAPI 0呼出、0 USD。初回検証の実測は50.460秒。全試験後に今回のコンテナが残っていないことも確認した。
 
 直接依存はDSPy 3.4.1、OpenAI 2.54.0、PyYAML 6.0.3、Click 8.5.0、Rich 15.0.0。
 GEPA 0.1.4、LiteLLM 1.105.1を含む全70パッケージを[hash付きlock](../fixtures/self-evolution/requirements.lock)に固定し、同lockのwheelだけをnetworkなしで導入した。
@@ -90,7 +90,7 @@ lockはlinux/arm64・CPython 3.12向け。別platformへの流用は未検証。
 
 | 検証 | 結果と限界 |
 | --- | --- |
-| 隔離gate | 7分類成功。境界22項目、disk / memory / pids / CPU制限、timeoutと子process停止、出力上限。実行時networkなし・全入力read-only、ホスト書込共有なし |
+| 隔離gate | 7分類成功。境界22項目、disk / memory / pids / CPU制限、timeoutと子process停止、出力上限。timeoutは子が出す開始通知（今回pid 7、parent_pid 1）とTIMEOUTの両方、出力上限はprobe固有stdoutとOUTPUT_LIMITの両方を必須とする。実行時networkなし・全入力read-only、ホスト書込共有なし |
 | 実CLI help / dry-run | 成功。ただし最小模擬repoのスキル読込までで、Hermes本体の統合成功ではない |
 | 実validator | 同一335文字のスキルは全文で `skill_structure=true`、本文だけではfalse。他のsize/non_emptyは両方true |
 | 実GEPA API | 公式CLIと同じ `max_steps=1` は `TypeError: GEPA.__init__() got an unexpected keyword argument 'max_steps'`。providerに接続せずconstructorで再現 |
@@ -130,7 +130,16 @@ PATH=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin python3 -I -B tests/test_se
 - 人間判断待ち: 最終採否、Issue完了範囲、Merge。
 - 2026-10-16、ユーザーが検査済みPUBLIC差分12ファイルとPR本文案を確認してcommit / push / 調査PR提出を承認した。宛先は `second-works/hermes-self-improvement` の `issue-6-self-evolution-spike` → main、参照は `Refs #6`。原本runs/logsの送信、Issue Close、Merge、モデルAPI、本番適用は含まない。
 
-最終実装の標準検証は30 tests成功、追加の隔離契約試験10 testsと既存評価基盤の回帰34 testsも成功（計74）。typecheck/buildは既存の実行可能入口がないため理由付きskip。
+最終実装の標準検証は30 tests成功、追加の隔離契約試験14 testsと既存評価基盤の回帰34 testsも成功（計78）。typecheck/buildは既存の実行可能入口がないため理由付きskip。
 新規資産を含むSecurity PreflightはSECURITY_PASSED。依存の脆弱性監査は対応manifestがなく対象外であり、wheelの安全性を保証するものではない。
-self-reviewではIssue・既存評価controller・公式の呼出元/validator/対称する候補保存経路と照合し、既存の固定入口・workflow・本番境界に変更がないこと、成功/失敗/未検証の区別、原本保存を確認した。PR後のCI / Security / CodeQL / Codex Reviewは未実施。
+self-reviewではIssue・既存評価controller・公式の呼出元/validator/対称する候補保存経路と照合し、既存の固定入口・workflow・本番境界に変更がないこと、成功/失敗/未検証の区別、原本保存を確認した。CI / Security / CodeQL / Codex Reviewは同一headに対応するPRの記録を正本とし、ローカル検証の成功から推定しない。
 設計文書のローカルLLM圧縮は完了結果を得られず中断し、判断に使用しなかった。安全境界・固定ソースの上記事実は原文を直接確認した。
+
+## 初回Codex Reviewへの対応
+
+対象head `c9c81b19f48b28d16c0f60685107fc7a91cbc6ce` のP2を2件ともBLOCKINGとして受け入れ、同じbranchで修正した。
+
+- R1: 初期化失敗の記録欠如（`scripts/self_evolution_spike.py` のrun初期化）。Docker未利用またはsource hash検査失敗で新runのreportが欠落し、失敗を記録するDone/安全契約に違反する。reportの最小状態を先に作り、sandbox・source検査・準備初期化をtry/finally内へ移した。Docker不可/source欠如の両方を注入し、修正前はreportなしでfail、修正後はBLOCKED reportと理由が残ってpass。
+- R2: timeout開始前の遅延を成功扱い（`validate_gate` とtimeout probe）。start/attach自体のTIMEOUTだけでgateを通せるため、隔離成功の証拠要件に違反する。子processが実際に起動して出すJSON通知を必須とし、通知なし・不正pid・別通知のTIMEOUTは拒否する。修正前fail→修正後pass。対称する出力上限もdaemonエラーでは通さず、固定probeのstdoutを必須にした。
+
+今回の差分との因果と再現は追加の `tests/test_self_evolution_spike.py` で確認した。現行harnessで実Dockerの全gateとCLI/APIを再実行し、上のPUBLIC証拠を更新した。初回レビュー時の成功結果を更新headのCI / Security / Codex再レビューの代用にしない。

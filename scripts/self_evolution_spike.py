@@ -70,7 +70,17 @@ def snapshot(source, destination):
 def validate_gate(mode, result):
     if mode in ('timeout', 'output'):
         require(result['error'] == ('TIMEOUT' if mode == 'timeout' else 'OUTPUT_LIMIT'), 'DENIAL_FAILED')
-        return {'status': 'VERIFIED', 'reason': result['error']}
+        require(not result['stderr'], 'PROBE_START_UNVERIFIED')
+        if mode == 'timeout':
+            started = load_json(result['stdout'])
+            require(type(started) is dict and set(started) == {'probe', 'pid', 'parent_pid'} and
+                    started['probe'] == 'timeout-child-started' and type(started['pid']) is int and
+                    started['pid'] > 1 and type(started['parent_pid']) is int and
+                    started['parent_pid'] == 1, 'PROBE_START_UNVERIFIED')
+        else:
+            require(len(result['stdout']) >= 1024 and set(result['stdout']) == {ord('x')},
+                    'PROBE_START_UNVERIFIED')
+        return {'status': 'VERIFIED', 'reason': result['error'], 'probe_started': True}
     require(result['exit'] == 0 and not result['error'] and not result['stderr'], 'PROBE_FAILED')
     value = load_json(result['stdout'])
     expected = BOUNDARIES if mode == 'boundaries' else {
@@ -85,7 +95,7 @@ def validate_gate(mode, result):
 def execute(box, phase, mode):
     box.phase = phase
     program = PROBE if phase == 'gate' else WORKER
-    result = box.run(program, canonical({'mode': mode}), timeout=1 if mode == 'timeout' else 60)
+    result = box.run(program, canonical({'mode': mode}), timeout=3 if mode == 'timeout' else 60)
     prefix = phase + '-' + mode
     write_new(box.work / (prefix + '.stdout.txt'), result.pop('stdout'))
     write_new(box.work / (prefix + '.stderr.txt'), result.pop('stderr'))
@@ -106,18 +116,18 @@ def run(source):
     tag = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ-') + secrets.token_hex(6)
     work = runs / ('self-evolution-' + tag)
     work.mkdir(mode=0o700)
-    for name in ('source', 'prepare', 'prepare/site'):
-        (work / name).mkdir(exist_ok=True)
-    # Only this new preparation directory is writable by the preparation worker.
-    (work / 'prepare').chmod(0o777)
-    (work / 'prepare/site').chmod(0o777)
-    box = SpikeSandbox(ROOT, work, deadline=deadline)
     report = {'run_id': work.name, 'classification': 'PUBLIC', 'upstream': UPSTREAM,
               'approval': 'human chat approval 2026-10-16; docs/self-evolution-spike.md stage 1',
-              'model_api_calls': 0, 'cost_usd': 0, 'status': 'RUNNING', 'gate': {}, 'probes': {},
-              'sources': {n: digest(regular(ROOT / n, ROOT)) for n in SOURCES}}
+              'model_api_calls': 0, 'cost_usd': 0, 'status': 'RUNNING', 'gate': {}, 'probes': {}}
     print(json.dumps({'run_id': work.name}), flush=True)
     try:
+        for name in ('source', 'prepare', 'prepare/site'):
+            (work / name).mkdir(exist_ok=True)
+        # Only this new preparation directory is writable by the preparation worker.
+        (work / 'prepare').chmod(0o777)
+        (work / 'prepare/site').chmod(0o777)
+        report['sources'] = {n: digest(regular(ROOT / n, ROOT)) for n in SOURCES}
+        box = SpikeSandbox(ROOT, work, deadline=deadline)
         report['source_files'] = snapshot(source, work / 'source')
         report['environment'] = box.environment()
         # Exact official registry digest, no mutable tag resolution or model endpoint.

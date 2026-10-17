@@ -39,7 +39,7 @@ class Contracts(unittest.TestCase):
         self.assertEqual(len({c['scenario_id'] for c in gold['cases']}), 20)
         self.assertEqual(len({c['scenario_id'] for c in gold['cases'] if c['split'] == 'development'}), 10)
         report = make_report(s)
-        metrics = evaluate(report, gold)
+        metrics = evaluate(report, gold, s['sources'])
         self.assertEqual(metrics['splits']['all']['correct_states'], 18)
         self.assertEqual(metrics['splits']['all']['active_false_negative'], 2)
         self.assertEqual(metrics['splits']['all']['resolved_false_positive'], 1)
@@ -54,7 +54,7 @@ class Contracts(unittest.TestCase):
         good=decode((FIX/'gold.json').read_bytes())
         for key,val in [('task_id',[]),('state',[]),('evidence',[{}])]:
             bad=deepcopy(good);bad['cases'][0][key]=val
-            with self.assertRaises(ContractError):evaluate(make_report(snapshot()),bad)
+            with self.assertRaises(ContractError):evaluate(make_report(snapshot()),bad,snapshot()['sources'])
 
     def test_source_spans_and_ids_independently_match_physical_bytes(self):
         for candidate in snapshot()['candidates']:
@@ -85,6 +85,8 @@ class Contracts(unittest.TestCase):
         self.assertEqual(before, packets(s))
         self.assertNotIn('gold', canonical(before).decode())
         self.assertNotIn('state', before['packets'][0])
+        self.assertNotIn('sources', before)
+        self.assertNotIn('sources', make_report(s))
 
     def test_bad_json_never_repaired(self):
         for raw in [b'```json\n{}\n```', b'{"x":1,"x":2}', b'{"x":NaN}', b'{', b'\xff']:
@@ -120,7 +122,7 @@ class Contracts(unittest.TestCase):
         s=snapshot(); report=make_report(s,canonical(response(s)))
         self.assertEqual(report['status'],'COMPLETE')
         self.assertEqual(report['mode'],'mock-selection')
-        metrics=evaluate(report,decode((FIX/'gold.json').read_bytes()))
+        metrics=evaluate(report,decode((FIX/'gold.json').read_bytes()),s['sources'])
         self.assertFalse(metrics['model_accuracy_measured'])
         self.assertGreater(metrics['splits']['all']['active_false_negative'],0)
         self.assertEqual(metrics['semantic_entailment'],'HUMAN_REVIEW_REQUIRED')
@@ -227,7 +229,26 @@ class Contracts(unittest.TestCase):
             bad=deepcopy(original);bad['cases'][0]['evidence'][0][field]=value
             with self.subTest(field=field):
                 with self.assertRaisesRegex(ContractError,'GOLD_SOURCE_MISMATCH'):
-                    evaluate(report,bad)
+                    evaluate(report,bad,snapshot()['sources'])
+
+    def test_crlf_and_setext_headings_do_not_become_claims(self):
+        e=dict(path='logs/a.md',sha256='0'*64,sequence=0)
+        for raw in (b'#\r\n', '結果は未確認。\n---\n'.encode(), '結果は未確認。\n===\n'.encode()):
+            with self.subTest(raw=raw):
+                records,unsupported=parse_records(e,raw)
+                self.assertTrue(unsupported)
+
+    def test_gold_cannot_replace_discarded_heading_with_blank(self):
+        from worklog_candidates.evaluation import bind_reference
+        data='テスト失敗。\n# real heading\n修正後の再テスト成功。'.encode()
+        e=dict(path='logs/a.md',sha256=digest(data),sequence=0)
+        records,_=parse_records(e,data)
+        refs=[r.__dict__ for r in records]
+        gold=dict(path=e['path'],line_start=1,line_end=3,text='テスト失敗。\n\n修正後の再テスト成功。',record_ids=[r.record_id for r in records])
+        with self.assertRaisesRegex(ContractError,'GOLD_SOURCE_MISMATCH'):
+            bind_reference(gold,refs,{e['path']:data})
+        gold['text']=data.decode()
+        bind_reference(gold,refs,{e['path']:data})
 
     def test_nul_paths_are_fixed_contract_errors(self):
         with self.assertRaisesRegex(ContractError,'PATH_BOUNDARY'):

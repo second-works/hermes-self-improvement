@@ -136,7 +136,9 @@ def parse_records(entry, data):
         pending = []
 
     for number, line in enumerate(lines, 1):
-        marker = re.match(r'^ {0,3}(`{3,}|~{3,})(.*)$', line)
+        # Normalize only the syntax view; evidence retains original CR bytes.
+        syntax = line[:-1] if line.endswith('\r') else line
+        marker = re.match(r'^ {0,3}(`{3,}|~{3,})(.*)$', syntax)
         if fence:
             pending.append(line)
             if marker and marker[1][0] == fence[0] and len(marker[1]) >= len(fence) and not marker[2].strip():
@@ -146,7 +148,11 @@ def parse_records(entry, data):
         if marker:
             flush(number - 1)
             start, fence, pending = number, marker[1], [line]
-        elif re.match(r'^ {0,3}#{1,6}(?:[ \t]|$)', line):
+        elif re.match(r'^ {0,3}#{1,6}(?:[ \t]|$)', syntax):
+            flush(number - 1)
+        elif pending and line_kind(pending[0]) == 'narrative' and re.fullmatch(r' {0,3}(?:=+|-+)[ \t]*', syntax):
+            # Setext is deliberately unsupported in v1; never interpret it as a claim.
+            unsupported = True
             flush(number - 1)
         elif not line.strip():
             flush(number - 1)
@@ -180,7 +186,7 @@ def load_snapshot(root, manifest_path):
             manifest['source_kind'] == 'synthetic-fixture', 'SOURCE_BOUNDARY')
     rows = manifest['files']
     require(type(rows) is list and 1 <= len(rows) <= 40, 'FILE_COUNT')
-    total, paths, scenarios, grouped = 0, set(), set(), {}
+    total, paths, scenarios, grouped, sources = 0, set(), set(), {}, {}
     for entry in rows:
         fields(entry, 'path sha256 session_id task_id scenario_id sequence')
         for name in ('session_id', 'task_id', 'scenario_id'):
@@ -198,6 +204,9 @@ def load_snapshot(root, manifest_path):
         require(total <= MAX_TOTAL, 'TOTAL_LIMIT')
         require(digest(data) == entry['sha256'], 'SOURCE_HASH')
         records, unsupported = parse_records(entry, data)
+        # Keep the exact hash-checked bytes for post-classification gold binding.
+        # This cache never enters packets or serialized reports.
+        sources[path] = data
         key = (entry['session_id'], entry['task_id'])
         candidate = grouped.setdefault(key, {'candidate_id': identifier('c-', key),
                                   'session_id': key[0], 'task_id': key[1],
@@ -215,7 +224,7 @@ def load_snapshot(root, manifest_path):
         require(sum(len(r.text.encode('utf-8')) for r in candidate['records']) <= 32768,
                 'CONTEXT_LIMIT')
     return {'manifest_sha256': digest(raw), 'files': rows, 'input_bytes': total,
-            'candidates': candidates}
+            'candidates': candidates, 'sources': sources}
 
 
 def evidence(candidate):

@@ -1,12 +1,12 @@
 """Finite synthetic scoring. Labels enter only after classification has finished."""
 import re
 
-from .core import STATES, fields, ident, require
+from .core import STATES, digest, fields, ident, require
 
 ACTIVE = set(STATES[:3])
 
 
-def bind_reference(ref, references):
+def bind_reference(ref, references, sources):
     """Bind the entire gold span to actual parsed text and exact record membership."""
     lines = ref['text'].split('\n')
     require(ref['line_end'] == ref['line_start'] + len(lines) - 1,
@@ -16,18 +16,23 @@ def bind_reference(ref, references):
     ids = [r['record_id'] for r in overlapping]
     require(ids and len(set(ref['record_ids'])) == len(ref['record_ids']) and
             set(ids) == set(ref['record_ids']), 'GOLD_SOURCE_MISMATCH')
-    source_lines = {}
+    raw = sources.get(ref['path'])
+    require(type(raw) is bytes and all(digest(raw) == r['file_sha256'] for r in overlapping),
+            'GOLD_SOURCE_MISMATCH')
+    source_lines = raw.decode('utf-8').split('\n')
+    if len(source_lines) > 1 and source_lines[-1] == '':
+        source_lines.pop()
+    require(ref['line_end'] <= len(source_lines) and
+            '\n'.join(source_lines[ref['line_start'] - 1:ref['line_end']]) == ref['text'],
+            'GOLD_SOURCE_MISMATCH')
     for record in overlapping:
-        require(ref['line_start'] <= record['line_start'] <= record['line_end'] <= ref['line_end'],
+        require(ref['line_start'] <= record['line_start'] <= record['line_end'] <= ref['line_end'] and
+                '\n'.join(source_lines[record['line_start'] - 1:record['line_end']]) == record['text'],
                 'GOLD_SOURCE_MISMATCH')
-        for offset, line in enumerate(record['text'].split('\n')):
-            source_lines[record['line_start'] + offset] = line
-    # The only gaps allowed between complete parsed blocks are blank lines in gold.
-    require(all(source_lines.get(ref['line_start'] + n, '') == line
-                for n, line in enumerate(lines)), 'GOLD_SOURCE_MISMATCH')
 
 
-def evaluate(report, gold):
+
+def evaluate(report, gold, sources):
     fields(gold, 'schema_version classification cases')
     require(type(gold['schema_version']) is int and gold['schema_version'] == 1 and
             gold['classification'] == 'PUBLIC' and type(gold['cases']) is list and
@@ -56,7 +61,7 @@ def evaluate(report, gold):
         if row is not None:
             require(row['scenario_id'] == case['scenario_id'], 'GOLD_SOURCE_MISMATCH')
             for ref in case['evidence']:
-                bind_reference(ref, row['references'])
+                bind_reference(ref, row['references'], sources)
     groups = {}
     for split in ('all', 'development', 'evaluation'):
         cases = [v for v in expected.values() if split == 'all' or v['split'] == split]
@@ -76,12 +81,8 @@ def evaluate(report, gold):
             selected = [r for r in row['references'] if r['record_id'] in row['evidence_ids']] if row else []
             # Physical source coverage is checkable; it is not semantic entailment.
             for ref in case['evidence']:
-                required = {ref['line_start'] + offset for offset, line in enumerate(ref['text'].split('\n')) if line.strip()}
-                covered = {line for r in selected if r['path'] == ref['path']
-                           for line in range(r['line_start'], r['line_end'] + 1)}
                 selected_ids = {r['record_id'] for r in selected}
-                evidence_missing += not (required.issubset(covered) and
-                                         set(ref['record_ids']).issubset(selected_ids))
+                evidence_missing += not set(ref['record_ids']).issubset(selected_ids)
         groups[split] = {'cases': len(cases), 'correct_states': correct,
                          'hold': hold, 'confusion_matrix': matrix,
                          'active_true_positive': tp, 'active_false_positive': fp,

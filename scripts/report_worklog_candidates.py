@@ -35,7 +35,7 @@ def main(argv=None):
             raw = read_relative(fixture_root, args.responses)
         report = make_report(snapshot, raw)
         if args.evaluate:
-            report['evaluation'] = evaluate(report, decode(read_relative(fixture_root, 'gold.json')))
+            report['evaluation'] = evaluate(report, decode(read_relative(fixture_root, 'gold.json')), snapshot['sources'])
         if args.output:
             write_output(args.output, report)
         data = canonical(report) + b'\n' if args.format == 'json' else markdown(report).encode('utf-8')

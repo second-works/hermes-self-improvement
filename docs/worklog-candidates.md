@@ -51,6 +51,8 @@ manifestの識別・順序情報は人が用意した評価用メタデータで
 
 段落を物理行範囲付きの記録へ分け、見出しを区切りとする。
 コード囲み内の見出しは区切らず、引用とコードの文字列をルール基準の状態根拠に使わない。
+CRLFは構文判定時だけ正規化し、原文の改行byteは根拠として保持する。
+Setext見出しは初期版で未対応として明示的に保留し、本文の主張へ混入させない。
 未閉鎖コード囲みや見出ししかない入力は診断を残す。
 source_idは相対pathと原本hash、record_idはsource_idと行範囲、candidate_idは明示session/taskから生成。
 原文が変われば記録IDは変わる。同一入力では候補ID/候補集合/JSONが再現する。
@@ -139,6 +141,8 @@ schema/ID/hash/path/line検査は決定的コードへ移し、意味判断と�
 実Gemmaと実データは、それぞれ宛先・分類・対象allowlist・上限・停止条件を具体化して別承認する。
 CI/Security/Codex ReviewはPR提出後の同一headで確認し、人間がMergeを判断する。
 
-ローカル検証（2026-10-18）: 新規24 testsと標準30 testsが成功。Securityの最終結果は同じindexの実行記録で照合する。typecheck/buildは既存入口非実行による理由付きskip、依存manifestなしで依存監査は対象外。GitHub CI/Security/Codex Review、実Gemma、人間の有用性検収は未実施。
+ローカル検証（2026-10-18）: 新規26 testsと標準30 testsが成功。Securityの最終結果は同じindexの実行記録で照合する。typecheck/buildは既存入口非実行による理由付きskip、依存manifestなしで依存監査は対象外。GitHub CI/Security/Codex Review、実Gemma、人間の有用性検収は未実施。
 
 PR #17の初回レビューでは、字下げ/空ATX見出しの認識とgoldの原文・行末・記録ID照合をBLOCKING P2として補強した。捏造text/IDと不一致line_endはGOLD_SOURCE_MISMATCHで停止し、物理coverageの成功へ混入させない。
+
+再レビューではCRLF/Setext見出しとgoldの省略行を補強。goldは入力時のhash検証済み原文byteを保持したcacheへ全行照合し、見出しなどの省略行を空白で推測しない。cacheは採点時だけ使い、packet/報告には追加しない。

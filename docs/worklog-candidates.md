@@ -141,8 +141,10 @@ schema/ID/hash/path/line検査は決定的コードへ移し、意味判断と�
 実Gemmaと実データは、それぞれ宛先・分類・対象allowlist・上限・停止条件を具体化して別承認する。
 CI/Security/Codex ReviewはPR提出後の同一headで確認し、人間がMergeを判断する。
 
-ローカル検証（2026-10-18）: 新規26 testsと標準30 testsが成功。Securityの最終結果は同じindexの実行記録で照合する。typecheck/buildは既存入口非実行による理由付きskip、依存manifestなしで依存監査は対象外。GitHub CI/Security/Codex Review、実Gemma、人間の有用性検収は未実施。
+ローカル検証（2026-10-18）: 新規27 testsと標準30 testsが成功。Securityの最終結果は同じindexの実行記録で照合する。typecheck/buildは既存入口非実行による理由付きskip、依存manifestなしで依存監査は対象外。GitHub CI/Security/Codex Review、実Gemma、人間の有用性検収は未実施。
 
 PR #17の初回レビューでは、字下げ/空ATX見出しの認識とgoldの原文・行末・記録ID照合をBLOCKING P2として補強した。捏造text/IDと不一致line_endはGOLD_SOURCE_MISMATCHで停止し、物理coverageの成功へ混入させない。
 
 再レビューではCRLF/Setext見出しとgoldの省略行を補強。goldは入力時のhash検証済み原文byteを保持したcacheへ全行照合し、見出しなどの省略行を空白で推測しない。cacheは採点時だけ使い、packet/報告には追加しない。
+
+正解ケース集合が候補集合と一致しない場合（未知session/taskやケース欠落を含む）は、分類の見落としとして採点せずGOLD_SOURCE_MISMATCHで停止する。モデルの未応答は全候補を保持したholdとして別に扱う。

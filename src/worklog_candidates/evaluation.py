@@ -56,19 +56,22 @@ def evaluate(report, gold, sources):
         require(key not in expected, 'GOLD_DUPLICATE')
         expected[key] = row
     actual = {(r['session_id'], r['task_id']): r for r in report['candidates']}
+    require(set(actual) == set(expected), 'GOLD_SOURCE_MISMATCH')
     for key, case in expected.items():
         row = actual.get(key)
-        if row is not None:
-            require(row['scenario_id'] == case['scenario_id'], 'GOLD_SOURCE_MISMATCH')
-            for ref in case['evidence']:
-                bind_reference(ref, row['references'], sources)
+        # The harness retains every candidate, even for missing model decisions.
+        # An unknown gold key is corrupt input, not a classifier false negative.
+        require(row is not None and row['scenario_id'] == case['scenario_id'],
+                'GOLD_SOURCE_MISMATCH')
+        for ref in case['evidence']:
+            bind_reference(ref, row['references'], sources)
     groups = {}
     for split in ('all', 'development', 'evaluation'):
         cases = [v for v in expected.values() if split == 'all' or v['split'] == split]
         matrix, correct, tp, fp, fn, false_open, evidence_missing, hold = {}, 0, 0, 0, 0, 0, 0, 0
         for case in cases:
-            row = actual.get((case['session_id'], case['task_id']))
-            state = row['state'] if row else 'missing'
+            row = actual[(case['session_id'], case['task_id'])]
+            state = row['state']
             truth = case['state']
             name = truth + ' -> ' + state
             matrix[name] = matrix.get(name, 0) + 1
@@ -78,7 +81,7 @@ def evaluate(report, gold, sources):
             fn += truth in ACTIVE and state not in ACTIVE
             false_open += truth == 'resolved_in_log' and state in ACTIVE
             hold += state == 'hold'
-            selected = [r for r in row['references'] if r['record_id'] in row['evidence_ids']] if row else []
+            selected = [r for r in row['references'] if r['record_id'] in row['evidence_ids']]
             # Physical source coverage is checkable; it is not semantic entailment.
             for ref in case['evidence']:
                 selected_ids = {r['record_id'] for r in selected}

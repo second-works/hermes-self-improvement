@@ -250,6 +250,18 @@ class Contracts(unittest.TestCase):
         gold['text']=data.decode()
         bind_reference(gold,refs,{e['path']:data})
 
+    def test_unknown_gold_candidate_key_is_rejected_not_scored(self):
+        s=snapshot();report=make_report(s);gold=decode((FIX/'gold.json').read_bytes())
+        for field in ('session_id','task_id'):
+            bad=deepcopy(gold);bad['cases'][0][field]='typo-task'
+            bad['cases'][0]['evidence'][0]['text']='fabricated'
+            with self.subTest(field=field):
+                with self.assertRaisesRegex(ContractError,'GOLD_SOURCE_MISMATCH'):
+                    evaluate(report,bad,s['sources'])
+        incomplete=deepcopy(gold);incomplete['cases'].pop()
+        with self.assertRaisesRegex(ContractError,'GOLD_SOURCE_MISMATCH'):
+            evaluate(report,incomplete,s['sources'])
+
     def test_nul_paths_are_fixed_contract_errors(self):
         with self.assertRaisesRegex(ContractError,'PATH_BOUNDARY'):
             read_relative(FIX,'logs/bad\x00.md')

@@ -262,6 +262,15 @@ class Contracts(unittest.TestCase):
         with self.assertRaisesRegex(ContractError,'GOLD_SOURCE_MISMATCH'):
             evaluate(report,incomplete,s['sources'])
 
+    def test_selection_packets_exclude_label_bearing_fixture_paths(self):
+        data=packets(snapshot())
+        for packet in data['packets']:
+            for record in packet['records']:
+                self.assertEqual(set(record),{'record_id','text','kind','sequence'})
+        encoded=canonical(data).decode()
+        self.assertNotIn('resolved-same-log',encoded)
+        self.assertNotIn('open-paraphrase',encoded)
+
     def test_nul_paths_are_fixed_contract_errors(self):
         with self.assertRaisesRegex(ContractError,'PATH_BOUNDARY'):
             read_relative(FIX,'logs/bad\x00.md')

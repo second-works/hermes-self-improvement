@@ -18,7 +18,9 @@ def packets(snapshot):
     """Every task is a separate packet; no tools, free text fields, or gold labels."""
     return {'schema_version': 1, 'packets': [
         {'candidate_id': c['candidate_id'], 'session_id': c['session_id'],
-         'task_id': c['task_id'], 'records': evidence(c)} for c in snapshot['candidates']]}
+         'task_id': c['task_id'],
+         'records': [{'record_id': r.record_id, 'text': r.text, 'kind': r.kind,
+                      'sequence': r.sequence} for r in c['records']]} for c in snapshot['candidates']]}
 
 
 def validate_response(snapshot, raw):

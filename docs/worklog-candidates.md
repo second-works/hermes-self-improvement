@@ -77,6 +77,8 @@ source_idは相対pathと原本hash、record_idはsource_idと行範囲、candid
 `src/worklog_candidates/response.schema.json` は応答の形を定義する。
 コードは追加key・重複JSON key・NaN・不正型・enum・ID・state/reasonの組合せ・重複IDを厳密検証する。
 候補ごとに独立したpacketを作り、その候補以外の記録IDを根拠にすることはできない。
+packetの記録はID・本文・kind・sequenceだけとし、正解を示唆するfixtureファイル名/pathや原文cacheを渡さない。
+原文へのpath/行/hashはハーネスが報告側で付与する。
 選べる値は候補ID、固定状態・理由code、提示された記録IDだけ。自由文fieldとtoolはない。
 
 Markdown囲み除去、未知enum補正、期待値の埋込みで成功扱いしない。
@@ -141,7 +143,7 @@ schema/ID/hash/path/line検査は決定的コードへ移し、意味判断と�
 実Gemmaと実データは、それぞれ宛先・分類・対象allowlist・上限・停止条件を具体化して別承認する。
 CI/Security/Codex ReviewはPR提出後の同一headで確認し、人間がMergeを判断する。
 
-ローカル検証（2026-10-18）: 新規27 testsと標準30 testsが成功。Securityの最終結果は同じindexの実行記録で照合する。typecheck/buildは既存入口非実行による理由付きskip、依存manifestなしで依存監査は対象外。GitHub CI/Security/Codex Review、実Gemma、人間の有用性検収は未実施。
+ローカル検証（2026-10-18）: 新規28 testsと標準30 testsが成功。Securityの最終結果は同じindexの実行記録で照合する。typecheck/buildは既存入口非実行による理由付きskip、依存manifestなしで依存監査は対象外。GitHub CI/Security/Codex Review、実Gemma、人間の有用性検収は未実施。
 
 PR #17の初回レビューでは、字下げ/空ATX見出しの認識とgoldの原文・行末・記録ID照合をBLOCKING P2として補強した。捏造text/IDと不一致line_endはGOLD_SOURCE_MISMATCHで停止し、物理coverageの成功へ混入させない。
 

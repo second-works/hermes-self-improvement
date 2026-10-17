@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "decisions": [
+    {
+      "candidate_id": "c-0a0c84d619254cc70dd03335c5988cc219582024481da93e914504f698abe2d3",
+      "state": "needs_check",
+      "reason": "explicit_open",
+      "evidence_ids": [
+        "r-deafe2e49c1d7ff396eb2c133b3604f27ea339857318396d6587f33464811b3f"
+      ]
+    }
+  ]
+}

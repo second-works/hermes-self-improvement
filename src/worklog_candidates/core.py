@@ -146,7 +146,7 @@ def parse_records(entry, data):
         if marker:
             flush(number - 1)
             start, fence, pending = number, marker[1], [line]
-        elif re.match(r'^#{1,6}\s', line):
+        elif re.match(r'^ {0,3}#{1,6}(?:[ \t]|$)', line):
             flush(number - 1)
         elif not line.strip():
             flush(number - 1)

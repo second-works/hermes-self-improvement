@@ -210,6 +210,25 @@ class Contracts(unittest.TestCase):
         self.assertIn('\\[click\\]',rendered)
         self.assertIn('現在のGitHub',markdown(report))
 
+    def test_indented_and_empty_atx_headings_are_not_claims(self):
+        from worklog_candidates.core import baseline
+        e=dict(path='logs/a.md',sha256='0'*64,sequence=0)
+        for raw in (b'#',b'###   ', '   # 結果は未確認。\n'.encode(), '  #### 修正後の再テスト成功。\n'.encode()):
+            records,unsupported=parse_records(e,raw)
+            self.assertTrue(unsupported)
+            self.assertEqual(baseline(dict(records=records,unsupported=unsupported)),('hold','unsupported_format'))
+
+    def test_gold_reference_binds_text_ids_and_line_end(self):
+        original=decode((FIX/'gold.json').read_bytes())
+        report=make_report(snapshot())
+        for field,value in [('text','架空の成功文。'),('record_ids',['r-'+'0'*64]),
+                            ('record_ids',original['cases'][1]['evidence'][0]['record_ids']),
+                            ('path',original['cases'][1]['evidence'][0]['path']),('line_end',4)]:
+            bad=deepcopy(original);bad['cases'][0]['evidence'][0][field]=value
+            with self.subTest(field=field):
+                with self.assertRaisesRegex(ContractError,'GOLD_SOURCE_MISMATCH'):
+                    evaluate(report,bad)
+
     def test_nul_paths_are_fixed_contract_errors(self):
         with self.assertRaisesRegex(ContractError,'PATH_BOUNDARY'):
             read_relative(FIX,'logs/bad\x00.md')

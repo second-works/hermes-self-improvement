@@ -6,6 +6,27 @@ from .core import STATES, fields, ident, require
 ACTIVE = set(STATES[:3])
 
 
+def bind_reference(ref, references):
+    """Bind the entire gold span to actual parsed text and exact record membership."""
+    lines = ref['text'].split('\n')
+    require(ref['line_end'] == ref['line_start'] + len(lines) - 1,
+            'GOLD_SOURCE_MISMATCH')
+    overlapping = [r for r in references if r['path'] == ref['path'] and
+                   r['line_start'] <= ref['line_end'] and r['line_end'] >= ref['line_start']]
+    ids = [r['record_id'] for r in overlapping]
+    require(ids and len(set(ref['record_ids'])) == len(ref['record_ids']) and
+            set(ids) == set(ref['record_ids']), 'GOLD_SOURCE_MISMATCH')
+    source_lines = {}
+    for record in overlapping:
+        require(ref['line_start'] <= record['line_start'] <= record['line_end'] <= ref['line_end'],
+                'GOLD_SOURCE_MISMATCH')
+        for offset, line in enumerate(record['text'].split('\n')):
+            source_lines[record['line_start'] + offset] = line
+    # The only gaps allowed between complete parsed blocks are blank lines in gold.
+    require(all(source_lines.get(ref['line_start'] + n, '') == line
+                for n, line in enumerate(lines)), 'GOLD_SOURCE_MISMATCH')
+
+
 def evaluate(report, gold):
     fields(gold, 'schema_version classification cases')
     require(type(gold['schema_version']) is int and gold['schema_version'] == 1 and
@@ -30,6 +51,12 @@ def evaluate(report, gold):
         require(key not in expected, 'GOLD_DUPLICATE')
         expected[key] = row
     actual = {(r['session_id'], r['task_id']): r for r in report['candidates']}
+    for key, case in expected.items():
+        row = actual.get(key)
+        if row is not None:
+            require(row['scenario_id'] == case['scenario_id'], 'GOLD_SOURCE_MISMATCH')
+            for ref in case['evidence']:
+                bind_reference(ref, row['references'])
     groups = {}
     for split in ('all', 'development', 'evaluation'):
         cases = [v for v in expected.values() if split == 'all' or v['split'] == split]
@@ -52,7 +79,9 @@ def evaluate(report, gold):
                 required = {ref['line_start'] + offset for offset, line in enumerate(ref['text'].split('\n')) if line.strip()}
                 covered = {line for r in selected if r['path'] == ref['path']
                            for line in range(r['line_start'], r['line_end'] + 1)}
-                evidence_missing += not required.issubset(covered)
+                selected_ids = {r['record_id'] for r in selected}
+                evidence_missing += not (required.issubset(covered) and
+                                         set(ref['record_ids']).issubset(selected_ids))
         groups[split] = {'cases': len(cases), 'correct_states': correct,
                          'hold': hold, 'confusion_matrix': matrix,
                          'active_true_positive': tp, 'active_false_positive': fp,

@@ -1,0 +1,5 @@
+# 最終headの照合（scripts/check-pr-head.sh）で必須にするcheck。1行に1つ。
+# 照合はmainにある版を読むので、変更はmergeの後に効く。
+ci
+Security Preflight
+Analyze (python)

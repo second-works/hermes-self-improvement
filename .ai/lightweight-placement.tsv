@@ -1,10 +1,10 @@
 # Written by templates/lightweight/place.sh. It uses this file to update and check the placement.
-source	7a6e56520ab1d0c7f6eb98aefa944042b519bade
+source	41202b8bea491188aac53436075e5147cf1d43b5
 block	AGENTS.md	d821964fa349b78afe4543d839467c5105a7c1effeb76eb1e8290abcfbb380da
 block	CLAUDE.md	53a90d7965497b9fea2f018e20ba44427aac3d3c7bcf698c352f4990eb0b2a52
 file	.agents/skills/plan-to-issues/SKILL.md	7ce0f879269fd383d827b228b61403280fa7e326e3efca1d295c5acd3a223f36
-file	.claude/skills/steward/SKILL.md	f16cea8b570777329aa5e146bca2b5130e71e7d044c52b1bf7bd084e1ac828df
-file	scripts/check-pr-head.sh	f763dd8897a01ebc62f8c86172ad7f4414155f084c6544f57f2fd0bb0168c5fd
+file	.claude/skills/steward/SKILL.md	daa7595cb325b8a5f0eb5d6683c6d7293a9a52225a4de55e1a08287b4cfd9efc
+file	scripts/check-pr-head.sh	a7f84fe30d87de7348ded697d30ecf27ac6b16e22b3999a87c82eee216e3e719
 settings	.claude/settings.json	-
 file	.claude/hooks/guard-git-push.sh	e52e9e70ad1d2499d11982457a3f29fe346e2decfc87e83747e3f2e88b0fb809
 file	.github/ISSUE_TEMPLATE/parent-issue.md	d158e758b2ab819245558757387fb5bdf11e8fbc212de2e581cce053daee9b4a

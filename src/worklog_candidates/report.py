@@ -160,7 +160,8 @@ def write_output(destination, report):
             fd = new
         # Reserve the name first: this keeps the create-only check (FileExistsError).
         os.mkdir(destination.name, mode=0o700, dir_fd=fd)
-        staging = f'.{destination.name}.partial-{os.urandom(8).hex()}'
+        # A fixed-length name, so a destination name near NAME_MAX still works.
+        staging = f'.worklog-output-partial-{os.urandom(8).hex()}'
         try:
             os.mkdir(staging, mode=0o700, dir_fd=fd)
             try:

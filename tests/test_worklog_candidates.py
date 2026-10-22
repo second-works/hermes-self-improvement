@@ -237,6 +237,16 @@ class Contracts(unittest.TestCase):
                 write_output(parent/'report',report)  # the name is free again
                 self.assertEqual(sorted(os.listdir(parent/'report')),['report.json','report.md'])
 
+    def test_output_name_near_name_max_still_works(self):
+        report=make_report(snapshot())
+        with tempfile.TemporaryDirectory() as name:
+            parent=Path(name).resolve()
+            limit=os.pathconf(parent,'PC_NAME_MAX')
+            dest=parent/('r'*limit)  # the longest valid name worked before staging was added
+            write_output(dest,report)
+            self.assertEqual(sorted(os.listdir(parent)),[dest.name])
+            self.assertEqual(sorted(os.listdir(dest)),['report.json','report.md'])
+
     def test_indented_and_empty_atx_headings_are_not_claims(self):
         from worklog_candidates.core import baseline
         e=dict(path='logs/a.md',sha256='0'*64,sequence=0)

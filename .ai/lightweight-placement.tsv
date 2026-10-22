@@ -1,0 +1,14 @@
+# Written by templates/lightweight/place.sh. It uses this file to update and check the placement.
+source	41202b8bea491188aac53436075e5147cf1d43b5
+block	AGENTS.md	d821964fa349b78afe4543d839467c5105a7c1effeb76eb1e8290abcfbb380da
+block	CLAUDE.md	53a90d7965497b9fea2f018e20ba44427aac3d3c7bcf698c352f4990eb0b2a52
+file	.agents/skills/plan-to-issues/SKILL.md	7ce0f879269fd383d827b228b61403280fa7e326e3efca1d295c5acd3a223f36
+file	.claude/skills/steward/SKILL.md	daa7595cb325b8a5f0eb5d6683c6d7293a9a52225a4de55e1a08287b4cfd9efc
+file	scripts/check-pr-head.sh	a7f84fe30d87de7348ded697d30ecf27ac6b16e22b3999a87c82eee216e3e719
+settings	.claude/settings.json	-
+file	.claude/hooks/guard-git-push.sh	e52e9e70ad1d2499d11982457a3f29fe346e2decfc87e83747e3f2e88b0fb809
+file	.github/ISSUE_TEMPLATE/parent-issue.md	d158e758b2ab819245558757387fb5bdf11e8fbc212de2e581cce053daee9b4a
+file	.github/ISSUE_TEMPLATE/child-issue.md	e7f8feedfa408ca59f401eaee80687520ff63b3f18ddbd5cd71e3d790ded97de
+file	.github/pull_request_template.md	90222c8f1336c9ddf4525a01ddefa1e6e2f858064c4526694a7bb649efafc0ef
+kept	scripts/verify.sh	-
+kept	scripts/security-preflight.sh	-

@@ -28,7 +28,7 @@ AGENTS.mdの境界を守り、次の順に進める。各段階の結果は、Is
 
 ## 4. CIとSecurity
 
-1. 最終headで、CIとSecurityのcheckを別々に確認する。`scripts/check-pr-head.sh <PR番号>` で照合できる。
+1. 最終headで、CIとSecurityのcheckを別々に確認する。`scripts/check-pr-head.sh <PR番号>` で照合できる。必須checkの名前は `.github/pr-gate-checks` に書く（照合はbaseブランチの版を読む。なければ既定の名前で照合する）。
 2. 失敗したらログを読み、原因を直してpushする。skip、無効化、空commitでの再実行はしない。
 3. checkが見つからない、開始されない、取得できないときは成功にしない。状態を報告して判断を求める。
 

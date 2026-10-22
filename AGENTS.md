@@ -7,6 +7,7 @@
 - 標準検証は `./scripts/verify.sh`。SecurityはBash 5以上で `bash scripts/security-preflight.sh .`。`.agents/skills/` と `templates/` は共通ルールの参照資産であり、自動起動や本番変更の許可ではない。
 - 通常レーンだけを採用し、Auto-Fix / Auto-Merge例外は採用しない。最終Mergeは必ず人間が判断する。
 - Codexレビュー未実施・認証失敗・利用制限・head不一致を成功扱いしない。手順は `docs/repository-setup.md`。
+- マージ依頼の前の必須checkは `.github/pr-gate-checks`（`ci`、`Security Preflight`、`Analyze (python)`）。`scripts/check-pr-head.sh` がこれで照合する。
 
 ## Code Review Rules
 - Issue #1では、最小権限、Secrets非公開、失敗を成功扱いしないこと、CIからHermes本番へ接続しないことを確認する。

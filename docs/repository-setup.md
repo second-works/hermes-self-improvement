@@ -1,5 +1,11 @@
 # Issue #1 導入判断・運用
 
+> **2026-10-22 更新（軽量構成への切り替え）:** 開発の指示は ai-development の軽量構成に切り替えた（所有者の判断、second-works/ai-development#196）。
+> - AGENTS.md は、このrepo固有の節と軽量ブロックになった。下の表の「AGENTS.md 採用」と Issue / PR テンプレートの行は、切り替え前の記録。
+> - マージ依頼の前の最終headの照合は、`scripts/check-pr-head.sh <PR番号>` で行う。必須checkは `.github/pr-gate-checks`（`ci`、`Security Preflight`、`Analyze (python)`）に書いてあり、照合はmainにある版を読む。`Security Preflight` はcommit statusとして報告されるので、check runと両方を照合する。
+> - 下に書いた手動の wait-checks helper（`.agents/skills/pr-review-fix/`）は、標準の手順では使わない参照資産として残している。
+> - CI、Security、CodeQL の workflow と保護の運用は変えていない。
+
 2026-10-14。Risk Tier: HIGH（CI・Security・レビュー運用の初期導入）。ユーザーがIssue #1の実装とPR提出を承認。Hermes本番、課金変更、自己改善の自動適用、Auto-Mergeは範囲外。復旧は本PRのrevertで行う。
 
 原本は second-works/ai-development の `b2715a76c5ab3715ccce88167c23ce12c81e85b1`。取得時点の原文とプロジェクト固有境界を照合した。参照資産の3文書（plan-authoring、app/docs/design、web-todo-app-plan.sample）は末尾空白のみ正規化した。既存ファイルはなく、既存の未追跡 `.bm25/` は保持・除外した。空リポジトリのPR比較先として、ファイルなしの初期コミットだけmainに配置した。

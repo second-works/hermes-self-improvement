@@ -124,29 +124,69 @@ def markdown(report):
     return '\n'.join(lines)
 
 
+OUTPUT_FILES = ('report.json', 'report.md')
+
+
+def _remove_partial(parent_fd, name):
+    """Remove a staging directory this call created, and only the files it writes."""
+    for child in OUTPUT_FILES:
+        try:
+            os.unlink(f'{name}/{child}', dir_fd=parent_fd)
+        except FileNotFoundError:
+            pass
+    try:
+        os.rmdir(name, dir_fd=parent_fd)
+    except FileNotFoundError:  # the staging directory itself was not created
+        pass
+
+
 def write_output(destination, report):
-    """Create-only output with a pinned parent directory descriptor."""
+    """Create-only output with a pinned parent directory descriptor.
+
+    report.json and report.md appear together under the destination name, or not
+    at all: they are written into a hidden staging directory, which then replaces
+    the empty directory that reserved the name. A failure removes both.
+    """
     destination = Path(destination).absolute()
     require('\x00' not in str(destination) and destination.name not in ('', '.', '..') and
             '..' not in destination.parts, 'OUTPUT_PATH')
+    payloads = [(OUTPUT_FILES[0], canonical(report) + b'\n'),
+                (OUTPUT_FILES[1], markdown(report).encode('utf-8'))]
     fd = os.open('/', os.O_RDONLY | os.O_DIRECTORY)
     try:
         for part in destination.parent.parts[1:]:
             new = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
             os.close(fd)
             fd = new
+        # Reserve the name first: this keeps the create-only check (FileExistsError).
         os.mkdir(destination.name, mode=0o700, dir_fd=fd)
-        out = os.open(destination.name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+        staging = f'.{destination.name}.partial-{os.urandom(8).hex()}'
         try:
-            for name, data in [('report.json', canonical(report) + b'\n'),
-                               ('report.md', markdown(report).encode('utf-8'))]:
-                target = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-                                 0o600, dir_fd=out)
-                with os.fdopen(target, 'wb') as stream:
-                    stream.write(data)
-                    stream.flush()
-                    os.fsync(stream.fileno())
-        finally:
-            os.close(out)
+            os.mkdir(staging, mode=0o700, dir_fd=fd)
+            try:
+                out = os.open(staging, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+                try:
+                    for name, data in payloads:
+                        target = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                                         0o600, dir_fd=out)
+                        with os.fdopen(target, 'wb') as stream:
+                            stream.write(data)
+                            stream.flush()
+                            os.fsync(stream.fileno())
+                    os.fsync(out)
+                finally:
+                    os.close(out)
+                # rename replaces only an empty directory, which is the reservation.
+                os.rename(staging, destination.name, src_dir_fd=fd, dst_dir_fd=fd)
+            except BaseException:
+                _remove_partial(fd, staging)
+                raise
+        except BaseException:
+            try:
+                os.rmdir(destination.name, dir_fd=fd)  # still empty, so still ours
+            except OSError:
+                pass
+            raise
+        os.fsync(fd)
     finally:
         os.close(fd)

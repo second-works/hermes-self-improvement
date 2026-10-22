@@ -1,0 +1,207 @@
+{
+  "schema_version": 1,
+  "classification": "PUBLIC",
+  "source_kind": "synthetic-fixture",
+  "files": [
+    {
+      "path": "logs/01-open-basic-0.md",
+      "sha256": "2ccf3aca482fb75e75b6585f50981837dcb37952f6347319c4ffd948014c6516",
+      "session_id": "session-01",
+      "task_id": "task-a",
+      "scenario_id": "scenario-01",
+      "sequence": 0
+    },
+    {
+      "path": "logs/02-open-check-0.md",
+      "sha256": "b2be5332d5977a9c3b58198d1e3ea87ae0e97cb27c09df0bafb627d315075a59",
+      "session_id": "session-02",
+      "task_id": "task-a",
+      "scenario_id": "scenario-02",
+      "sequence": 0
+    },
+    {
+      "path": "logs/03-open-paraphrase-0.md",
+      "sha256": "f62eb5fe292b83e3303580ca5ff0e934b8fc554b8c3e2730895438773348d9be",
+      "session_id": "session-03",
+      "task_id": "task-a",
+      "scenario_id": "scenario-03",
+      "sequence": 0
+    },
+    {
+      "path": "logs/04-approval-basic-0.md",
+      "sha256": "9abaf11d6fe1e60bc26e8947ac4408c4c34dd533e6ce02a58d16ec2036501993",
+      "session_id": "session-04",
+      "task_id": "task-a",
+      "scenario_id": "scenario-04",
+      "sequence": 0
+    },
+    {
+      "path": "logs/05-approval-unobtained-0.md",
+      "sha256": "04ac6b32ad60c98f27c2b5d89ad1e113094f2e0459bbd9e31a624a0135b1ec13",
+      "session_id": "session-05",
+      "task_id": "task-a",
+      "scenario_id": "scenario-05",
+      "sequence": 0
+    },
+    {
+      "path": "logs/06-investigation-basic-0.md",
+      "sha256": "c3456c5e7add1020175d9c420b25a01a5e7a49036ac042957d81f233db060298",
+      "session_id": "session-06",
+      "task_id": "task-a",
+      "scenario_id": "scenario-06",
+      "sequence": 0
+    },
+    {
+      "path": "logs/07-investigation-cause-0.md",
+      "sha256": "7e49aae3c4ff5a30c897c5cde2781f2f52c565180448a99fca23741715f23fc3",
+      "session_id": "session-07",
+      "task_id": "task-a",
+      "scenario_id": "scenario-07",
+      "sequence": 0
+    },
+    {
+      "path": "logs/08-resolved-same-log-0.md",
+      "sha256": "4a9f63398899b868db3e3e6994ad423c3139131740c5cff2d1a8cd1d609f7999",
+      "session_id": "session-08",
+      "task_id": "task-a",
+      "scenario_id": "scenario-08",
+      "sequence": 0
+    },
+    {
+      "path": "logs/09-resolved-linked-0.md",
+      "sha256": "f8967657a785c57f696d13ec6ccd24f0485c73d0c79d75fa5965ad237e78733d",
+      "session_id": "session-09",
+      "task_id": "task-a",
+      "scenario_id": "scenario-09",
+      "sequence": 0
+    },
+    {
+      "path": "logs/10-resolved-paraphrase-0.md",
+      "sha256": "148b77b3766667ab5d7a7c1259678d16a62fda65d3dcec7dd1c9ca170b0e27b7",
+      "session_id": "session-10",
+      "task_id": "task-a",
+      "scenario_id": "scenario-10",
+      "sequence": 0
+    },
+    {
+      "path": "logs/11-resolved-later-0.md",
+      "sha256": "4a5a00b4d4ec8087233eba1d01945eb1dcc3e2b46b108f8351dabc93f6a4b130",
+      "session_id": "session-11",
+      "task_id": "task-a",
+      "scenario_id": "scenario-11",
+      "sequence": 0
+    },
+    {
+      "path": "logs/11-resolved-later-1.md",
+      "sha256": "4019ee892907c23222ed756f2929922892951a44d0c28eb5ae30b17e00814066",
+      "session_id": "session-11",
+      "task_id": "task-a",
+      "scenario_id": "scenario-11",
+      "sequence": 1
+    },
+    {
+      "path": "logs/12-reopened-later-0.md",
+      "sha256": "8a475c0e63b01268a359c558b86adb12d5617a4e70ddb657e4932ec3c74fef30",
+      "session_id": "session-12",
+      "task_id": "task-a",
+      "scenario_id": "scenario-12",
+      "sequence": 0
+    },
+    {
+      "path": "logs/12-reopened-later-1.md",
+      "sha256": "6f49e9bf1bd5037c4516d5c2f5e02939c9ab29f093f135512d1f5e3d3a5982cb",
+      "session_id": "session-12",
+      "task_id": "task-a",
+      "scenario_id": "scenario-12",
+      "sequence": 1
+    },
+    {
+      "path": "logs/13-duplicate-copy-0.md",
+      "sha256": "615ea38f0e74c72ea72b5811ab9c4ab178af12fd1a260ce2e97387424af08e51",
+      "session_id": "session-13",
+      "task_id": "task-a",
+      "scenario_id": "scenario-13",
+      "sequence": 0
+    },
+    {
+      "path": "logs/13-duplicate-copy-1.md",
+      "sha256": "615ea38f0e74c72ea72b5811ab9c4ab178af12fd1a260ce2e97387424af08e51",
+      "session_id": "session-13",
+      "task_id": "task-a",
+      "scenario_id": "scenario-13",
+      "sequence": 0
+    },
+    {
+      "path": "logs/14-duplicate-reprint-0.md",
+      "sha256": "ef5569e7f6d8b2a2b088175b353901e44b89567a6bc162d298d74c322b0f7d69",
+      "session_id": "session-14",
+      "task_id": "task-a",
+      "scenario_id": "scenario-14",
+      "sequence": 0
+    },
+    {
+      "path": "logs/15-duplicate-quote-0.md",
+      "sha256": "c8aa8d0edbb615e3418e6565edafab3ac73245704b66a27cb9357da5166679c9",
+      "session_id": "session-15",
+      "task_id": "task-a",
+      "scenario_id": "scenario-15",
+      "sequence": 0
+    },
+    {
+      "path": "logs/15-duplicate-quote-1.md",
+      "sha256": "7314aca4b65e239102247039c65493a87510008b7c10fb1d9c8e055d9a677c7c",
+      "session_id": "session-15",
+      "task_id": "task-a",
+      "scenario_id": "scenario-15",
+      "sequence": 1
+    },
+    {
+      "path": "logs/16-other-task-success-0.md",
+      "sha256": "c7f50e285c7886166ed4d67fb5b0e62d5051f8bb4a7c8600f0775d14ccb19cf1",
+      "session_id": "session-16",
+      "task_id": "task-a",
+      "scenario_id": "scenario-16",
+      "sequence": 0
+    },
+    {
+      "path": "logs/17-missing-context-0.md",
+      "sha256": "7f29847b7ba30e890256eb1d76f126bbbb8bd420a7f9f67ed3fb88c73d7170a5",
+      "session_id": "session-17",
+      "task_id": "task-a",
+      "scenario_id": "scenario-17",
+      "sequence": 0
+    },
+    {
+      "path": "logs/18-contradiction-0.md",
+      "sha256": "57930a64f5faf8751477315c41b76cf53eff54c299e86d8382a0d6eff740e175",
+      "session_id": "session-18",
+      "task_id": "task-a",
+      "scenario_id": "scenario-18",
+      "sequence": 0
+    },
+    {
+      "path": "logs/19-injection-command-0.md",
+      "sha256": "e7bcb45e66c6bdea1318a019882cb2b012f358f6649a7cdd7d56f7045b663136",
+      "session_id": "session-19",
+      "task_id": "task-a",
+      "scenario_id": "scenario-19",
+      "sequence": 0
+    },
+    {
+      "path": "logs/20-injection-fence-0.md",
+      "sha256": "3827d12fa7f614620c93824da27f1a8d757443940b4f3adac5399226b28831d7",
+      "session_id": "session-20",
+      "task_id": "task-a",
+      "scenario_id": "scenario-20",
+      "sequence": 0
+    },
+    {
+      "path": "logs/16-other-task-success-b.md",
+      "sha256": "d4a0896be6079eb0e52ac8c14424baed29c22dc9d94fdd4efd1f3c62a0a3b654",
+      "session_id": "session-16",
+      "task_id": "task-b",
+      "scenario_id": "scenario-16",
+      "sequence": 0
+    }
+  ]
+}

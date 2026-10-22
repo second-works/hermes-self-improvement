@@ -205,12 +205,55 @@ class Contracts(unittest.TestCase):
             before=digest((dest/'report.json').read_bytes())
             with self.assertRaises(FileExistsError):write_output(dest,report)
             self.assertEqual(before,digest((dest/'report.json').read_bytes()))
+            self.assertEqual((dest.stat().st_mode & 0o777, (dest/'report.json').stat().st_mode & 0o777,
+                              (dest/'report.md').stat().st_mode & 0o777), (0o700, 0o600, 0o600))
+            self.assertEqual(sorted(os.listdir(dest.parent)), ['report'])
+            self.assertEqual(sorted(os.listdir(dest)), ['report.json', 'report.md'])
             alias=dest.parent/'link';alias.symlink_to(dest,target_is_directory=True)
             with self.assertRaises(OSError):write_output(alias/'new',report)
         rendered=safe_text('[click](https://example.invalid) <script>\x1b\u202e')
         self.assertNotIn('<script>',rendered);self.assertNotIn('\x1b',rendered)
         self.assertIn('\\[click\\]',rendered)
         self.assertIn('現在のGitHub',markdown(report))
+
+    def test_output_failure_part_way_leaves_nothing(self):
+        import errno
+        report=make_report(snapshot())
+        real_open,real_mkdir=os.open,os.mkdir
+        def fail_second_file(path,*args,**kwargs):
+            if path=='report.md':raise OSError(errno.ENOSPC,'injected')
+            return real_open(path,*args,**kwargs)
+        def fail_staging(path,*args,**kwargs):
+            if str(path).startswith('.'):raise OSError(errno.ENOSPC,'injected')
+            return real_mkdir(path,*args,**kwargs)
+        def fail_rename(*args,**kwargs):raise OSError(errno.EIO,'injected')
+        real_fsync,calls=os.fsync,[]
+        def fail_parent_sync(fd):
+            # report.json, report.md and the staging directory come first; the 4th
+            # call syncs the parent after the rename has published the output.
+            calls.append(fd)
+            if len(calls)==4:raise OSError(errno.EIO,'injected')
+            return real_fsync(fd)
+        for target,fake in (('open',fail_second_file),('mkdir',fail_staging),('rename',fail_rename),
+                            ('fsync',fail_parent_sync)):
+            with self.subTest(failure=target), tempfile.TemporaryDirectory() as name:
+                parent=Path(name).resolve()
+                with patch(f'worklog_candidates.report.os.{target}',side_effect=fake):
+                    with self.assertRaises(OSError) as caught:write_output(parent/'report',report)
+                self.assertIn(caught.exception.errno,(errno.ENOSPC,errno.EIO))
+                self.assertEqual(os.listdir(parent),[])
+                write_output(parent/'report',report)  # the name is free again
+                self.assertEqual(sorted(os.listdir(parent/'report')),['report.json','report.md'])
+
+    def test_output_name_near_name_max_still_works(self):
+        report=make_report(snapshot())
+        with tempfile.TemporaryDirectory() as name:
+            parent=Path(name).resolve()
+            limit=os.pathconf(parent,'PC_NAME_MAX')
+            dest=parent/('r'*limit)  # the longest valid name worked before staging was added
+            write_output(dest,report)
+            self.assertEqual(sorted(os.listdir(parent)),[dest.name])
+            self.assertEqual(sorted(os.listdir(dest)),['report.json','report.md'])
 
     def test_indented_and_empty_atx_headings_are_not_claims(self):
         from worklog_candidates.core import baseline

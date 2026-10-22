@@ -227,7 +227,15 @@ class Contracts(unittest.TestCase):
             if str(path).startswith('.'):raise OSError(errno.ENOSPC,'injected')
             return real_mkdir(path,*args,**kwargs)
         def fail_rename(*args,**kwargs):raise OSError(errno.EIO,'injected')
-        for target,fake in (('open',fail_second_file),('mkdir',fail_staging),('rename',fail_rename)):
+        real_fsync,calls=os.fsync,[]
+        def fail_parent_sync(fd):
+            # report.json, report.md and the staging directory come first; the 4th
+            # call syncs the parent after the rename has published the output.
+            calls.append(fd)
+            if len(calls)==4:raise OSError(errno.EIO,'injected')
+            return real_fsync(fd)
+        for target,fake in (('open',fail_second_file),('mkdir',fail_staging),('rename',fail_rename),
+                            ('fsync',fail_parent_sync)):
             with self.subTest(failure=target), tempfile.TemporaryDirectory() as name:
                 parent=Path(name).resolve()
                 with patch(f'worklog_candidates.report.os.{target}',side_effect=fake):

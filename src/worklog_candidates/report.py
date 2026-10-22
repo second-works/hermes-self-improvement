@@ -188,6 +188,12 @@ def write_output(destination, report):
             except OSError:
                 pass
             raise
-        os.fsync(fd)
+        try:
+            os.fsync(fd)
+        except BaseException:
+            # The rename may not be durable, and the caller reports a failure, so do
+            # not leave an output behind: remove what this call published.
+            _remove_partial(fd, destination.name)
+            raise
     finally:
         os.close(fd)

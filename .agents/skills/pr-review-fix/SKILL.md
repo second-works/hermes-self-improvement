@@ -12,7 +12,7 @@ description: 既存GitHub PRのCodex Code Review指摘・レビューコメン�
 
 ## 実行環境
 
-通常レビューのshell helperとSecurity PreflightはBash 5以上を使う。macOS標準の`/bin/bash` 3.2は非対応で、外部操作前に説明付きで停止する。利用するBashの絶対パス（例: Apple SiliconのHomebrew版 `/opt/homebrew/bin/bash`）を `BASH5` に設定し、`"$BASH5" --version` で5以上を確認してから、以下の `bash "$RUNTIME_DIR/scripts/..."` の例では `bash` を `"$BASH5"` に置き換える。Security Preflightも同じBashで実行し、非対応環境の `SECURITY_UNAVAILABLE` を成功として扱わない。手動JEV評価用の`triage-with-jev.sh`はこのBash 5前提の対象外で、従来の起動経路を維持する。スクリプトはインストールやPATH変更を行わない。
+通常レビューのshell helperとSecurity PreflightはBash 5以上を使う。macOS標準の`/bin/bash` 3.2は非対応で、外部操作前に説明付きで停止する。利用するBashの絶対パス（例: Apple SiliconのHomebrew版 `/opt/homebrew/bin/bash`）を `BASH5` に設定し、`"$BASH5" --version` で5以上を確認してから、以下の `bash "$RUNTIME_DIR/scripts/..."` の例では `bash` を `"$BASH5"` に置き換える。Security Preflightも同じBashで実行し、非対応環境の `SECURITY_UNAVAILABLE` を成功として扱わない。スクリプトはインストールやPATH変更を行わない。
 
 ## Structured Current State
 
@@ -82,49 +82,9 @@ Issue範囲内で、修正が小さく、副作用が限定的で、今回直す
 
 誤検知、根拠不足、スタイル差、重複指摘、すでに解消済みのもの。
 
-## JEV / Local Judge Manual Evaluation (Paused in Normal Review)
+## JEV / Local Judge（廃止）
 
-通常のPRレビュー修正ではCodex Code Reviewと既存の人手による仕様確認だけを使う。JEV Shadow TriageとLocal Judgeは一時停止中であり、このSkillの通常手順から呼び出さず、その出力を分類・修正・完了判断に使わない。実装、スクリプト、手動評価Workflowは比較再開用に保持する。ユーザーが明示的に評価を依頼した場合に限り、後述の運用契約と専用Workflowを使う。
-
-以下は、明示的な手動評価を再開する場合の参照情報であり、通常レビューの実行手順ではない。
-手動経路として `.agents/skills/pr-review-fix/scripts/triage-with-jev.sh`、`.github/workflows/jev-triage.yml`、`.github/workflows/decision-shadow.yml`、およびLocal Judge用Workflowを維持する。
-
-Review Comment Auto-Triage は Cloudflare Workers AI `typesafe/jev` を使う。
-
-- JEVの出力は常に `authoritative=false` として扱う。
-- 有効な最終分類のsourceは `effective_disposition_source=baseline` とし、既存のP0/P1/P2/P3ルールとReview Evidence Contractで決定する。
-- JEVはコード修正、GitHub書き込み、thread resolve、再レビュー依頼、Mergeを実行しない。
-- 呼び出し先は `JEV_TRIAGE_URL`、Bearer Secretは `JEV_TRIAGE_TOKEN` で与える。どちらかが未設定ならJEVをskipし、既存レビュー工程を継続する。
-- Skill側のShadow観測用confidence閾値は `JEV_MIN_CONFIDENCE` とし、未設定時は `0.80` を使う。
-- Workerが `mode=shadow` 以外を返した場合は、その結果を自動ルーティングに使わずfallbackする。
-- API障害、401/5xx、malformed response、低confidence、`high_risk=true`、`security`、P0/P1は既存Skill判断へfallbackする。
-- Unified Billingのクレジット不足は `credits_exhausted`、Spend Limit到達は `spend_limit`、一般429は `rate_limited`、課金設定異常は `billing_unavailable` として理由コードを残す。これらはJEVだけを無効化し、レビュー工程はCodex baselineで継続する。
-- JEVのHTTP 200応答も信頼せず、`decision-result.schema.json`相当の型・enum・必須項目・余剰項目禁止・nested object契約を満たす場合だけ参照する。不正応答は`malformed_response`としてbaselineへfallbackし、未検証フィールドを監査ログへ転記しない。
-- 現在head SHAに紐づくCodex review commentだけをJEVへ渡す。古いSHAの未解決threadは従来どおりReview Evidence Contractで判定する。
-- JEV監査ログにはcomment id、判定メタデータ、候補分類、latency/token usage等だけを保存し、レビュー本文、diff、Bearer Secretを保存しない。
-
-JEV出力は次の**候補分類**へ正規化する。候補はShadow観測用であり、これだけを理由に修正・停止・Merge判定を行わない。
-
-- P0 / P1 / security / high risk: `BLOCKING`候補 + baseline fallback
-- `decision=no_action`: `DISMISS`候補
-- P3のaction required: `FOLLOW-UP`候補
-- P2のaction requiredかつ `auto_fixable=true`: `IN-SCOPE FIX`候補
-- P2のaction requiredかつ `auto_fixable=false`: `FOLLOW-UP`候補
-- undecided / low confidence / API failure / non-shadow response: 候補を参考情報に留めbaseline fallback
-
-Shadow Modeの観測結果が既存分類と不一致でも、自動的に既存分類を変更しない。50〜100件程度の評価結果を蓄積し、限定自動化へ進む場合は別Design Decisionとする。
-
-### Local Judge / 共通Decision Provider
-
-Local Judgeを比較する場合は、[Local Judge運用契約](../../../templates/review-comment-auto-triage/local_judge/README.md)を参照する。
-`triage-with-providers.py` は JEV / Local Judge / Codex baseline を共通の `observe(review)` interfaceで扱う。JEVの既存API、`model=typesafe/jev`、`JEV_*`、単独実行は維持する。
-
-- 比較入口でも `authoritative=false` / `effective_disposition_source=baseline` を固定し、修正・thread resolve・routing・Merge判断を委譲しない。
-- Local JudgeはGemma 4で5項目を1-token判定し、固定候補の確率を返す。`LOCAL_JUDGE_MIN_CONFIDENCE` は評価上のfallbackメタデータだけに使い、`JEV_MIN_CONFIDENCE` と分離する。
-- Secretは `.github/workflows/decision-shadow.yml` の保護された `local-judge-shadow` Environment内でだけ参照する。Codex promptへSecret値を渡さない。
-- Local Judge未設定・障害・不正応答でもbaselineで継続する。既存のJEV単独実行を必須の比較Workflowへ置き換えない。
-- baselineの5項目ラベルを別途与えるまで比較はnullであり、Codexとの一致やFalse Negative検証を完了扱いにしない。監査artifactとSHAを固定したラベルを後からjoinできる。
-- 配備前の検証は合成fixtureに限定し、実PR本文/diffの送信先追加・Access/Tunnel/Secret登録は運用契約の承認境界を確認する。
+JEV Shadow TriageとLocal Judgeは廃止した。スクリプトとPoCはこのrepoから削除し、呼び出し先のCloudflare Workerも削除済み。このrepoにJEV用のSecretや変数はなく、呼び出す経路はない。レビュー指摘はCodex Code Reviewと人手による仕様確認だけで分類する。
 
 ## FOLLOW-UPの記録・参照
 
@@ -359,10 +319,6 @@ PR本文の `Closes #XX` 等からIssueを確認し、Issue本文を仕様基準
 - Issue範囲外: FOLLOW-UPまたは停止して報告
 - 仕様曖昧: 推測せず人間へ確認
 
-### 3.5. JEV / Local Judgeは実行しない
-
-通常レビューではJEVへの送信、Local JudgeのWorkflow dispatch、比較artifactの取得を行わない。Codexレビューコメントを直接確認し、次の手順で分類する。JEVまたはLocal Judgeを呼び出すのは、ユーザーが手動評価を明示した場合だけとする。
-
 ### 4. 指摘を分類
 
 現在有効な指摘を以下へ整理する。
@@ -373,7 +329,7 @@ PR本文の `Closes #XX` 等からIssueを確認し、Issue本文を仕様基準
 
 P2をBLOCKINGと判定する場合は、具体的な失敗条件・再現経路・PR差分との因果・Issue受入条件との関係を記録する。
 
-分類はCodexがレビュー本文・差分・Issue受入条件を照合して決定する。JEV / Local Judgeの出力は通常レビューでは存在せず、判断材料として参照しない。
+分類はCodexがレビュー本文・差分・Issue受入条件を照合して決定する。
 
 ### 5. 同じhead branch上で修正
 
@@ -526,7 +482,7 @@ bash "$RUNTIME_DIR/scripts/wait-codex-review.sh" \
 - `STATUS=REVIEW_PASSED`: BLOCKINGの未処理指摘なし。P2のみの指摘は完了条件を阻害しない。
 - timeout: 再レビュー待ちとして停止。
 
-`REVIEW_PASSED` でもP2が報告された場合、現在headのreview commentを再取得してCodexの分類ルールだけで評価する。JEV / Local Judgeは再実行しない。
+`REVIEW_PASSED` でもP2が報告された場合、現在headのreview commentを再取得してCodexの分類ルールだけで評価する。
 
 1. 各P2を `BLOCKING / IN-SCOPE FIX / FOLLOW-UP / DISMISS` に分類する。P2のみでは停止せず、分類結果を記録する。
 2. BLOCKINGだけ修正する。
@@ -568,7 +524,6 @@ CI / security / Codex Reviewがすべて `EXPECTED_SHA` 対象だったことを
 - PR番号 / repository / head branch
 - 修正前後SHA / push SHA
 - P0 / P1 / P2の件数と分類
-- JEV / Local Judgeは通常レビューでは未実行（手動評価経路は保持）
 - BLOCKING残件
 - FOLLOW-UP / DISMISS項目
 - Issue受入条件の充足状況
@@ -596,5 +551,3 @@ AI-Memory-RAG PR #39では、P2修正後に新たなP2が発生し続け、レ�
 - force push
 - `@codex address that feedback`
 - 代替branch / follow-up PR作成
-- JEV候補だけを根拠にBLOCKING確定・自動修正・thread resolve・Merge判定すること
-- JEV Workerが`limited_automation`を返した場合に、そのrouteをこのSkillから実行すること

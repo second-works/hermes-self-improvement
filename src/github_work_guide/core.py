@@ -5,8 +5,11 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+from . import guide
+
 REPO = 'second-works/hermes-self-improvement'
 VERSION = 1
+PLAN_VERSION = 2  # v2: per-item guidance, excerpt evidence, work fingerprint
 REQUIRED = ('ci', 'Security Preflight', 'Analyze (python)')
 KINDS = {
     'completion': ('完了範囲確認', 'IssueのDoneと関連PRの実装範囲を人が照合する。'),
@@ -147,6 +150,23 @@ def complete(snapshot):
     require(snapshot['coverage']['status'] == 'COMPLETE', 'incomplete acquisition')
 
 
+def work_view(raw):
+    """Source minus repository-wide metadata that changes without any change to this item."""
+    detail = dict(raw['detail'])
+    for side in ('head', 'base'):
+        if isinstance(detail.get(side), dict) and 'repo' in detail[side]:
+            ref = dict(detail[side])
+            repo = ref['repo']
+            ref['repo'] = repo.get('full_name') if isinstance(repo, dict) else repo
+            detail[side] = ref
+    return {**raw, 'detail': detail}
+
+
+def fingerprint(item):
+    """Work fingerprint for diff/recheck. The source hash stays the integrity check of the original."""
+    return digest(work_view(item['raw']))
+
+
 def diff(current, previous=None):
     validate(current)
     if previous is not None:
@@ -156,29 +176,15 @@ def diff(current, previous=None):
     for key in sorted(old.keys() | current['items'].keys()):
         a, b = old.get(key), current['items'].get(key)
         status = ('UNAVAILABLE' if b is None else 'FIRST' if previous is None else
-                  'ADDED' if a is None else 'UNCHANGED' if a['hash'] == b['hash'] else 'CHANGED')
+                  'ADDED' if a is None else 'UNCHANGED' if fingerprint(a) == fingerprint(b) else 'CHANGED')
         fields = []
         if a and b and status == 'CHANGED':
+            va, vb = work_view(a['raw']), work_view(b['raw'])
             fields = [k for k in ('state', 'title', 'body') if a[k] != b[k]]
-            fields += [k for k in sorted(a['raw'].keys() | b['raw'].keys())
-                       if a['raw'].get(k) != b['raw'].get(k)]
-        changes.append({'target': key, 'status': status, 'fields': fields})
+            fields += [k for k in sorted(va.keys() | vb.keys()) if va.get(k) != vb.get(k)]
+        changes.append({'target': key, 'status': status, 'fields': fields,
+                        'metadata_only': bool(status == 'UNCHANGED' and a['hash'] != b['hash'])})
     return changes
-
-
-def dependencies(item):
-    """Only an explicit machine-readable line is actionable; prose stays on hold."""
-    sections = re.findall(r'^#+\s+Dependencies\s*\n(.*?)(?=^#+\s|\Z)', item['body'], re.M | re.S | re.I)
-    if len(sections) != 1:
-        return [], '依存欄がない、または複数ある'
-    text = sections[0].strip()
-    if text.lower() in ('none', 'なし', '依存なし'):
-        return [], None
-    values = re.findall(r'^- depends-on: #([1-9][0-9]*)\s*$', text, re.M)
-    remainder = re.sub(r'^- depends-on: #[1-9][0-9]*\s*$', '', text, flags=re.M).strip()
-    if not values or remainder:
-        return [], '依存の自然文は未確定（明示形式での確認が必要）'
-    return sorted(set(int(x) for x in values)), None
 
 
 def gate(item):
@@ -214,11 +220,220 @@ def gate(item):
     return failures
 
 
-def evidence(item):
-    return [{'id': f'{item["kind"]}:{item["number"]}:body', 'url': item['url'],
-             'quote': item['body'], 'source_hash': item['hash']},
-            {'id': f'{item["kind"]}:{item["number"]}:state', 'url': item['url'],
-             'quote': item['state'], 'source_hash': item['hash']}]
+def hold(code, category, reason, evidence, check, question, release, **extra):
+    return {'code': code, 'category': category, 'reason': reason, 'evidence': evidence,
+            'check': check, 'question': question, 'release': release, **extra}
+
+
+class Analysis:
+    """Per-snapshot text index shared by all candidates."""
+
+    def __init__(self, items):
+        self.items = items
+        self.texts, self.refs, self.external = {}, {}, {}
+        for key, item in items.items():
+            texts = [guide.Text(key, 'body', item['body'])]
+            texts += [guide.Text(key, f'c{i}', c['body']) for i, c in enumerate(item['raw']['comments'], 1)]
+            self.texts[key] = texts
+            self.refs[key], self.external[key] = [], []
+            for text in texts:
+                internal, external = guide.references(text, REPO)
+                for r in internal:
+                    r['target'] = guide.resolve(items, r['kind'], r['number'])
+                self.refs[key] += [r for r in internal if r['target'] != key]
+                self.external[key] += external
+
+
+def analyze(key, item, a):
+    """Sections, holds, relations and evidence for one OPEN Issue (all from quoted source)."""
+    items, body = a.items, a.texts[key][0]
+    found = guide.sections(body)
+    named = [s for s in found if s['name']]
+    evidence, holds, notes = {}, [], []
+
+    def cite(entry):
+        owner = items[':'.join(entry['id'].split(':')[:2])]
+        evidence.setdefault(entry['id'], {**entry, 'url': owner['url'], 'source_hash': owner['hash']})
+        return entry['id']
+
+    def section_excerpt(s, lines=4):
+        return cite(body.excerpt(s['line'], min(s['end'], s['line'] + lines)))
+
+    recognised = ', '.join(guide.LABELS[s['name']] for s in named) or 'なし'
+    goals = [s for s in named if s['name'] == 'goal']
+    if not goals:
+        first = [section_excerpt(named[0], 2)] if named else ([cite(body.excerpt(0, 2))] if item['body'].strip() else [])
+        holds.append(hold('format_missing', 'format', '目的/Goal欄がない', first,
+                          f'{key} 本文（認識した欄: {recognised}）', 'このIssueで達成することは何か。本文のどの記載が目的に当たるか。',
+                          '目的/Goal欄を本文に1つ書く、または目的を人が判断して記録する。', section='goal'))
+    elif len(goals) > 1:
+        ids = []
+        for s in goals:
+            if s['parent'] is not None:
+                ids.append(cite(body.excerpt(s['parent'], s['parent'] + 1)))
+            ids.append(section_excerpt(s))
+        holds.append(hold('goal_multiple', 'semantic', f'目的/Goalの欄が{len(goals)}箇所ある', ids,
+                          f'{key} の各目的欄（' + '、'.join(f'L{s["line"] + 1}' for s in goals) + '）と、上位の見出し',
+                          'どの欄が現行の目的か。後の欄は前の欄を置き換えるか。',
+                          '現行の目的を1つに決め、本文に反映するか人の判断として記録する。'))
+    elif not goals[0]['content']:
+        holds.append(hold('goal_empty', 'format', '目的/Goal欄が空', [section_excerpt(goals[0], 2)],
+                          f'{key} L{goals[0]["line"] + 1} の目的欄', 'このIssueで達成することは何か。',
+                          '目的/Goal欄に内容を書く、または目的を人が判断して記録する。'))
+
+    sources = [(s['line'], s['content'], body.excerpt(s['line'], s['end']))
+               for s in named if s['name'] == 'dependencies']
+    sources += [(x['line'], x['value'], body.excerpt(x['line'], x['line'] + 1)) for x in guide.labels(body, found)]
+    sources.sort(key=lambda x: x[0])
+    numbers = []
+    if not sources:
+        holds.append(hold('format_missing', 'format', '依存欄がない', [],
+                          f'{key} 本文（認識した欄: {recognised}）', '先に終わっている必要があるIssue/PRはあるか。',
+                          '依存/Dependencies欄に番号（- depends-on: #N）か「なし」を書く、または人が判断して記録する。',
+                          section='dependencies'))
+    if len(sources) > 1:
+        holds.append(hold('dependency_multiple', 'semantic', f'依存の記載が{len(sources)}箇所ある',
+                          [cite(x[2]) for x in sources], f'{key} の依存の記載（' + '、'.join(f'L{x[0] + 1}' for x in sources) + '）',
+                          'どの記載が現行の依存か。', '現行の依存を1つに決め、本文に反映するか人の判断として記録する。'))
+    for line, value, quote in sources:
+        explicit, terms = guide.dependency_value(value)
+        if explicit is not None:
+            numbers += explicit
+            continue
+        mentioned = []
+        end = next((s['end'] for s in found if s['line'] == line), line + 1)
+        for r in a.refs[key]:
+            if r['evidence']['id'].startswith(f'{key}:L') and line <= r['line'] < end:
+                target = r['target']
+                if target not in [m['target'] for m in mentioned]:
+                    mentioned.append({'target': target, 'state': items[target]['state'] if target in items else 'UNFETCHED'})
+        holds.append(hold('dependency_prose', 'semantic', '依存が自然文で書かれ、Issue/PR番号が確定していない', [cite(quote)],
+                          f'{key} L{line + 1} の依存の各項目と、名称が近いIssue（未確定の候補）',
+                          '各項目はどのIssue/PRか。先に完了している必要があるか。',
+                          '依存を番号（- depends-on: #N）か「なし」で確定する、または人が判断して記録する。',
+                          terms=[{'term': t, 'candidates': [] if guide.SHORT.search(t) else guide.name_candidates(t, items, key)}
+                                 for t in terms], mentioned=mentioned))
+    numbers = sorted(set(numbers)) if not any(h['code'] == 'dependency_prose' for h in holds) else []
+
+    for c_text in a.texts[key][1:]:
+        for i, line in enumerate(c_text.lines):
+            m = re.search(r'Goal|目標|方針', line, re.I)
+            if m:
+                holds.append(hold('comment_change', 'semantic', 'コメントのGoal/方針変更は人の確認が必要',
+                                  [cite(c_text.window(i, m.start(), m.end()))], f'{key} {c_text.where} L{i + 1}',
+                                  'コメントは本文の目的・方針・範囲を変更するか。',
+                                  '変更を本文に反映するか、変更なしと人が判断して記録する。'))
+                break
+
+    related = {}
+    def relate(target, relation, direction, ev):
+        k = (target, relation, direction)
+        if k in related:
+            return
+        entry = {'target': target, 'relation': relation, 'direction': direction, 'evidence': ev,
+                 'state': items[target]['state'] if target in items else 'UNFETCHED'}
+        if target in items and items[target]['kind'] == 'pr':
+            d = items[target]['raw']['detail']
+            entry.update(head=d['head']['sha'], merged_at=guide.valid_time(d.get('merged_at')))
+        related[k] = entry
+    for p in items.values():
+        if p['kind'] == 'pr' and any(c['number'] == item['number'] and c['repository']['nameWithOwner'] == REPO
+                                     for c in p['raw']['closing']):
+            relate(f'pr:{p["number"]}', 'closing', 'in', None)
+    for r in a.refs[key]:
+        relate(r['target'], 'mention', 'out', cite(r['evidence']))
+    for other, refs in a.refs.items():
+        for r in refs:
+            if r['target'] == key:
+                relate(other, r['relation'], 'in', cite(r['evidence']))
+    related = sorted(related.values(), key=lambda r: (r['target'], r['relation'], r['direction']))
+    external, seen = [], set()
+    for x in a.external[key]:
+        if x['url'] not in seen:
+            seen.add(x['url'])
+            external.append({'url': x['url'], 'evidence': cite(x['evidence']),
+                             'note': f'対象外repo（{x["repo"]}）のため取得しない。必要なら人が確認する。'})
+
+    done = []
+    for s in named:
+        if s['name'] == 'done':
+            checked, total = guide.done_counts(body, s)
+            done.append({'line': s['line'] + 1, 'checked': checked, 'total': total, 'evidence': section_excerpt(s, 6)})
+
+    merged = [r for r in related if r['state'] == 'MERGED' and (r['relation'] == 'closing' or
+              (r['relation'] == 'refs' and r['direction'] == 'in'))]
+    merged_targets = sorted({r['target'] for r in merged})
+    if merged and not any(r['relation'] == 'closing' for r in merged):
+        holds.append(hold('relation_not_closing', 'semantic', 'MERGEDの関連PRは参照（Refs）だけで、closing関係ではない',
+                          [r['evidence'] for r in merged if r['evidence']],
+                          f'{key} の完了条件と ' + '、'.join(merged_targets) + ' の変更内容',
+                          'このPRでIssueのどの完了条件を満たしたか。残りはあるか。',
+                          'PRとIssueの対応範囲を人が確定する（Issue Closeは人間が判断）。'))
+    updated = guide.valid_time(item['raw']['detail'].get('updated_at'))
+    for r in merged:
+        if r.get('merged_at') and updated and r['merged_at'] > updated:
+            notes.append(f'{r["target"]} のMerge（{r["merged_at"]}）はIssueの最終更新（{updated}）より後。'
+                         '本文の状態の記述はMerge前の時点として読む。')
+    notes = sorted(set(notes))
+    gaps = [n for n in guide.EXPECTED if n not in {s['name'] for s in named}
+            and not (n == 'dependencies' and sources)]
+    other = [{'line': s['line'] + 1, 'heading': s['heading']} for s in found if not s['name']]
+    return {'sections': [{'name': s['name'], 'line': s['line'] + 1} for s in named], 'gaps': gaps, 'done': done,
+            'related': related, 'external': external, 'holds': holds, 'notes': notes, 'other_headings': other,
+            'numbers': numbers, 'merged': merged_targets, 'evidence': evidence}
+
+
+def steps_for(key, kind, item, info, deps, items):
+    if kind == 'none':
+        return [f'{item["state"]}のため再実装を開始しない。']
+    if kind == 'review':
+        head = item['raw']['detail']['head']['sha']
+        steps = [f'現head {head} で必須check（{", ".join(REQUIRED)}）・正式レビュー・threadを確認する。']
+        return steps + [f'保留 gate: {h["reason"]}' for h in info['holds']] + [
+            f'scripts/check-pr-head.sh {item["number"]} が PR_GATE_STATUS=READY を返すまでマージを依頼しない。']
+    steps = []
+    if kind == 'completion':
+        for r in info['related']:
+            if r['target'] in info['merged'] and r['relation'] in ('closing', 'refs') and r['direction'] == 'in':
+                how = 'closing' if r['relation'] == 'closing' else 'Refs（closingではない）'
+                steps.append(f'{r["target"]}（MERGED、head {r["head"]}、Merge {r["merged_at"] or "日時不明"}、関係: {how}）'
+                             'の変更内容と検証記録を確認する。')
+        if info['done']:
+            summary = '、'.join(f'L{d["line"]}: ' + (f'{d["checked"]}/{d["total"]}チェック' if d['total'] else 'チェック項目なし')
+                               for d in info['done'])
+            steps.append(f'完了条件の欄（{summary}）を、上記PRの実装範囲と照合する。')
+        else:
+            steps.append('完了条件の欄がないため、目的と作業範囲を上記PRの変更と照合する。')
+    elif kind == 'dependency':
+        states = '、'.join(f'{d}: {items[d]["state"] if d in items else "未取得"}' for d in deps)
+        steps.append(f'依存 {states} の完了条件を確認する。CLOSEDでも成功・採用は推定しない。')
+    elif kind == 'scope':
+        steps.append(f'保留{len(info["holds"])}件を解除するまで実装を始めない。')
+    else:
+        steps.append('目的と作業範囲を照合し、実装Issueとして計画を整理する。')
+    for r in info['related']:
+        if r['direction'] == 'out' and r['state'] == 'OPEN':
+            steps.append(f'本文が言及するOPENの {r["target"]} との境界を引用（{r["evidence"]}）で確認する（範囲の重複・変更の有無）。')
+    if info['external']:
+        steps.append(f'対象外repoへの参照{len(info["external"])}件は取得しない。親計画などの内容が必要なら人が確認する。')
+    for h in info['holds']:
+        where = f'（{h["evidence"][0]}）' if h['evidence'] else ''
+        steps.append(f'保留 {h["code"]}{where}: {h["release"]}')
+    if info['gaps']:
+        if 'verification' in info['gaps'] and info['done']:
+            steps.append('検証/Verification欄がない: 完了条件をどう確認するかが未定義。確認方法を決める。')
+        missing = [guide.LABELS[g] for g in info['gaps'] if g not in ('goal', 'dependencies')]
+        if missing:
+            steps.append('未定義の欄: ' + '、'.join(missing) + '。Issueに追記するか、不要と人が判断して記録する。')
+    if kind == 'completion':
+        steps.append('Issue Close・採用・本番適用は人間が判断する（ハーネスは推定しない）。')
+    return steps
+
+
+def state_evidence(item):
+    key = f'{item["kind"]}:{item["number"]}'
+    return {'id': f'{key}:state', 'url': item['url'], 'quote': item['state'], 'truncated': False,
+            'source_hash': item['hash']}
 
 
 def build_plan(snapshot, priority=()):
@@ -226,48 +441,60 @@ def build_plan(snapshot, priority=()):
     items = snapshot['items']
     priority = list(priority)
     require(len(set(priority)) == len(priority) and all(k in items for k in priority), 'invalid priority')
+    a = Analysis(items)
     candidates, deps = {}, {}
     for key, item in sorted(items.items()):
-        reasons = []
-        linked = []
-        if item['kind'] == 'issue':
-            linked = [p for p in items.values() if p['kind'] == 'pr' and any(
-                c['number'] == item['number'] and c['repository']['nameWithOwner'] == REPO
-                for c in p['raw']['closing'])]
+        info = {'sections': [], 'gaps': [], 'done': [], 'related': [], 'external': [], 'holds': [], 'notes': [],
+                'other_headings': [], 'numbers': [], 'merged': [], 'evidence': {}}
         if item['state'] != 'OPEN':
-            kind, nums = 'none', []
+            kind = 'none'
         elif item['kind'] == 'pr':
-            kind, nums = 'review', []
-            reasons += gate(item)
+            kind = 'review'
+            head = item['raw']['detail']['head']['sha']
+            info['holds'] = [hold('gate', 'gate', reason, [f'{key}:head'], f'{key} 現head {head}',
+                                  '必須check・正式レビュー・threadが現headでそろっているか。',
+                                  f'scripts/check-pr-head.sh {item["number"]} が PR_GATE_STATUS=READY を返し、未解決の指摘がない。')
+                             for reason in gate(item)]
+            info['evidence'][f'{key}:head'] = {'id': f'{key}:head', 'url': item['url'], 'quote': head,
+                                               'truncated': False, 'source_hash': item['hash']}
         else:
-            nums, unknown = dependencies(item)
-            if unknown:
-                reasons.append(unknown)
-            goals = re.findall(r'^#+[ \t]+Goal[ \t]*\r?\n(.*?)(?=^#+[ \t]|\Z)',
-                               item['body'], re.M | re.S | re.I)
-            if len(goals) != 1 or not goals[0].strip():
-                reasons.append('現行Goalを一意に確認できない')
-            if any(re.search(r'Goal|目標|方針', c.get('body') or '', re.I) for c in item['raw']['comments']):
-                reasons.append('コメントのGoal/方針変更は人の確認が必要')
-            kind = 'dependency' if nums else 'scope' if reasons else 'completion' if any(
-                p['state'] == 'MERGED' for p in linked) else 'plan'
-        deps[key] = [f'issue:{n}' for n in nums]
+            kind = 'issue'  # decided below from dependencies, related PRs and holds
+            info = analyze(key, item, a)
+        deps[key] = [f'issue:{n}' for n in info['numbers']]
         for dep in deps[key]:
             if dep not in items:
-                reasons.append(f'{dep}: 未取得')
+                reason, release = f'{dep}: 未取得', '依存先の番号を確認し、取得範囲で状態を確認できるようにする。'
             elif items[dep]['state'] != 'CLOSED':
-                reasons.append(f'{dep}: 依存完了/採用の確認待ち')
+                reason, release = f'{dep}: 依存完了/採用の確認待ち', '依存先がCLOSEDになり、その完了条件を人が確認する。'
             else:
                 # CLOSED is not proof of acceptance or successful delivery.
-                reasons.append(f'{dep}: CLOSED、依存の成功条件は人が確認')
+                reason, release = f'{dep}: CLOSED、依存の成功条件は人が確認', 'CLOSEDの依存先の完了条件と採用を人が確認して記録する。'
+            info['holds'].append(hold('dependency_state', 'state', reason, [], f'{dep} の状態と完了条件',
+                                      '依存先は成功条件を満たしているか。', release))
+        if kind not in ('none', 'review'):
+            kind = 'dependency' if deps[key] else 'completion' if info['merged'] else 'scope' if info['holds'] else 'plan'
         label, action = KINDS[kind]
+        related_ev = {}
+        for r in info['related']:
+            if r['target'] in info['merged']:
+                pr = items[r['target']]
+                related_ev[f'{r["target"]}:state'] = state_evidence(pr)
+                related_ev[f'{r["target"]}:head'] = {'id': f'{r["target"]}:head', 'url': pr['url'], 'quote': r['head'],
+                                                     'truncated': False, 'source_hash': pr['hash']}
+        evidence = [state_evidence(item)] + list(info['evidence'].values()) + list(related_ev.values())
         candidates[key] = {
-            'target': key, 'kind': kind, 'label': label, 'evidence': evidence(item) +
-            [e for p in linked for e in evidence(p)], 'dependencies': deps[key],
+            'target': key, 'kind': kind, 'label': label,
+            'status': {'state': item['state'], 'updated_at': guide.valid_time(item['raw']['detail'].get('updated_at')),
+                       'comments': len(item['raw']['comments'])},
+            'sections': info['sections'], 'gaps': info['gaps'], 'done': info['done'], 'related': info['related'],
+            'external': info['external'], 'holds': info['holds'], 'notes': info['notes'],
+            'other_headings': info['other_headings'], 'evidence': evidence, 'dependencies': deps[key],
             'start_condition': '取得完了、状態不変、保留なしを再取得で確認する。',
-            'next_step': action, 'success_condition': '人が原文と受入条件を照合する（実行・承認・検収の完了ではない）。',
+            'next_step': action, 'steps': steps_for(key, kind, item, info, deps[key], items),
+            'success_condition': '人が原文と受入条件を照合する（実行・承認・検収の完了ではない）。',
             'stop_condition': '状態/head/依存/check/レビューの変化、欠落、取得失敗なら停止する。',
-            'hold_reasons': reasons, 'fingerprint': item['hash'],
+            'hold_reasons': [h['reason'] for h in info['holds']],
+            'fingerprint': fingerprint(item), 'source_hash': item['hash'],
         }
     ordered, visiting, visited = [], set(), set()
     for root in priority + sorted(items):
@@ -282,13 +509,17 @@ def build_plan(snapshot, priority=()):
                 ordered.append(key)
             elif key in visiting:
                 for member in visiting:
-                    if '依存循環' not in candidates[member]['hold_reasons']:
-                        candidates[member]['hold_reasons'].append('依存循環')
+                    c = candidates[member]
+                    if '依存循環' not in c['hold_reasons']:
+                        c['hold_reasons'].append('依存循環')
+                        c['holds'].append(hold('dependency_cycle', 'state', '依存循環', [], f'{member} の依存',
+                                               '依存の向きは正しいか。', '循環しないように依存を直す。'))
+                        c['steps'].append('保留 dependency_cycle: 循環しないように依存を直す。')
             else:
                 visiting.add(key)
                 stack.append((key, True))
                 stack.extend((dep, False) for dep in reversed(deps[key]) if dep in candidates)
-    return {'version': VERSION, 'repo': REPO, 'snapshot_hash': snapshot['hash'],
+    return {'version': PLAN_VERSION, 'repo': REPO, 'snapshot_hash': snapshot['hash'],
             'priority': priority, 'order': ordered, 'candidates': candidates}
 
 
@@ -305,13 +536,22 @@ def recheck(snapshot, plan, target, fresh):
     if target not in fresh['items']:
         return {'target': target, 'status': 'BLOCKED', 'reasons': ['対象が未取得']}
     # Compare the whole bounded scope: dependencies, relations, comments and checks included.
-    before = {k: v['hash'] for k, v in snapshot['items'].items()}
-    after = {k: v['hash'] for k, v in fresh['items'].items()}
+    # Repository-wide metadata is excluded by the work fingerprint; the source hash is still validated.
+    before = {k: fingerprint(v) for k, v in snapshot['items'].items()}
+    after = {k: fingerprint(v) for k, v in fresh['items'].items()}
     if before != after:
         return {'target': target, 'status': 'STALE', 'reasons': ['取得範囲の状態/根拠が計画時と変化']}
     reasons = plan['candidates'][target]['hold_reasons']
     return {'target': target, 'status': 'BLOCKED' if reasons else 'CONFIRMED', 'reasons': reasons,
             'meaning': '読取dry-runのみ。実行・承認・完了を意味しない。', 'fresh_hash': fresh['hash']}
+
+
+RELATION_LABELS = {('closing', 'in'): 'closing関係', ('refs', 'in'): '相手がRefs等で参照', ('mention', 'in'): '相手が言及',
+                   ('refs', 'out'): '本文がRefs等で参照', ('mention', 'out'): '本文が言及'}
+
+
+def previous_given(changes):
+    return any(x['status'] != 'FIRST' for x in changes) or not changes
 
 
 def markdown(snapshot, changes, plan=None, result=None):
@@ -324,15 +564,59 @@ def markdown(snapshot, changes, plan=None, result=None):
              f'上限: {safe(snapshot["coverage"]["limits"])}',
              '新規モデル通信0、GitHub書込0。意味精度・人の確認時間・有用性検収は未確認。',
              '', '## 今回の変更', '']
-    lines += [f'- {x["target"]}: {x["status"]} {safe(x["fields"])}' for x in changes]
+    first = [x for x in changes if x['status'] == 'FIRST']
+    moved = [x for x in changes if x['status'] not in ('UNCHANGED', 'FIRST')]
+    if first:
+        lines.append(f'- FIRST: {len(first)}件（前回runなし。差分は次回から）')
+    lines += [f'- {x["target"]}: {x["status"]} {safe(x["fields"])}' for x in moved]
+    same = sum(x['status'] == 'UNCHANGED' for x in changes)
+    meta = sum(x['metadata_only'] for x in changes)
+    if previous_given(changes):
+        lines.append(f'- UNCHANGED: {same}件（うちrepo全体のメタデータだけが変化: {meta}件）')
     if plan:
-        for key in plan['order']:
+        active = [k for k in plan['order'] if plan['candidates'][k]['kind'] != 'none']
+        done = [k for k in plan['order'] if plan['candidates'][k]['kind'] == 'none']
+        for key in active:
             c = plan['candidates'][key]
-            lines += ['', f'## {key} — {c["label"]}', '', f'次操作: {c["next_step"]}',
-                      f'開始条件: {c["start_condition"]}', f'成功判定: {c["success_condition"]}',
-                      f'停止条件: {c["stop_condition"]}', f'保留理由: {safe(c["hold_reasons"])}']
-            lines += [f'- [{e["id"]}]({e["url"]}) / hash {e["source_hash"]}: {safe(e["quote"])}'
-                      for e in c['evidence']]
+            ev = {e['id']: e for e in c['evidence']}
+            def quote(i):
+                e = ev[i]
+                return f'[{i}]({e["url"]}) {safe(e["quote"])}' + ('（抜粋）' if e['truncated'] else '')
+            s = c['status']
+            lines += ['', f'## {key} — {c["label"]}', '',
+                      f'- 現在: {s["state"]} / 最終更新 {s["updated_at"] or "不明"} / コメント{s["comments"]}件',
+                      '- 認識した欄: ' + ('、'.join(f'{x["name"]}(L{x["line"]})' for x in c['sections']) or 'なし')]
+            if c['other_headings']:
+                lines.append('- 判断に使っていない見出し: ' + '、'.join(f'L{x["line"]}' for x in c['other_headings']))
+            grouped = {}
+            for r in c['related']:
+                grouped.setdefault(r['target'], []).append(r)
+            for target, rs in grouped.items():
+                how = '、'.join(RELATION_LABELS[(r['relation'], r['direction'])] for r in rs)
+                extra = f'、head {rs[0]["head"]}' if rs[0].get('head') else ''
+                where = ', '.join(r['evidence'] for r in rs if r['evidence'])
+                lines.append(f'- 関連候補: {target}（{rs[0]["state"]}{extra}）{how}' + (f' ← {where}' if where else ''))
+            for x in c['external']:
+                lines.append(f'- 対象外: {safe(x["url"])} — {x["note"]}')
+            for n in c['notes']:
+                lines.append(f'- 注意: {n}')
+            lines += ['', '確認手順:']
+            lines += [f'{i}. {step}' for i, step in enumerate(c['steps'], 1)]
+            if c['holds']:
+                lines += ['', '保留:']
+                for h in c['holds']:
+                    lines.append(f'- {h["code"]}（{h["category"]}）{h["reason"]} / 確認対象: {h["check"]} / '
+                                 f'問い: {h["question"]} / 解除条件: {h["release"]}')
+                    for t in h.get('terms', []):
+                        cands = '、'.join(f'{x["target"]}({x["state"]}, 一致{x["score"]}, 未確定)' for x in t['candidates']) or '候補なし'
+                        lines.append(f'  - 項目 {safe(t["term"])}: {cands}')
+                    if h.get('mentioned'):
+                        lines.append('  - 記載の番号: ' + '、'.join(f'{m["target"]}({m["state"]})' for m in h['mentioned']))
+            lines += ['', f'進める条件: {c["start_condition"]} / 止める条件: {c["stop_condition"]}', '', '根拠:']
+            lines += [f'- {quote(i)}' for i in ev if not i.endswith(':state')]
+        if done:
+            lines += ['', f'## 今回対応不要（CLOSED/MERGED） {len(done)}件', '',
+                      '、'.join(f'{k}: {plan["candidates"][k]["status"]["state"]}' for k in done)]
     else:
         lines += ['', '取得不完全。手順は生成しない。', safe(snapshot['coverage']['errors'])]
     if result:

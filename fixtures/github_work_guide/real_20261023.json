@@ -1,0 +1,719 @@
+{
+ "classification": "PUBLIC",
+ "repo": "second-works/hermes-self-improvement",
+ "captured_at": "2026-10-23T08:00:00+00:00",
+ "note": "PUBLIC REST GETで取得したIssue/PRの原文。案内に使わないCLOSED/MERGEDのコメント・check・review・threadは省略。closingはPR本文のCloses行から再現。",
+ "items": [
+  {
+   "detail": {
+    "number": 1,
+    "state": "closed",
+    "title": "chore: ai-development共通テンプレートを安全に導入する",
+    "body": "## 目的\n空の `hermes-self-improvement` リポジトリに、既存の [ai-development](https://github.com/second-works/ai-development) の共通開発ルールを取り込み、1 Issue→1 PR→Codex自動レビュー→修正→マージの運用を確立する。\n\n## 作業\n- テンプレートの `AGENTS.md`, `.github/ISSUE_TEMPLATE/`, PRテンプレート、`.github/workflows/`, `SECURITY.md` および必要な共通スクリプトを棚卸しする。\n- プロジェクトに必要なものだけを移植し、パス・権限・トリガー・Secrets・有料API依存を確認する。既存ルールを無条件に上書きしない。\n- Codex自動レビューの実際の起動条件と認証・費用・失敗時挙動を検証する。レビューが動かない場合にマージを誤認して許可しない。\n- CodeQL、Dependabot、最低限のテストとPRチェックを導入する。保護ルールは利用可能なGitHubプラン・権限に合わせる。\n- Hermesの本番設定や `~/.hermes` をCIから変更しない方針を `AGENTS.md` に明記する。\n\n## 完了条件\n- テンプレートから採用したファイルと除外したファイルを文書化。\n- テスト用PRでCIとCodexレビューの発火・成功/失敗時の動作を確認。\n- APIキーをコミットせず、権限最小化・人間のマージ承認を維持する。\n\n## 制約\nこのIssueはセットアップ専用。自己改善の自動適用はしない。",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/issues/1",
+    "comments": 0,
+    "updated_at": "2026-10-15T00:26:41Z"
+   },
+   "comments": []
+  },
+  {
+   "detail": {
+    "number": 2,
+    "state": "closed",
+    "title": "docs: Hermes自己改善システムの基本設計と段階的実装計画",
+    "body": "## 背景\nmacOS Mac mini M2 (16GB) で Hermes Agent v0.21.5 が稼働。DoctorではGateway、外部モデルAPI、GitHub CLI、Skills、Delegation、Cronの基盤が確認できた。スキル一覧は123件（自己診断は124件と報告、差分未解明）。defaultプロファイルのCronは0件。Memoryの有効な読み出しは未検証。\n\n## 目的\nHermesのスキル・ツール・運用手順を **観測→診断→提案→隔離実装→評価→人間の承認→採用** で改善する。LLMの重みの自己学習とは区別する。\n\n## 設計する内容\n- Hermes本体、拡張コード、本番スキル、評価用データ、改善履歴の責務と境界。\n- サブエージェント・Codex・GitHub Actions・Memory・Cron・Dockerの分担。\n- 自己改善の状態遷移、反復上限、API費用上限、時間上限、停止条件、重複実行防止。\n- 評価指標（正解率・回帰・実行時間・API費用・安全性）と未知の検証データを含む評価方針。\n- 改善が劣化した場合のロールバック、監査ログ、PRによる人間の承認。\n- Hermes v0.21.5と公式Self-Evolutionの現在の互換性・CLIを調査し、未検証のコマンドを前提としない。\n\n## 成果物\n`docs/architecture.md`, `docs/roadmap.md`, `docs/security-model.md` および依存Issueへのリンク。\n\n## 完了条件\n最小構成の評価付き1サイクルが図・入出力仕様・権限境界で再現可能に設計され、実装の前提条件が明記されている。\n\n依存: 共通テンプレート導入Issue。",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/issues/2",
+    "comments": 0,
+    "updated_at": "2026-10-15T05:21:23Z"
+   },
+   "comments": []
+  },
+  {
+   "detail": {
+    "number": 3,
+    "state": "open",
+    "title": "test: Hermes Memoryの永続化と検索・セッション復元を検証",
+    "body": "## 目的\nHermesの自己診断で「Memoryから有効な情報を取得できなかった」原因を切り分け、再帰的改善の基盤となる記録を検証する。\n\n## 作業\n- Built-in memory、`MEMORY.md`、`USER.md`、`state.db`、`session_search` の役割を整理。\n- テスト用の非機密な固有識別子を書き込み、別セッション/再起動後に読み出せるか検証。\n- 保存・検索・保持期間・失敗時動作・競合・秘密情報のマスキングを確認。\n- 自己改善ログ用の最小スキーマ（iteration、baseline、candidate、metrics、approval、rollback）を設計。\n- 外部RAGや追加DBは必要性が判明するまで導入しない。\n\n## 完了条件\n読み書き・セッション越えの再取得テストが再現可能で、失敗時の原因と回復手順を記録。秘密や実データはテストに使わない。\n\n依存: 基本設計Issue。\n\n### 実装・検証境界（2026-10-15）\n\nRisk Tier: HIGH。隔離した保存・検索・失敗時停止・監査出力の安全境界を検証するため。\n\n依存 #2 は PR #11 でMerge済み。基準mainは `648327dafefca195e1191fdfc691b0de57ffa763`。固定公開upstreamと合成fixtureで、このrepoだけを変更する。本番 `~/.hermes`・設定・認証・履歴・サービスを参照・変更・起動しない。RAG・追加DB・モデルAPIを導入しない。\n\n2026-10-15のCodexチャットでユーザーが監査保存方針を承認した。保存先は `runs/<run_id>/`（Git管理外）。合成原データは最低30日、検査済み監査記録は最低90日保持し、自動削除しない。期限後の削除も対象を限定した人間承認を要する。Git管理は検査済みPUBLIC要約・再現手順だけとし、Memoryを承認・成功状態の正本にしない。\n\nローカルでは保存・検索13項目、harness 8項目、標準検証の既存30テストが成功。ローカルSecurityはPASS。再現手順・最小schema・失敗原因と回復手順は `docs/memory-verification.md` を参照する。\n\n上流保存・検索層には自動Secrets maskを保証できない。値を監査出力へ渡さない方式を検証した。本番障害の実原因、実Hermes全体との統合、OS再起動、CIへの新試験組込みは未検証/未実施であり、成功扱いしない。情報はPUBLICだけで、LLM環境をMANAGEDと推定せずCONFIDENTIALを収集・送信しない。\n\n\n### PR提出と最終チェック（2026-10-15）\n\n[PR #12](https://github.com/second-works/hermes-self-improvement/pull/12) を提出。headは `6568f521631b2db737b83b0ccf1cc6e5c0687f58`。ローカル13+8+30項目、CI、Security Preflight、CodeQLが成功。CodexのP2 / BLOCKING 1件（manifestの監査結合欠如）を再現・修正し、同headの再レビューは新規指摘なしで完了、未解決thread 0を確認した。証拠URLと原本hashはPR本文を参照。\n\n実Hermes全体・本番原因・OS再起動・新試験のCI組込み・本番Product Acceptanceは未検証/未実施のまま区別する。IssueのCloseと最終Mergeは人間の判断とし、今回実行していない。\n",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/issues/3",
+    "comments": 0,
+    "updated_at": "2026-10-15T06:20:57Z"
+   },
+   "comments": []
+  },
+  {
+   "detail": {
+    "number": 4,
+    "state": "open",
+    "title": "feat: Skills/Toolsの自己監査と失敗原因分析エンジン",
+    "body": "## 目的\n単なるスキル数の確認ではなく、タスク失敗の原因を分析して改善対象を提案する。\n\n## 作業\n- 利用可能なSkills・ツール・モデル・認証・Delegation状態を読み取り専用で棚卸し。\n- 123件/124件の集計差を調査し、builtin/local/hubとプロファイル条件の定義を統一。\n- 失敗原因を「スキル不足」「既存スキル未選択」「手順不良」「モデル制約」「権限/APIエラー」「外部依存」に分類。\n- 改善提案に根拠となるログ、推定確度、期待効果、テスト可能な受け入れ条件を付与する。\n- `hermes-agent-skill-authoring` の呼び出しは提案/隔離作業に限定。本番への自動インストールは禁止。\n- サンプル失敗履歴で誤判定と過剰なスキル生成を検証する。\n\n## 完了条件\n機械可読な監査レポートと改善候補が出力され、同じ入力で再現可能。実環境への変更はない。\n\n依存: 基本設計、Memory検証。",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/issues/4",
+    "comments": 1,
+    "updated_at": "2026-10-15T21:35:43Z"
+   },
+   "comments": [
+    {
+     "body": "Risk Tier: MEDIUM。固定公開upstreamとPUBLIC合成fixtureを使う決定的な監査CLIの機能追加。認証・権限・安全規則・本番・既存Gateは変更しない。\n\nScope: Skills/Tools/Models/認証/Delegationの入力snapshot、profile/origin/filter/同名排除の明示集計、6分類と根拠付き改善提案、同一入力の再現性、誤判定・過剰生成の合成試験。123/124は集計条件の合成再現で、本番の件数・原因は未確認。Goal/DoneはJSON出力と再現性、実環境変更なし。依存PR #11/#12のMerge確認済み。\n\nReadは当repoと固定公開upstreamだけ。出力はstdout。候補生成・インストール・本番読取・モデルAPI・Docker・RAG/DB・定期化は範囲外。GitHub提出先はsecond-works/hermes-self-improvementのissue-4-audit-diagnosis branchと対応PR、検査済みPUBLIC差分・要約だけ。最終Mergeは人間判断。\n\nVerification: ./scripts/verify.sh（30 tests）、追加監査14 tests、既存独立評価の純粋契約34 tests、Memoryハーネス8 testsが成功。Bash 5 SecurityはSECURITY_PASSED。依存manifestなしのDEPENDENCY_STATUS=SECURITY_NOT_APPLICABLE、typecheck/buildは入口未設定の理由付きskip。self-review済み。固定のCI・verify/lint/test・tests/test_setup.pyは変更していない。remote CI/Security/CodeQL/Codex ReviewはPR提出後に同一headで確認し、未確認を成功にしない。\n",
+     "created_at": "2026-10-15T21:35:43Z",
+     "user": {
+      "login": "second-works"
+     }
+    }
+   ]
+  },
+  {
+   "detail": {
+    "number": 5,
+    "state": "open",
+    "title": "test: 改善前後を比較する独立評価・回帰テスト基盤",
+    "body": "## 目的\n「改善した」というLLMの主観評価に頼らず、ベースラインと候補を比較して採否を判定する。\n\n## 作業\n- 固定評価セットと、候補生成時に未公開の検証セットを分離。\n- 少なくとも品質、回帰、失敗率、レイテンシ、推論/APIコスト、権限違反を測定。\n- 代表例として `github-code-review` スキルの小規模な評価ケースを準備。\n- テストで参照するレポジトリ・PR・パッチは匿名化したフィクスチャまたは隔離用リポジトリを利用。\n- 比較基準、改善の最低閾値、信頼性が不足する場合の「保留」、ログ・成果物の形式を定義。\n- Docker等で候補実行を隔離し、機密情報とホスト環境にアクセスさせない。\n\n## 完了条件\n初期版と意図的な劣化版を区別でき、結果をJSONと人間向けレポートで出力できる。\n\n依存: 基本設計。自己改善ループより先に完成すること。",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/issues/5",
+    "comments": 2,
+    "updated_at": "2026-10-15T20:48:52Z"
+   },
+   "comments": [
+    {
+     "body": "Risk Tier: HIGH（候補の隔離実行・hidden評価・採否判定と監査の安全境界）。2026-10-15の人間承認に基づき、API費用0の匿名github-code-review fixtureに限定して実装・隔離検証した。旧Dockerバックアップと本番環境は操作せず、外部ディスクの空のDocker環境を使用した。\n\n基準 `0707986342146b3086bf30b9fec29c0ed6d61452` と候補 `37623f177575b0be73dff940d1574347742b8936` を、候補生成前に固定した公開10件・hidden10件で各3回比較。基準HOLD（各7/10）、候補PASS（各10/10）、劣化版FAIL（各4/10）。回帰0、実行失敗0、median時間比1.021、API呼出/token/費用0、成功した権限逸脱の観測0。実LLM推論は未実施であり一般品質の向上や本番検収を意味しない。\n\n7分類のDocker拒否試験、新規26テスト、標準検証の既存30テスト・lint、ローカルSecurityが成功。CI・remote Security・CodeQL・PRのCodex Reviewは未確認。新規試験は明示コマンドで実行し、固定workflow/検証入口は変更していない。\n\nrun `evaluation-20261015T111545Z-ccaf749b4602` の監査を照合済み。\nreport SHA-256: `70f91623330ac11aec4bab57d5e4f3ac70780761a0438456499d0a5aa6e48a4f`\nfinal event SHA-256: `cec6410fd5e54ae27792c57468cd2d86559f2cacb50112b8744eea696f057d0a`\n原本は承認済みruns/方針で保持し、採用状態には進めない。\n\n",
+     "created_at": "2026-10-15T11:50:00Z",
+     "user": {
+      "login": "second-works"
+     }
+    },
+    {
+     "body": "PR #13の実装・検証とレビュー対応を完了し、人間の最終確認・Merge判断待ちにしました。\n\n- PR: https://github.com/second-works/hermes-self-improvement/pull/13\n- 対象head: `527f4ef696cac96347166e8192175687ccffdcec`\n- Risk Tier: HIGH（候補実行・hidden・隔離・採否判定の境界）。本番・実LLM・認証・workflow・固定検証資産は変更していません。\n- 新規34件、標準検証のlint/既存30件、ローカルSecurityが成功。typecheck/buildは未構成による理由付きskip、依存manifestなしでDEPENDENCY_STATUS=SECURITY_NOT_APPLICABLE。\n- 同一headの[CI](https://github.com/second-works/hermes-self-improvement/actions/runs/38804063382)、[Security Preflight](https://github.com/second-works/hermes-self-improvement/actions/runs/38804057411)、[CodeQL](https://github.com/second-works/hermes-self-improvement/actions/runs/38804063443)が成功。CIはGitHub-hosted ubuntu-latest。\n- [同じheadのCodexレビュー](https://github.com/second-works/hermes-self-improvement/pull/13#issuecomment-6201944608)は重大問題なしで完了。BLOCKING P2 6件を修正・再検証し、全6スレッドを解決済み。GitHubの観測はCLEAN/MERGEABLEです。\n\n有限fixtureの完了条件を実証しました。公開10件と未公開10件を各版3回、実行位置を均等にして計180回比較し、基準7/10・7/10でHOLD、候補10/10・10/10でPASS、劣化版4/10・4/10でFAILとなりました。回帰/実行失敗0、時間比0.999331（上限1.2）、API費用0。隔離7分類・CPU不正値拒否と後続有効出力・応答不明/遅延可視化時の回収・監査も成功。JSONと日本語レポートを出力しています。\n\n最新run: `evaluation-20261015T203818Z-194ee3c8fc06`。基準 `a17de04328d9c85ccfadb2a950584fced4cc33ee` と候補headを固定し、閾値と候補artifactを変えず、新hiddenで検証しました。旧runを最新headの成功として流用していません。\n\nPUBLIC checkpoint:\n- manifest: `03e449629980896b9be6ab13b743370dccd419e9cda86a7c9874a272b840ffd3`\n- report: `6373220c2f17fe51bb2fb65a48c2c49a4959e2ff450b64612e18575f9a86e3ff`\n- last event: `109ff3ffebe603e2e9697e16e7855fcde6810550a4e4d9f65381a57a4f5b40a9`\n- markdown: `bf493dd40582ef32c9dc8732c77cdd444e032a4202d616ddb3a705251f2bc74d`\n\n残る制約はPR本文を正本とします。新規試験の固定CIへの組込み、完全なJSON Schema validatorによる動的検証は未実施。これは決定的な小規模fixtureの実証であり、実LLM品質・一般性能・本番検収ではありません。Merge、Issue Close、Deploy、Product Acceptanceは実施していません。hidden・個別trace・既存バックアップ・監査原本は保持しています。\n",
+     "created_at": "2026-10-15T20:48:52Z",
+     "user": {
+      "login": "second-works"
+     }
+    }
+   ]
+  },
+  {
+   "detail": {
+    "number": 6,
+    "state": "open",
+    "title": "spike: NousResearch Self-Evolutionを隔離環境で検証する",
+    "body": "## 目的\n公式 `NousResearch/hermes-agent-self-evolution` の現行実装を調べ、Hermes v0.21.5環境で使える範囲を実証する。\n\n参考: https://github.com/NousResearch/hermes-agent-self-evolution\n\n## 作業\n- README/設定/ライセンス/対応Python/依存関係/未解決Issueを確認し、実装済み機能と計画段階の機能を区別。\n- Hermes本体のvenvと分離した検証環境・固定バージョンでセットアップ。\n- スキル最適化の実際のCLI・APIと評価方法を確認。未確認の `evolve_skill` コマンドをそのまま採用しない。\n- `github-code-review` または安全な複製スキルを候補に、小規模で改善実験する。\n- 必要なモデルAPI・費用、成功率、失敗モード、Hermes本体への副作用を記録。\n- 導入・ラップ・独自実装のどれが最適か比較判断する。\n\n## 完了条件\n実行ログ、依存バージョン、再現手順、採用判断をPRに添付。本番スキルは変更しない。\n\n依存: 評価基盤、基本設計。",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/issues/6",
+    "comments": 0,
+    "updated_at": "2026-10-14T11:49:45Z"
+   },
+   "comments": []
+  },
+  {
+   "detail": {
+    "number": 7,
+    "state": "open",
+    "title": "feat: AIの登録済み操作選択とハーネスによる検証付き実行",
+    "body": "## 目的\n監査で発見した不足機能に対し、HermesのDelegationとCodex等を使い改善候補を作成する。\n\n## 作業\n- 親エージェントが改善仕様を作成し、子エージェントにスキル作成・修正・テストを委任。\n- Codex OAuthなど実際の認証状態を確認し、未設定時はフォールバック/明示エラー。\n- 隔離作業ツリーでのみファイル変更。子エージェントに本番スキル・秘密情報・マージ権限を渡さない。\n- 入力・出力・予算・最大再試行回数・タイムアウトを定義。\n- 実験候補をGit差分として出力し、評価基盤に渡せるようにする。\n\n## 完了条件\nテスト用不足スキル1件に対して候補作成→単体テスト→成果物の記録まで実行でき、承認前に本番環境を変えない。\n\n依存: 自己監査、評価基盤。\n\n## 2026-10-23 合意した実装範囲（上記の生成目標を更新）\n\n### Goal\nAIが事前登録済みの修正操作を選び、ハーネスが検査、候補への適用、検証、実行結果のJSON出力を担う構成を実装として確定する。\nユーザーは本チャットで、実証済み構成を採用して実装へ進むことを承認した。\n\n### Scope / Boundaries\n- 登録済み2操作 count_context_lines / count_added_comments と、空リストによる修正不要判断を対象とする。未知の操作、重複、契約違反を拒否する。\n- 固定PUBLIC課題と隔離候補だけを扱い、元の候補を保全する。AIの回答を実行結果として採用せず、ハーネスの実stdoutから結果を作る。\n- 既存の実証コードと証拠を整理し、実験固有の固定runに依存しないカタログ参照とオフライン検証の入口を整える。\n- 最新mainを基準に実装する。元checkoutの未コミット成果と未追跡ログは保全し、別worktreeへ必要な成果だけを移す。\n- Risk Tier: HIGH。既存のモデル選択、候補修正、隔離実行の境界を実装として確定するため。今回追加する操作権限や外部宛先はない。\n- 情報分類PUBLICの検査済みコードと証拠だけを本repo専用branch/PRへ送る。実ログ、秘密情報、認証情報は送らない。\n\n### Non-goals\n自由なコード生成、新セッションでの自律的なスキル再利用、汎用精度の保証、追加モデル実験、Dockerやモデルサービスの起動/変更、本番参照/適用、Cron、Auto-Merge、CI構成変更は行わない。\n過去の実験コードと証拠は履歴として保持し、今回の実用入口と区別する。\n\n### Done\n- [x] 操作カタログ、AIの選択契約、ハーネスの実行責任をコードと文書で照合できる。\n- [x] 許可済み操作と修正不要を扱い、不正選択と範囲外変更を拒否する。\n- [x] 原本保持、回帰/不完全修正の拒否、厳密JSONの実行結果を検証できる。\n- [x] 過去の実モデル証拠（6/15→15/15、追加2入力）と今回のオフライン検証を区別して提示する。\n- [x] 最新main上で標準検証、対象試験、Security、自己レビューを通し、同一headのCI/Security/正式レビューを確認する。\n- [x] 1 PRで提出し、最終MergeとIssue Closeは人間に残す。\n\n### Verification\n既存delegation試験、追加する入口の成功/拒否/原本保持試験、./scripts/verify.sh、Bash 5 Security Preflight、PRの同一headチェックを実施する。\nモデル/Docker/サービスを使う試験は新規実行せず、未実施の独立評価を成功扱いしない。\n\n### Dependencies\n既存監査/評価基盤と、mainへMerge済みのPR #17/#22/#23/#24。\n\n\n## 実装提出と最終照合（2026-10-23）\n\n[PR #25](https://github.com/second-works/hermes-self-improvement/pull/25)へ提出し、`3dd1227d1f7905d04fce62c8a12393cd9336480e`をcommit/push済み。\n標準30件、関連62件、新入口8件、ローカルSecurityが成功。既存typecheck/buildは理由付きskip、依存検査は対応manifestなしでNOT_APPLICABLE。\n同一headのCI、Security Preflight、CodeQLが成功し、正式Codex ReviewはCompleted、新規指摘なし、未解決thread 0。`scripts/check-pr-head.sh 25`は`PR_GATE_STATUS=READY`。\n\n独立レビューの入力制限1件と正式レビューのテスト環境依存1件を修正し、再確認済み。詳しい証拠と残存リスクはPRを参照。\n元checkoutのindex、48ファイル、logs/runsは保持し、最新mainの別worktreeで実装した。\n新しいモデル実験、Docker実行、サービス変更、本番適用は行っていない。\n\n現在の工程は人間の最終Merge判断待ち。IssueはOPENのままとし、Merge、Issue Close、Product Acceptance、本番採用は完了扱いにしていない。\n",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/issues/7",
+    "comments": 0,
+    "updated_at": "2026-10-23T02:20:00Z"
+   },
+   "comments": []
+  },
+  {
+   "detail": {
+    "number": 8,
+    "state": "open",
+    "title": "feat: 改善結果のIssue/PR化と人間承認・ロールバック",
+    "body": "## 目的\nHermesが作成した変更をGitHub上の追跡可能なIssue/PRとして管理し、安全に適用・復旧する。\n\n## 作業\n- 改善提案、評価結果、差分、失敗ケースをIssue/PRへ関連付ける。\n- 既存 `ai-development` の自動Codexレビュー/CIルールを再利用する。\n- CodeQL/Dependabotを活用し、レビュー結果や必須チェックを記録。\n- 本番プラグイン導入、スキル上書き、マージ、権限変更は必ず人間の承認を要求。\n- バージョン固定、バックアップ、復旧テスト、監査ログの手順を用意。\n\n## 完了条件\n評価済み候補がPRとして出され、人間の承認で採用でき、想定した問題に対してロールバックできる。\n\n依存: 共通テンプレート、評価基盤、隔離スキル作成。",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/issues/8",
+    "comments": 0,
+    "updated_at": "2026-10-14T11:49:48Z"
+   },
+   "comments": []
+  },
+  {
+   "detail": {
+    "number": 9,
+    "state": "open",
+    "title": "feat: 上限付き自己改善ループとCron定期診断の導入",
+    "body": "## 目的\n観測→診断→隔離改善→評価→PR→承認→採用→再観測を繰り返す最小限の再帰的改善システムを構築する。\n\n## 作業\n- 初期は手動実行で最大3〜5反復、時間/API費用/同時実行数の上限と緊急停止を設ける。\n- 毎回ベースラインと評価結果を保存し、改善が確認できない場合は棄却する。\n- 適用済み版のみ次の反復の基準として利用し、自己評価だけで本番反映しない。\n- Cronは最初は「定期診断→改善提案通知」のみとし、バックグラウンド結果の回収と失敗時通知をテスト。\n- Cron profile `default` は現在0件。重複実行、通知不達、Gateway再起動後の復元、実行履歴を検証。\n- 反復の継続や定期ジョブ有効化は人間承認後とする。\n\n## 完了条件\n手動で少なくとも1つの評価付き改善サイクルが再現可能。採用前承認・上限・停止・復旧がテストされている。\n\n依存: Memory、自己監査、評価基盤、Self-Evolution調査、委任実装、GitHub承認フロー。",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/issues/9",
+    "comments": 0,
+    "updated_at": "2026-10-14T11:49:50Z"
+   },
+   "comments": []
+  },
+  {
+   "detail": {
+    "number": 10,
+    "state": "closed",
+    "title": "chore: 安全な共通開発基盤を導入する (Issue #1)",
+    "body": "Closes #1\n\n空のリポジトリへ、ai-development `b2715a76c5ab3715ccce88167c23ce12c81e85b1` を基に共通ルール、Issue/PRテンプレート、標準検証、CI、CodeQL、Dependabotを導入します。採用・除外・調整は `docs/repository-setup.md` に記録しました。参照資産は自動実行せず、JEV / Slack / local judge / API課金のworkflowは有効化しません。\n\nSecurityは保護されたmain側のworkflowで候補のGitオブジェクトだけを取得し、固定scanner `fd2bbbbd6a41c5cfeebdb8e6a8338d7c2ba675e7` で未変換index blob・pathname・symlink targetを検査します。CI/CodeQL定義、検証入口と既存テストもmode/blobを固定します。npm監査はcandidate .npmrcと継承環境を分離し、公式registryへ固定します。\n\nstatus上書き防止のため、人間が承認した専用App（ID5322549、Commit statuses書込＋Metadata読取、このrepoのみ）から結果を報告し、main保護の必須送信元もこのAppへ固定しました。秘密鍵はmain branchだけを許可するEnvironmentに保持します。candidateコードはSecurity jobで実行せず、GITHUB_TOKENはcontents readのみです。鍵の生成・入力はユーザーが行い、値をチャット/ログ/commitへ出していません。\n\nHermes Agent本体 `~/.hermes` は読み込み・変更せず、CIはGitHub-hosted runnerだけを使用します。OpenAI APIキー、自己改善の自動適用、Auto-Merge、Deployは導入しません。既存.bm25とユーザーの未追跡logsは保持しました。\n\nRisk Tier: HIGH（CI・Security・認証・保護設定）。PUBLICのrepoデータだけを対象に、送信先はこのGitHub repoとnpm公式registryへ限定。復旧は変更revertと人間が承認した設定の見直し。通常レーンの最終Mergeは人間が判断します。\n\nCurrent head: `f9943a4dcfb1488bb19f1469d4bfea10e0faa70e`\n\n- Local: `./scripts/verify.sh`、30テスト、Bash 5 Security成功。typecheck/buildはアプリ・型検査設定がなく対象外。依存manifestなしでdependency監査はNOT_APPLICABLE。\n- CI: [38658607998](https://github.com/second-works/hermes-self-improvement/actions/runs/38658607998)成功。\n- Security: [38658606470](https://github.com/second-works/hermes-self-improvement/actions/runs/38658606470)成功。\n- CodeQL: [38658608008](https://github.com/second-works/hermes-self-improvement/actions/runs/38658608008)成功。\n- Codex: 自動発火・完了を実動確認済み。review5526207244のPython import迂回P1を修正済み。f95c027のreview5526324336でstack切替による固定テスト省略P1を再現し、CIで固定テストをauto stack検出とは独立して先に必須実行するよう修正。30テスト・ローカルSecurity成功。P1計13件の修正を実装済み、P2 IN-SCOPE FIX5件修正済み。最新headのCI/Security/CodeQLは成功。Codexは同一headでCompletedとなり、[最終結果6181370435](https://github.com/second-works/hermes-self-improvement/pull/10#issuecomment-6181370435)で重大問題なしを報告、botの👍も確認。未解決thread0件、CodeQL open alert0件、mergeState CLEAN。人間の最終Merge判断待ち。\n- FOLLOW-UP: P2 1件、非実行のPython CIテンプレートにおけるuv/Poetry開発group導入（docs/review-followups.md FU-10-1）。有効化前に対応・検証が必要。Issue化は人間の必要性確認後。\n\n負例の実動確認: 一時fixture SHA ead39384でcandidate branchとPR merge refのEnvironment利用を拒否。専用Appが未承認workflow集合にfailureを返した後、別送信元の同名successを追加しても、ci/CodeQL成功・未解決thread0件でPRはBLOCKEDでした。Mergeを試みず、fixtureは通常commitで削除済み。Tag許可は0をAPI/UIと公式仕様で確認し、tagを作成した実動テストはしていません。\n\nmain保護は具体承認後に適用済み: PR必須、最新ci / Security Preflight / Analyze (python)必須、未解決thread禁止、管理者にも適用、force push/削除禁止、承認票数0。承認済みSecurity workflowのmain配置だけを通常pushで行い、毎回finallyで管理者保護を即復元。PR全体は未Mergeです。\n\n残存条件: GitHubの2026-11-02 pull_request_target既定policy強制適用の対象・許可設定は管理者確認が必要。policyのopt-out、課金・プラン変更は行わず、イベント拒否時はSecurity未検証で停止します。Dependabotは本PRのmain Merge後に有効になります。Implementation / Merge / 運用受入を区別します。\n\n承認記録: 2026-10-15、人間の明示承認に基づきmainのsecurity.ymlのscanner固定SHA1行更新、commit5fa7c4ac4b16c7aa18d5232d47aa96d88380cc1aを適用。PUBLICのrepoデータをGitHubのこのrepoだけへ通常pushし、管理者保護はfinallyで即復元。実npmでroot/nestedと両lockfileの4正常ケースは修正前fail→修正後pass。App権限・Secret・Hermes・Mergeはこの更新の対象外です。\n\n追加承認記録: 2026-10-15、人間がPython import隔離修正の固定pin1行更新commit56ad56e5b0ba9162439c8e92606bc637ce47aaa5を明示承認。通常pushで適用し、finallyで管理者保護を即復元。App権限・Secret・Hermes・PR Mergeの変更なし。\n\n追加承認記録: 2026-10-15、人間が必須固定テストCIの信頼元pin1行更新13b7baffad2cbca2cc37fe621799a76659d91f6dを明示承認。通常pushで適用し、finallyで管理者保護を即復元。\n",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/pull/10",
+    "comments": 0,
+    "updated_at": "2026-10-15T00:26:39Z",
+    "merged": true,
+    "merged_at": "2026-10-15T00:26:39Z",
+    "head": {
+     "sha": "f9943a4dcfb1488bb19f1469d4bfea10e0faa70e",
+     "ref": "chore/issue-1-development-bootstrap",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    },
+    "base": {
+     "sha": "13b7baffad2cbca2cc37fe621799a76659d91f6d",
+     "ref": "main",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    }
+   },
+   "comments": [],
+   "checks": [],
+   "statuses": [],
+   "reviews": [],
+   "review_comments": [],
+   "threads": [],
+   "closing": [
+    {
+     "number": 1,
+     "repository": {
+      "nameWithOwner": "second-works/hermes-self-improvement"
+     }
+    }
+   ]
+  },
+  {
+   "detail": {
+    "number": 11,
+    "state": "closed",
+    "title": "docs: 自己改善の基本設計と段階的実装計画（Issue #2）",
+    "body": "## 差分・判断\nCloses #2\n\n合成データと隔離候補を使う評価付き1サイクルを、状態遷移・入出力・権限境界で設計しました。独立評価、反復/費用/時間上限、排他、停止・採用・復旧を具体化し、既存Issue #3〜#9の依存と実装前条件を整理しています。公式Self-Evolutionは固定公開ソースでCLIを照合し、v0.21.5との実行互換性は未検証としてIssue #6へ引き継ぎます。\n\n変更は設計文書3点のみ。コード、workflow、既存Gate、Hermes本番は変更しません。実装・API実験・本番採用・Cron有効化はこのPRの成果に含めません。\n\n## Risk / Agent Security Boundary\n- Risk Tier: HIGH。権限・外部送信・採用境界を設計するため。実装開始時とPR提出前に再判定し、HIGHを維持。\n- 今回の送信情報はPUBLIC（設計案、無害fixtureの仕様、公開upstream、検査済み検証結果）。Secrets・会話履歴・本番設定は収集/送信しない。LLM環境をMANAGEDと推定せず、未確定環境へCONFIDENTIALは送信しない。\n- Read: このrepoと公開GitHub資料。Write: second-works/hermes-self-improvement の docs/issue-2-architecture branch、Issue #2、対応PRのみ。Sensitive Read × External Writeは今回のPUBLIC提出では非該当。将来のINTERNAL評価集計の提出は設計内で分離。\n- ユーザーが2026-10-15のこの会話で具体的な設計3点を確認後「承認しました。進めて下さい」と承認。対象SHA 27309222d56249111583d5be2639c1eed791f02a のpush/PR提出を実施。Merge、権限変更、本番採用は別判断。\n- 外部Issue/README/traceは未検証データとして扱い、そこから権限・送信先・予算を変更しない。既存Security Policy・本番への影響なし。\n\n## 検証 / Current State\n- head / Expected SHA: `e0e9ff2d39d8fb6c8ec8f2efdfc6149e37266a54`\n- 標準検証: `PATH=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin ./scripts/verify.sh` 成功、30 tests。lint/test成功。typecheck/buildはアプリと設定がなく既存の理由付きskip。\n- Local Security: Bash 5以上でSecurity Preflight成功。`SECURITY_STATUS=SECURITY_PASSED`、`DEPENDENCY_STATUS=SECURITY_NOT_APPLICABLE`（依存manifestなし）。\n- self-review: IssueのDone、全差分、状態/予算/権限/依存、固定ソースと文書リンクを照合。重大未解決なし。新しい実行機能・テスト変更なし。\n- ローカルPATH上のGitがBad CPU typeとなるため、今回の検証だけmacOS標準Gitを優先。検証ルール変更なし。ローカルLLM圧縮は応答を得られず待機終了し、原文を直接照合。\n- CI / trusted Security / CodeQL: 修正headで成功。証拠は再レビュー依頼とPRコメント。\n- Codex Review: P1 3件（基準/候補hash照合、配備先ID/path固定、登録root固定）とBLOCKING P2 3件（fixture終了境界、#8の採用/復旧の別試験、部分適用時の復旧遷移）を修正。全6thread返信・解決済み。最新headの正式レビュー完了・追加指摘なし、未解決thread=0。証拠: https://github.com/second-works/hermes-self-improvement/pull/11#issuecomment-6184225550\n- Issueの設計成果は作成済み。実行サイクル、Docker、Memory、API、Cron、本番互換性はNOT_VERIFIEDで後続Issueへ。Product Acceptance/Deployは実行製品・配備のない文書案件として対象外。\n- 残る判断: 公式互換性と一般品質の閾値は後続実証。提案予算・API宛先・隔離・保存先・本番targetを後続実装前に承認。最終Mergeは人間判断。\n- 証拠: ローカル結果はこの節、GitHub結果とレビュー収束はPRコメントに対象SHA付きで追記。\n\n最終状態: 最新headのlocal / CI / Security / CodeQL / Codex Reviewが揃い、未解決thread=0。OPEN / MERGEABLE / CLEAN。人間の最終Merge判断待ち。実行機能・配備の検収ではありません。\n",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/pull/11",
+    "comments": 0,
+    "updated_at": "2026-10-15T05:21:22Z",
+    "merged": true,
+    "merged_at": "2026-10-15T05:21:22Z",
+    "head": {
+     "sha": "e0e9ff2d39d8fb6c8ec8f2efdfc6149e37266a54",
+     "ref": "docs/issue-2-architecture",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    },
+    "base": {
+     "sha": "b6b41c3e9d367a65a4082e5bd27b5ffd0d81eb46",
+     "ref": "main",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    }
+   },
+   "comments": [],
+   "checks": [],
+   "statuses": [],
+   "reviews": [],
+   "review_comments": [],
+   "threads": [],
+   "closing": [
+    {
+     "number": 2,
+     "repository": {
+      "nameWithOwner": "second-works/hermes-self-improvement"
+     }
+    }
+   ]
+  },
+  {
+   "detail": {
+    "number": 12,
+    "state": "closed",
+    "title": "test: Memory保存とセッション検索の隔離検証 (#3)",
+    "body": "Memoryの書込みと読出しを再現できるよう、固定公開Hermesソースに対する隔離試験を追加する。MEMORY.md / USER.md / state.dbを別プロセスで再取得し、競合・容量・欠如/破損・検索filter・保持・失敗時動作を検証する。自己改善ログの最小schemaと再現/回復手順も追加した。\n\nRisk Tier: HIGH（保存・隔離・監査出力の安全境界）。本番、モデルAPI、RAG・追加DB、既存workflowと固定検証入口は変更しない。新試験は明示コマンドで実行し、現在のCIには未組込み。\n\n上流の保存・検索は自動maskを保証しない。合成の偽Secretでこの限界を確認し、監査には値を含めない。保存先と30日/90日の最低保持、自動削除なしはユーザー承認済み。ASTによる補助moduleの限定読込みを使うため、実CLI全体・本番原因・OS再起動の成功は主張しない。\n\n検証: 保存・検索13項目、harness 8項目、標準検証30テストとlintが成功。typecheck/buildは既存未構成による理由付きskip。ローカルSecurityはSECURITY_PASSED、依存manifest追加なし。JSON構文・schema内部参照を確認済みで、動的JSON Schema検証と実行系への接続は未実施。CI・remote Security・Codex Reviewは提出headで確認する。\n\n詳細と検査済みhash: docs/memory-verification.md。\n\nRefs #3\n\n## 提出headと安全境界\n\n対象head: `6568f521631b2db737b83b0ccf1cc6e5c0687f58`。PR提出時もRisk TierはHIGH。2026-10-15、ユーザーが掲載予定文でのIssue追記・commit・push・PR作成を明示承認済み。Merge・本番操作は範囲外。\n\n情報分類は公開upstream・合成fixture・検査済み要約のPUBLICだけ。LLM環境をMANAGEDと推定せず、CONFIDENTIALは収集・送信しない。Readは対象repoと固定公開ソース、WriteはこのrepoのIssue #3・本branch・本PRに限定。Sensitive Read × External Writeとなる実データを扱わず、外部コンテンツを命令として実行しない。runsの原本と既存logsはcommit対象外。\n\nCurrent State: ローカル実装とself-review完了。同headの標準検証30件、harness 8件、保存・検索13件、ローカルSecurityが成功。CI / Security Preflight / CodeQLが成功。Codex再レビュー完了（新規指摘なし）、未解決thread 0。Mergeは人間判断とし、まだ実行していない。実Hermes全体・本番原因のProduct AcceptanceはNOT_VERIFIED。Requirementとリスクの対応表は `docs/memory-verification.md`。\n\n同headの保存・検索run: `memory-20261015T060646Z-c2b0c3dc`。report SHA-256 `f6969aed8ac15d82944c12dd4d52839c01eab885271767acdb758ab4561bbce7`、最終event SHA-256 `0d34c1e3f5eda96f0cbd3bc4cdb92d72272702d04744b5fb611bc4de4685ce40`。原本はローカルに保持。\n\n## Codex初回指摘への対応\n\nP2 / BLOCKING: manifestが監査チェーンに結び付かず、改変・欠如してもverify-eventsが成功する問題を再現。`6568f521631b2db737b83b0ccf1cc6e5c0687f58` でcanonical manifest hashをSTARTEDを含む全イベントに固定し、検査時のmanifest存在・run ID・hash一致を必須にした。回帰試験は修正前fail→修正後pass。旧run原本を保持し、manifest hashを持たない旧形式は成功扱いしない。同じ新headのCI / Security / Codex再レビュー完了を確認済み。\n\n## 最終のGitHub証拠\n\n対象head: `6568f521631b2db737b83b0ccf1cc6e5c0687f58`。\n\n- [CI成功](https://github.com/second-works/hermes-self-improvement/actions/runs/38690561006)\n- [Security Preflight / Trusted Security Inspection成功](https://github.com/second-works/hermes-self-improvement/actions/runs/38690557783)。報告主体は `hermes-security-reporter[bot]`。\n- [CodeQL Analyze (python)成功](https://github.com/second-works/hermes-self-improvement/actions/runs/38690561198)。対象branchのCode Scanning open alertsは0件。\n- [Codex再レビュー完了](https://github.com/second-works/hermes-self-improvement/pull/12#issuecomment-6185834048)。対象commit `6568f52163`、新規指摘なし。途中のUnknown errorは成功扱いせず、同じheadで再試行して完了を確認した。\n\nP2 / BLOCKING 1件は修正・回帰検証・スレッド解決済み。未解決thread 0、mergeStateStatus=CLEANを確認。実装提出とローカル隔離試験までの証拠であり、実Hermes統合・本番原因・OS再起動・新試験のCI組込み・本番Product Acceptanceの成功は主張しない。Issue #3は人間の検収判断までOPENを保持し、Mergeは行っていない。\n",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/pull/12",
+    "comments": 0,
+    "updated_at": "2026-10-15T06:22:14Z",
+    "merged": true,
+    "merged_at": "2026-10-15T06:22:14Z",
+    "head": {
+     "sha": "6568f521631b2db737b83b0ccf1cc6e5c0687f58",
+     "ref": "issue-3-memory-verification",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    },
+    "base": {
+     "sha": "648327dafefca195e1191fdfc691b0de57ffa763",
+     "ref": "main",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    }
+   },
+   "comments": [],
+   "checks": [],
+   "statuses": [],
+   "reviews": [],
+   "review_comments": [],
+   "threads": [],
+   "closing": []
+  },
+  {
+   "detail": {
+    "number": 13,
+    "state": "closed",
+    "title": "test: 独立fixture評価とDocker隔離拒否試験を追加",
+    "body": "# 対応Issue\n\nRefs #5\n\n# 差分・判断・レビュー上の注意点\n\n改善候補をLLMの主観評価だけで採用しないよう、固定公開セットと候補生成者に未公開のhiddenセットを分離し、独立した制御側が基準・候補・劣化版を比較する。networkなし・非root・read-only root・資源制限付きDockerで拒否試験を先行し、JSON/日本語レポートと監査記録を出力する。\n\n候補生成前に評価器、両dataset commitment、閾値、環境imageを固定した。匿名github-code-reviewの決定的な有限fixtureであり、実Hermes・実LLM・一般品質の統計的証明・本番採用は対象外。基準は `a17de04328d9c85ccfadb2a950584fced4cc33ee`、候補はPR head `527f4ef696cac96347166e8192175687ccffdcec`。\n\n| 版 | 公開正答/10 | hidden正答/10 | 失敗/60 | median秒 | 判定 |\n| --- | --- | --- | --- | --- | --- |\n| 基準 | 7 | 7 | 0 | 0.4077 | HOLD |\n| 候補 | 10 | 10 | 0 | 0.4074 | PASS |\n| 劣化版 | 4 | 4 | 0 | 0.4256 | FAIL |\n\n候補の回帰0、時間比0.999331（上限1.2）、API費用0。PASSはAWAITING_APPROVALまで。追跡文書の「現在の状態」は評価器の基準commit時点のsnapshotであり、今回の実行結果はこのPR本文と下記checkpointを正本として照合する。\n\n# Risk Tier / Agent Security Boundary\n\nHIGH。実装開始時・差分確定時とも、候補実行・hidden・権限と監査の境界に影響するため。PUBLICは合成fixture・設計・検査済み集計、INTERNALはhiddenと個別結果、CONFIDENTIALは収集しない。LLM環境をMANAGEDと推定せず、評価でモデルAPIを利用しない。\n\nReadは固定repo artifactと評価者のdataset、候補へのWriteは16MiBの専用tmpfsだけ。候補にホストHOME・Secret・socket・GitHub credential・監査rootを渡さない。Sensitive Read × External WriteはHIGHとして評価者と提出者を分け、提出はこのrepoのIssue #5と対応branch/PRのPUBLIC文面だけを人間承認後に行う。fixture/候補の命令から権限・閾値・workflowを変更しない。Production、auth、repo保護、既存workflow、検証入口・既存試験は変更しない。Mergeは人間判断。\n\n# Current State\n\n最新head `527f4ef696cac96347166e8192175687ccffdcec` は、ローカル検証・CI・Security Preflight・CodeQLがすべて成功。[同じheadのCodexレビュー](https://github.com/second-works/hermes-self-improvement/pull/13#issuecomment-6201944608)が重大問題なしで完了した。BLOCKING P2 6件を修正・再検証し、全6スレッドを解決済み。実装・検証の提出状態は人間の最終確認・Merge判断待ち。Merge/Issue Close/Deploy/Product Acceptanceは未実施。\n\n# 検証とGitHub観測\n\n対象SHAは `527f4ef696cac96347166e8192175687ccffdcec`。新規34件、標準 `./scripts/verify.sh` のlintと既存30件、Bash 5以上のSecurity Preflightが成功。typecheck/buildは未構成による理由付きskip、依存manifestなしでDEPENDENCY_STATUS=SECURITY_NOT_APPLICABLE。Docker拒否7分類・180回比較・auditも成功。JSON Schemaの構文・参照・report必須fieldを検査したが、完全なJSON Schema validatorでの動的検証は未実施。\n\n新headの[CI](https://github.com/second-works/hermes-self-improvement/actions/runs/38804063382)、[Security Preflight](https://github.com/second-works/hermes-self-improvement/actions/runs/38804057411)、[CodeQL](https://github.com/second-works/hermes-self-improvement/actions/runs/38804063443)が成功。[同じheadのCodexレビュー](https://github.com/second-works/hermes-self-improvement/pull/13#issuecomment-6201944608)は重大問題なしで完了。旧headの結果を新headに流用しない。新規試験は `python3 -I -B tests/test_evaluation.py -v` と評価CLIで実行し、固定CIへの自動組込みは未実施。\n\n# Verification Evidence / Residual Risk Summary\n\n- 改善/劣化の判別 → 主観・過学習のリスク → 候補前のmanifest固定と3版比較 → VERIFIED（有限fixture）→ run `evaluation-20261015T203818Z-194ee3c8fc06`。\n- 権限/資源の拒否 → ホスト侵入・暴走 → 7分類gateと停止確認 → VERIFIED（probe範囲）→ 同runのgate/source hash。\n- 監査の同一性 → 古いSHA・原本改変 → manifest/両SHA/イベント/レポート照合 → VERIFIED → report `6373220c2f17fe51bb2fb65a48c2c49a4959e2ff450b64612e18575f9a86e3ff`、最終event `109ff3ffebe603e2e9697e16e7855fcde6810550a4e4d9f65381a57a4f5b40a9`。\n\nhiddenのカテゴリ生成規則は公開、個別path/line/正解は生成者に未公開。ホスト管理者の読取権限や未知のkernel脆弱性を防ぐ保証ではない。権限逸脱の観測0は全syscall試行の監視ではない。hashだけでは全原本とcheckpointを同時改変できる主体に対抗できず、上記checkpointを提出記録へ固定する。原本はGit管理外で最低30日、監査は最低90日、自動削除なし。\n\n# Harness\n\nHSI-05 / KEEP。主観評価・hidden漏洩・評価器改変を防ぐ。既存CI/Security/Reviewを代替しない。同等以上の独立評価・拒否保証を実証した場合だけ置換を再評価する。\n\n# 実利用検証 / レビュー収束\n\nローカル実装と有限fixture実証まで。Deployed / Product Acceptedではない。新headのCI/Security Preflight/CodeQLは成功し、Codexレビューは重大問題なしで完了。修正済み6件の全スレッドを解決した。Issue #5の有限fixture完了条件は実証済みで、人間の最終Merge判断は未実施。未レビューを指摘なしと報告せず、P0/P1/BLOCKING P2が出た場合は同じPR branchで対応する。評価対象artifactやheadが変われば旧評価を自動流用しない。\n\n# 初回レビューP2と再検証\n\n[応答不明なdocker create後にcleanupを飛ばすP2](https://github.com/second-works/hermes-self-improvement/pull/13#discussion_r4282627594)をBLOCKINGと分類し、同じbranchで修正した。2件の回帰は修正前fail→修正後pass。名前の照合・停止・削除・消失確認と、不明時のsandbox無効化を追加し、実Dockerの応答喪失模擬でも削除と後続禁止を確認した。\n\nsource hash変更に伴い基準artifactを元と同じ内容へ固定し直し、新hidden・同じ生成規則/閾値で、同じ候補artifact（SHA-256 `cad0a26cb7420aa037e2ee45ef4d1371420d6b438d05ac191df76590ecea00bc`）を再登録して180回比較した。候補の種類は1件のまま。新環境はDocker daemon 29.8.2 / Linux 7.0.14-linuxkit / arm64 / Python 3.12.15。image ID/digestは初回と同じであり、daemon versionは各manifestの固定値を用いる。旧runは保持し、現headの成功として流用しない。\n\n[成功/失敗が混在する反復を不安定と判定できないP2](https://github.com/second-works/hermes-self-improvement/pull/13#discussion_r4282801434)もBLOCKINGと分類して修正。findingが同じ[]のまま基準のhidden安全ケースが1回失敗する再現で、修正前の誤PASS→修正後の期待HOLDを確認した。反復一致はfinding hashと失敗状態の組で判定し、既知の安全違反/回帰のFAIL優先を保持する。34件の単体・境界試験と、新runでの拒否7分類・実応答喪失・180回比較・監査が成功。実行前後のdaemon環境/imageの同一性と評価用コンテナの残存なしも手動確認した。\n\n\n[create応答不明時に最初の空照会を受け入れるP2](https://github.com/second-works/hermes-self-improvement/pull/13#discussion_r4282942185)もBLOCKINGと分類した。遅延可視化と最後まで不可視の2件を修正前fail→修正後passで検証し、応答不明時に名前を再照会する。可視化されれば回収し、照会期間経過後も不明ならISOLATION_CLEANUP_FAILEDとpending_containerを記録し後続を禁止する。期間経過をdaemon処理の終了証明とは扱わず、自動再開しない。実Dockerで応答喪失と最初の2回の照会非表示を模擬し、実コンテナの削除・残存なし・sandbox無効化を確認した。新runのmanifestは `03e449629980896b9be6ab13b743370dccd419e9cda86a7c9874a272b840ffd3`、hidden commitmentは `30c98946faf177b370bc561c12d56adee8b976c1500f8b8a7e7bbee15a27f956`。集計・全checkpointは同runのPUBLIC report/checkpointに保存済み。\n\n[遅いcreate後に実行へ再び30秒与えるP2](https://github.com/second-works/hermes-self-improvement/pull/13#discussion_r4283120419)もBLOCKINGと分類して修正した。作成前にcase/globalの早い方の期限を固定し、create・設定inspect・startが残り時間を共有する。期限切れ後は起動しない。遅い作成・全体期限の2境界は修正前fail→修正後pass。期限後も必要な停止確認・回収には別途各Docker操作5秒上限を設け、不能は後続禁止とする。新規34件・標準30件・Security・隔離7分類・実回収模擬・新hidden180回比較・auditが成功。最新checkpointのmarkdown SHA-256は `bf493dd40582ef32c9dc8732c77cdd444e032a4202d616ddb3a705251f2bc74d`。\n\n[巨大なCPU整数によるOverflowErrorのP2](https://github.com/second-works/hermes-self-improvement/pull/13#discussion_r4283236336)もBLOCKINGと分類して修正。厳密なint/float型と0〜30の比較で検証し、float変換せずOUTPUT_CPUとして試行失敗へ渡す。巨大な正負整数・bool・NaN/無限大の拒否と有効境界0/30の回帰を修正前fail→修正後passで確認。実Dockerの固定probeでも巨大整数の拒否後に有効出力を処理できることを確認した。34件・標準30件・Security・隔離7分類・実回収模擬・新hidden180回比較・監査が成功。2026-10-16の再開時に前回のheadと未解決reviewを照合し、同じPR/branchで対応した。\n\n[候補が常に2番目となる実行順序P2](https://github.com/second-works/hermes-self-improvement/pull/13#discussion_r4288022481)もBLOCKINGと分類し、3回の実行順序を循環させて各版が各位置へ1回ずつ入るよう修正した。固定位置差1.3/1.0/1.1秒の模擬transportで修正前の偏りを再現し、修正後は全ケース均等配置・全版median1.1秒を確認。既存接続試験を強化し、全34件・標準30件・Security・隔離7分類・実probe・新hidden180回比較とauditが成功した。位置効果を均等化する有限fixtureの測定であり、時間変動や前試行の持越し効果の統計的除去・一般性能の証明は主張しない。\n",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/pull/13",
+    "comments": 0,
+    "updated_at": "2026-10-15T20:49:46Z",
+    "merged": true,
+    "merged_at": "2026-10-15T20:49:46Z",
+    "head": {
+     "sha": "527f4ef696cac96347166e8192175687ccffdcec",
+     "ref": "issue-5-independent-evaluation",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    },
+    "base": {
+     "sha": "d3f22dfcb6a81a13149cf131092f51416359d887",
+     "ref": "main",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    }
+   },
+   "comments": [],
+   "checks": [],
+   "statuses": [],
+   "reviews": [],
+   "review_comments": [],
+   "threads": [],
+   "closing": []
+  },
+  {
+   "detail": {
+    "number": 14,
+    "state": "closed",
+    "title": "feat: 合成fixtureによるSkills/Tools監査と失敗原因診断",
+    "body": "Skills件数だけでは改善対象を判断できないため、固定PUBLIC合成snapshotから機械可読な監査レポートと根拠付き改善提案を返すCLIを追加する。6分類、証拠不足/原因競合のHOLD、profile/filter/同名排除の集計、入力hashとログ参照、提案の重複排除を実装した。新規authoring案はスキル不足だけに限定し、自動実行は行わない。\n\nRisk Tier: MEDIUM（通常の機能追加。権限・安全規則・本番・既存Gateを変更しない）。基準mainはfe81a5c17e2ad2832e8f5d7a7190b86019e17262。Refs #4。1 Issue=1 PR、人間Merge。#3/#5のCloseは含まない。\n\n検証: 標準verify 30件、追加15件、既存独立評価契約34件、Memoryハーネス8件成功。Security Preflight=SECURITY_PASSED、依存manifestなしのSECURITY_NOT_APPLICABLE、typecheck/buildは入口未設定の理由付きskip。self-review済み。同一入力のCLI出力はbyte一致。サンプル10観測の期待原因は全件一致し、HOLD2件・NO_FAILURE1件・6提案・authoring案1件を確認した。\n\n制約: 有限の合成ルール試験であり、実環境の棚卸し・過去123/124の実原因・実LLM品質・本番検収は未確認。本番/~/.hermes/認証値/会話履歴/hidden原本は扱わず、モデルAPI・Docker・外部サービスの新規接続・自動生成/適用・定期化は行わない。公開先はこのrepoの検査済みPUBLIC差分・要約のみ。CI/remote Security/CodeQL/Codex Reviewは提出後に同一headで別々に確認する。\n\n詳細と再現手順: docs/audit-diagnosis.md\n\n\n\n## 提出後の検証\n\n検証対象head: `ecc070035c8ab795512216d9a1e5760b8ebe7fc3`。local HEAD / remote branch / GitHub PR head一致を確認した。\n\n- Local: 標準verify 30件、追加監査15件、独立評価契約34件、Memoryハーネス8件の計87件が同headで成功。ローカルSecurityもSECURITY_PASSED。\n- [CI](https://github.com/second-works/hermes-self-improvement/actions/runs/38811848411): success。\n- [Security Preflight / Trusted Security Inspection](https://github.com/second-works/hermes-self-improvement/actions/runs/38811842549): success。候補SHAへのSecurity Preflight status成功も別途確認した。\n- [CodeQL Analyze (python)](https://github.com/second-works/hermes-self-improvement/actions/runs/38811848464): success。CodeQL結果checkもsuccess。\n- Codex Review: 初回P2をBLOCKINGと分類し、成功観測の選択・resource整合性を修正。12条件の修正前fail→修正後passを確認し、[threadへ記録](https://github.com/second-works/hermes-self-improvement/pull/14#discussion_r4288581953)して解決。新headの[Codex再レビュー](https://github.com/second-works/hermes-self-improvement/pull/14#issuecomment-6202944473)は完了し、重大指摘なし。summaryも同じ完全SHAでcompleted / has_any_findings=false / has_unresolved_findings=false。未解決threadは0、mergeable=MERGEABLE / mergeStateStatus=CLEANを確認した。\n\nRisk Tier: MEDIUMを維持。最終Mergeは人間判断。Issue #4/#3/#5のClose、本番の棚卸し・検収・適用は行っていない。\n",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/pull/14",
+    "comments": 0,
+    "updated_at": "2026-10-15T21:47:36Z",
+    "merged": true,
+    "merged_at": "2026-10-15T21:47:35Z",
+    "head": {
+     "sha": "ecc070035c8ab795512216d9a1e5760b8ebe7fc3",
+     "ref": "issue-4-audit-diagnosis",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    },
+    "base": {
+     "sha": "fe81a5c17e2ad2832e8f5d7a7190b86019e17262",
+     "ref": "main",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    }
+   },
+   "comments": [],
+   "checks": [],
+   "statuses": [],
+   "reviews": [],
+   "review_comments": [],
+   "threads": [],
+   "closing": []
+  },
+  {
+   "detail": {
+    "number": 15,
+    "state": "closed",
+    "title": "spike: 公式Self-Evolutionのオフライン互換性と失敗経路を検証",
+    "body": "Refs #6\n\n公式Self-Evolutionの固定commitを費用0の隔離環境で検証し、実CLI/APIの互換性と失敗経路を記録した。DSPy 3.4.1では公式GEPA引数max_stepsがTypeErrorとなり、構造検査もスキル全文と本文で結果が異なる。dataset/optimizerを明示的に模擬化した実CLIでは、制約失敗でもexit 0となり、--run-testsのテスト呼出しは0回だった。\n\nRisk Tier: HIGH。外部コード・依存の実行と隔離境界を扱う。2026-10-16の人間承認により、モデルAPI 0呼出/0 USD、固定image、非root、networkなし、CPU 1/memory 1 GiB、候補tmpfs 128 MiB、全体20分の境界で第1段階を実施した。依存準備だけ公式registry/PyPIへ接続し、70パッケージをhash付きlockからオフライン導入した。隔離gate 7分類は成功し、コンテナ回収も確認した。\n\n変更は専用のspike入口、隔離契約試験、合成スキル、依存lock、調査文書と検査済みPUBLIC証拠に限定する。既存の固定検証入口・workflowを変更せず、本番・認証・会話・hidden/旧評価traceへアクセスしていない。失敗を含む3 runの原本はGit管理外で保持し、公開するのは検査済み抜粋だけ。\n\n現行版の直接導入は見送りを推奨する。実optimizerでの本文変更、実モデルの改善成功率、Hermes本体/v0.21.5互換性は未検証。これは限定した互換性spikeであり、実モデル改善の成功報告ではない。Issue #6の完了範囲と最終採否は人間判断とし、このPRではIssueを自動Closeしない。ラップ/独自候補生成器の実装、モデルAPI、本番適用は含めない。\n\n検証: ./scripts/verify.sh 30 tests、追加隔離契約14 tests、既存評価基盤の回帰34 testsが成功（計78）。typecheck/buildは既存入口なしの理由付きskip。Bash 5のSecurity PreflightはSECURITY_PASSED（依存の脆弱性監査は対応manifestなしで対象外）。self-reviewと証拠hash照合を実施。PR作成後の同一head CI/Security/CodeQL/Codex Reviewは別途確認する。最終Mergeは人間判断。\n\n初回Codex ReviewのBLOCKING P2は2件とも同じbranchで修正。初期化・source hash検査も失敗reportを残し、timeoutは子process開始通知、出力上限はprobe固有のstdoutを必須にした。修正前fail→修正後passを確認し、新しいharnessで実Docker gate 7分類とCLI/APIを再実行した（58.987秒、モデルAPI 0呼出）。旧runを保持し、公開証拠は新しいrunへ更新した。更新headのCI/Security/CodeQL/Codex再レビューを別途確認する。\n",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/pull/15",
+    "comments": 0,
+    "updated_at": "2026-10-16T07:58:54Z",
+    "merged": true,
+    "merged_at": "2026-10-16T07:58:54Z",
+    "head": {
+     "sha": "76f092adff063d22c62f684264d96503e1f42453",
+     "ref": "issue-6-self-evolution-spike",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    },
+    "base": {
+     "sha": "1d9439f4836db44d37f76f5f193497800ada4c8b",
+     "ref": "main",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    }
+   },
+   "comments": [],
+   "checks": [],
+   "statuses": [],
+   "reviews": [],
+   "review_comments": [],
+   "threads": [],
+   "closing": []
+  },
+  {
+   "detail": {
+    "number": 16,
+    "state": "closed",
+    "title": "feat: 合成作業ログから根拠付き対応候補を出すオフラインCLI",
+    "body": "# Goal\n\n利用者が合成Markdown作業ログから5分類の対応候補一覧を得て、各候補の根拠を原記録の行へ戻って確認できる。モデル通信なしで契約と異常時停止を検証できる。\n\n### Context\n\n上記の初期データ・責務契約と過去実験を適用する。Plan Review: 初期範囲の技術点検はPASS。通信なし・PUBLIC合成データ・独立moduleに範囲を限定し、後続の性能やモデル品質を前提にしない。正本: `docs/plan-review-gate.md`。2026-10-18 JST、このチャットでユーザーが初期Issue登録と通信なし実装を承認。\n\n### Scope / Boundaries\n\n- 追加候補path: `src/worklog_candidates/`、`scripts/report_worklog_candidates.py`、`tests/test_worklog_candidates*.py`、`fixtures/worklog_candidates/`、`docs/worklog-candidates.md`。既存workflow / verify / lint / tests/test_setup.pyは変更しない。\n- Risk Tier: MEDIUM。PUBLIC合成fixtureを扱うオフライン機能追加で、認証・権限・本番・Gateを変更しない。実データ送信等の安全影響が追加／不明になればHIGHへ再判定して停止する。\n- Intakeは明示manifestの合成ファイルのみ。Exposureはローカルのstdout／明示した新規出力先のみ。モデル・HTTP・shell実行toolを分類器へ与えない。LLM環境の承認判断はこのIssueでは発生しない。\n- 原本・既存出力保護、入力逸脱拒否、prompt injectionをデータ扱いする試験を行う。削除・サービス・本番・Secrets・認証変更・外部書込は対象外。例外なし。\n\n### Non-goals\n\n実Gemma接続、実ログ本文の収集・分類、GitHub/実行環境の状態照会、候補の自動Issue化・修正、UI、DB/RAG、Docker、Cron、Issue #7の修正・共通化、自由文要約は含めない。\n\n### Done\n\n- [ ] 20シナリオの原文・人が確認できる正解ラベル/根拠IDを作り、開発10件と評価10件に分離する。正解は分類器へ入力しない。\n- [ ] 通信0のルール基準と、厳密な模擬モデル応答を同じCLI・同じmanifestで実行でき、JSON/Markdownから全根拠へ戻れる。\n- [ ] 同一作業の失敗→修正→再試験成功、後日解決・再開、別作業の成功、重複保存・引用、承認待ち、矛盾・欠落を区別する。意味的な識別ができないものは保留。\n- [ ] 不正入力／不正応答は明示診断され、正常候補へ混入しない。部分結果・coverage不足を完了扱いしない。\n- [ ] 再実行の候補重複0、原本hash不変。新規出力先だけを作り、既存出力を破壊しない。\n- [ ] 控えめなルール基準の誤り・保留率を記録し、模擬出力のテストを実Gemma精度と呼ばない。\n\n### Verification\n\n実装時に入口を確定する想定コマンド:\n\n```sh\nPATH=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin python3 -I -B -m unittest discover -s tests -p 'test_worklog_candidates*.py' -v\nPATH=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin ./scripts/verify.sh\nPATH=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin /opt/homebrew/bin/bash scripts/security-preflight.sh .\n```\n\n20シナリオの内訳: 未解決3、承認待ち2、継続調査2、同一ログ内解決3、後日解決/再開2、二重保存/再出力/引用3、別Issue成功1、文脈欠落/矛盾2、prompt injection2。未知ID・捏造行・不正JSON・囲み・形式違反・path逸脱等は別のunit境界試験として加える。異なる分類が共存するログも含め、シナリオ数と候補数を混同しない。\n\n正常・範囲・整合性・境界・異常・回帰を上記で検証。既存テスト/Gateは保持し、新試験の明示実行をPRに記録する。形式と根拠検証の責務はunit、CLI→JSON/Markdownと原本不変はintegration、分類の意味精度は後続の実モデル評価が担当する。新試験を既存CIが実行すると推定しない。固定入口の変更が必要なら別途設計・承認へ戻す。\n\n新ハーネスの根拠は、過去の形式違反・誤rule、解決済み誤検出・証拠捏造・誤った状態結合のリスク。発火は手動manifest実行時。入力は合成原文/選択応答、出力は検査済み候補、原本stateは不変。決定的に検査できるschema/ID/line/hash/dedupをコードへ移し、意味判断は評価対象に残す。初期推論コスト0、運用負荷は手動実行と原文確認。既存監査・隔離候補実行とは対象/責務が異なる。検証の削除なし。分類の価値がルール基準を上回らない場合はモデル接続を見送り、不要な機構を再評価する。安全境界は価値不足を理由に削除しない。正本: `docs/ai-development-harness-inventory.md`。\n\n標準検証失敗/不能は停止。self-review後、提出が別途指示された場合は同一headのCI・Security・Codex Reviewを確認し、最終Mergeは人間判断。\n\n### Dependencies\n\n新規の未完了Issueへのコード依存なし。HEADに存在する標準基盤を利用し、#4/#5は参考、#7/#8/#9は依存にしない。実装開始時にremote mainとdirty stateを再確認する。承認後は既存47ファイルを持ち込まない別の作業環境を用意し、Issueごとの変更を分離する。実装時に分離した作業環境を作る。\n\n### Child Issue Quality Gate\n\n6 MUST（単一目的・path・独立検証・1 PR・依存・安全境界）は本文で充足。テスト責務と既存保証保持も記載。登録と通信なし実装は承認済み。\n\n\n# 入出力・状態契約\n\n実装・試験入力はPUBLICの架空Markdown 20シナリオと明示manifestだけ。実ログを自動探索する入口はまだ有効化しない。将来対象はこのrepoの `logs/codex/` に限定し、Codex元セッション全体、Claude Code、他project、`~/.hermes` へ拡大しない。\n\n### 入力と記録ID\n\n- manifestにschema版、PUBLIC / synthetic-fixture、入力相対path、ファイルSHA-256、架空session/task識別子を記録。path逸脱、symlink、特殊ファイル、非UTF-8、hash不一致、上限超過は拒否する。\n- 初期上限案: 20シナリオ、計40ファイル、1ファイル256KiB、合計2MiB。無言の切捨ては禁止。分割不能な巨大段落は入力失敗として可視化する。\n- Markdownは物理行位置を保持し、見出し・発言単位と前後文脈で分割。コード囲み内の見出しを境界と誤認しない。未対応形式は判断保留／parse診断とし、対応候補0件で成功扱いしない。\n- source_idは相対path＋内容hash、record_idはsource_id＋行範囲から生成する。同一snapshotでは安定、原本変更時は別版。人は相対path・1-based行位置・内容hashで原文を照合できる。\n- 重複判定用の指紋とrecord_idを分ける。同一内容を複数ファイルへ保存した場合も参照元は全て保持する。異なるtaskを同じ文章だけで統合しない。session/taskの明示根拠がない関連付けは保留。\n\n### 分類と状態\n\n固定enum: `needs_check`（要確認）、`awaiting_approval`（承認待ち）、`investigating`（継続調査）、`resolved_in_log`（対応済み）、`hold`（判断保留）。すべて「提供ログ上の状態」であり、現在の未解決状態を保証しない。\n\n- 要確認: 未確認事項・残作業の明示根拠がある。\n- 承認待ち: 承認が未取得という明示根拠がある。過去の別操作の承認は適用しない。\n- 継続調査: 調査継続・原因未確定の明示根拠がある。\n- 対応済み: 同じ作業の問題と修正後成功を結ぶ根拠がある。別Issueの成功や単なる時間順では解決扱いしない。\n- 判断保留: 文脈不足・矛盾・欠落・識別不能。後日解決・再開は同じ作業との明示的リンクがある場合だけ遷移可能。\n\nGemmaまたは通信なしの模擬応答は、ハーネスが提示した候補ID・記録ID、固定enum・固定reason codeを選ぶだけ。候補文言・担当者・期限・次操作を生成させない。最終表示は照合済み原文抜粋と固定文言から作る。候補抽出の見落としも評価し、モデルに渡る前の絞込みを精度評価から除外しない。\n\n### 厳密検証と報告\n\n- JSON Schemaをrepoに置き、追加key禁止、enum・必須field・型・件数制限を固定する。実装は契約に必要な検証を行い、完全な汎用JSON Schema validatorの実装を目的にしない。\n- JSON重複key / NaN / Markdown囲み / 不明ID / 別chunkのID / 根拠なし / 不正enum / 打切りは拒否する。fence除去やenum補正で合格させない。\n- schema妥当性、ID・行・hash一致、意味的に根拠が分類を支えることを別々に測る。IDが実在するだけで意味が正しいとはしない。\n- 未出力の候補を黙って消さず、coverage不足としてholdにする。形式エラー由来holdと意味的な判断保留を固定reason codeで分ける。run自体の成否と候補状態も分ける。\n- JSON / Markdownに相対path、record_id、行範囲、原文hash、抜粋、分類、理由code、重複参照、入力範囲・不完全性を含める。対応済みも監査用に出力し、要確認等と分ける。Markdown/terminalの制御文字・リンクは安全に表示する。\n- 原本の変更・削除なし。出力はstdoutまたは明示した新規ディレクトリだけ、既存出力への追記・上書きなし。同じmanifest・設定・模擬応答なら候補ID/候補集合は同じ。run時刻などの監査属性とは比較を分ける。\n\n\n# 過去検証の反映\n登録済み操作選択の成功はログ分類精度の証明ではない。自由回答のMarkdown囲み違反を補正して成功扱いしない。実Gemmaの精度・約66秒/呼出の転用は未検証。実Gemma通信・実ログ利用・サービス操作・commit/push/PR/mergeは別段階で、このIssueの実装指示には含めない。\n\n\n## ローカル実装・検証記録（2026-10-18 JST）\n\nRisk Tier: MEDIUMを維持。専用branch `issue-16-worklog-candidates`、基準HEAD `10419e1a49b62b28c6862102c7f08d8c9d03f4b2`。既存Issue #7のステージ済み47ファイルと未追跡logsは保持し、未コミットdelegationコードに依存しない。今回の追加pathだけを専用worktreeのindexへstageした。未コミット差分のSHA-256は `84617e57234ce689099933061c361247f225cb8adf18e064ce59563edc82217c`。\n\n- 通信なしのCLI、固定manifest/hash、物理行と根拠ID、5分類、時系列不明の保留、コピー/引用/古い再出力の扱い、厳密JSON選択検証、JSON/Markdown、新規出力のみを実装した。\n- PUBLIC架空20シナリオ・25ファイル・21候補。開発10/評価10シナリオ。goldは人が確認できる原文・行・記録IDを含み、分類後だけに参照する。PUBLICで開発者閲覧済みの有限fixtureであり、sealed hidden評価ではない。\n- 新規21 tests成功。標準 `./scripts/verify.sh` はlint/既存30 tests成功。Bash 5 Security Preflight=SECURITY_PASSED。typecheck/buildは既存入口非実行で理由付きskip、依存manifestなしでDEPENDENCY_STATUS=SECURITY_NOT_APPLICABLE。固定workflow/入口/既存testは変更していない。\n- 自己点検で、異なるsnapshotの同一sequenceをファイル名順で解決する問題、隣接した引用/インデントコードの成功文、成功後の古いファイル再保存、採点入力の不正型を補強し、最終indexで再検証した。\n- ルール基準の状態一致18/21、対応候補の見落とし2/12、対応済みの誤検出1/5、precision=10/11、recall=10/12、保留6/21、候補重複0、余分な候補0。根拠の物理範囲coverage欠落0は意味的正解を保証しない。見落とし・誤検出が残るため、人の確認を置き換えられるとは判定しない。\n- 模擬応答で全保留/欠落/形式違反を確認。模型応答の制御試験は実Gemma精度ではない。モデル通信0、実ログ分類なし。手順と制約は `docs/worklog-candidates.md`、入口は `scripts/report_worklog_candidates.py`。\n\n未実施: commit/push/PR、同一PR headのCI/remote Security/Codex Review、実Gemma評価、実ログ利用、人間の有用性検収、Merge/Issue Close。ローカル実装・検証とProduct Acceptanceを区別し、Issueはopenを維持する。\n\n\n## PR提出・レビュー収束（2026-10-18 JST）\n\n[PR #17](https://github.com/second-works/hermes-self-improvement/pull/17)を提出。ユーザーの進行指示に基づいてcommit/push/PRを実施し、最終headは `6da0770ea218b6003e85361533cb8bdb4b45c2b8`。local/remote/PRの同一SHAと作業ツリーcleanを確認した。Risk Tier: MEDIUMを維持。\n\n- 新規28 tests・標準30 tests・lint・ローカルSecurityが成功。typecheck/buildは既存入口非実行による理由付きskip、依存manifestなしでDEPENDENCY_STATUS=SECURITY_NOT_APPLICABLE。\n- 同じheadの[CI](https://github.com/second-works/hermes-self-improvement/actions/runs/39076447788)、[Security Preflight](https://github.com/second-works/hermes-self-improvement/actions/runs/39076446748)、[CodeQL](https://github.com/second-works/hermes-self-improvement/actions/runs/39076447873)が成功。対象branchのCode Scanning open alert=0。\n- [Codex正式レビュー](https://github.com/second-works/hermes-self-improvement/pull/17#issuecomment-6235865941)は同じheadでCompleted、新規/未解決指摘なし。計5件のBLOCKING P2を同branchで修正し、全5 thread解決、未解決0をGraphQLで確認。修正前fail→修正後passを残した。\n- 見出し境界、goldの原文全行/記録ID/候補集合照合を補強し、自己点検でfixture pathをpacketから除外した。モデルへ正解を示唆するファイル名や原文cacheを渡さない。\n- GitHub観測はOPEN / CLEAN / MERGEABLE。Issue #7のステージ済み47ファイルと未追跡logs、基準HEADは元checkoutに保持。\n\n人間の最終Merge判断待ち。Merge/Issue Close/実Gemma通信/実ログ利用/Product Acceptanceは未実施。ルールの状態一致18/21、見落とし2/12、対応済み誤検出1/5という有限評価の制約を維持し、Gemma比較はMerge後に別Issueと新規の具体的通信枠を確定する。\n",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/issues/16",
+    "comments": 0,
+    "updated_at": "2026-10-22T00:34:40Z"
+   },
+   "comments": []
+  },
+  {
+   "detail": {
+    "number": 17,
+    "state": "closed",
+    "title": "feat: 根拠付き作業候補を出すオフラインCLI",
+    "body": "## 対応Issue・利用者の結果\nRefs #16\n\nPUBLICの合成作業ログから、対応候補を要確認/承認待ち/継続調査/対応済み（ログ上）/判断保留に分け、根拠付きJSON/Markdownを出すオフラインCLIを追加する。各候補から相対path・物理行・記録ID・原文hashを使って原記録へ戻れる。現在のGitHub/実行環境の状態を調べず、現在の未解決を断定しない。\n\n## 差分・判断・受入条件\n- manifest/hash検証、明示session/task単位の候補化、同じ作業の修正成功/再開、コピー/引用/古い再出力の重複防止、時系列不明の保留を実装。\n- 選択応答は固定enumと提示記録IDだけを厳密検証。不正JSON/囲み/未知ID/欠落を補正せず、候補を保持したPARTIALとして残す。原本と既存出力を保持し、新規出力だけを作る。\n- goldは候補集合・記録ID・原文の全行へ照合してから採点する。分類器へ正解を渡さず、packetは記録ID/本文/kind/sequenceだけに絞り、答えを示唆するfixture pathや原文cacheを渡さない。\n- 20シナリオ/25ファイル/21候補。開発10/評価10シナリオ。PUBLICで開発者閲覧済みの有限fixtureで、sealed hidden評価ではない。初期入力は1ファイル=1作業の明示メタデータを使い、任意の実ログの作業境界推定は保証しない。\n- 原文を保持してCRLFを構文判定、Setextは明示unsupported。COMPLETEは処理coverageであり、意味的正解/未解決0件/承認取得を表さない。\n\n## Risk Tier / Agent Security Boundary\nMEDIUM（実装開始・PR提出・レビュー修正時とも同じ）。PUBLIC合成fixtureのオフライン機能追加。Readは当repoのfixture、Writeは新規ローカル出力と承認済みの本repo専用branch/PRに限定。Sensitive Read × External Writeは今回なし。モデル通信0、LLM環境の承認判断は今回発生しない。ログ内命令を実行するtoolやネットワーク経路を分類器に与えない。\n\nIssue #7のステージ済み47ファイルと未追跡logsは元checkoutに保持し、専用worktreeで分離。未コミットdelegationコードに依存しない。~/.hermes、本番、Secrets、認証、Docker、サービス、Cron、既存workflow/固定検証入口/既存testは変更しない。未知の外部接続や安全境界変更が必要になれば停止。最終Mergeは人間判断。\n\n## Current State / 同一head検証\n対象head: `6da0770ea218b6003e85361533cb8bdb4b45c2b8`\n- local: 新規28 tests、標準verifyのlint/既存30 tests、Bash 5 Security Preflightが成功。self-review済み。新規試験は明示実行で、固定CIが自動実行するとは扱わない。\n- [CI](https://github.com/second-works/hermes-self-improvement/actions/runs/39076447788)、[Security Preflight](https://github.com/second-works/hermes-self-improvement/actions/runs/39076446748)、[CodeQL](https://github.com/second-works/hermes-self-improvement/actions/runs/39076447873)が同一headで成功。対象branchのCode Scanning open alert=0。\n- typecheck/build: 既存入口非実行による理由付きskip。依存manifestなしでDEPENDENCY_STATUS=SECURITY_NOT_APPLICABLE。\n- Codex Review: 同一headの[正式レビュー](https://github.com/second-works/hermes-self-improvement/pull/17#issuecomment-6235865941)がCompleted、新規指摘なし（has_any_findings=false / has_unresolved_findings=false）。全5 thread解決済み、未解決0。\n- Current phase: 人間の最終Merge判断待ち。Issue受入は有限fixtureでローカル確認、Implementation Done/人間Merge/Product Acceptanceは未完了。Deployなし。\n\n## Verification Evidence / Residual Risk\n手順・責務と有限評価の正本: `docs/worklog-candidates.md`。head別の正式レビュー・CI証拠は本PR。\n- VERIFIED: ID/物理行/hash・入力境界・厳密応答・原文とgold照合・時系列/重複・再実行/原本保持・新規出力・CLI統合。NUL、見出し境界、gold捏造/省略行/未知keyは修正前fail→修正後passを確認。\n- ルール基準: 状態一致18/21、見落とし2/12、対応済み誤検出1/5、precision=10/11、recall=10/12、保留6/21、候補重複0。一般精度や人の確認の代替を主張しない。\n- NOT_VERIFIED: 実Gemma精度/処理時間/tokens、人の確認時間、意味的根拠の一般的正しさ、実ログ/Product Acceptance。物理根拠の一致だけで意味的正解にしない。\n\n## Harness / レビュー収束\n観測済みの形式違反、証拠捏造/誤解決/評価汚染のリスクに対応する手動ハーネス。ID/path/hash/line/dedupを決定的に検査し、意味精度と分ける。既存の監査/隔離実行の保証を削除せず、ルールより価値がなければモデル接続を見送る。\n\n正式レビューのBLOCKING P2 5件は同branchで修正し、回帰試験・根拠返信・thread解決を実施。現headの完了証拠と新たな指摘はCodex Review欄で照合する。人間Merge・Issue Close・Gemma通信は実行しない。\n",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/pull/17",
+    "comments": 0,
+    "updated_at": "2026-10-22T00:33:14Z",
+    "merged": true,
+    "merged_at": "2026-10-22T00:33:14Z",
+    "head": {
+     "sha": "6da0770ea218b6003e85361533cb8bdb4b45c2b8",
+     "ref": "issue-16-worklog-candidates",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    },
+    "base": {
+     "sha": "10419e1a49b62b28c6862102c7f08d8c9d03f4b2",
+     "ref": "main",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    }
+   },
+   "comments": [],
+   "checks": [],
+   "statuses": [],
+   "reviews": [],
+   "review_comments": [],
+   "threads": [],
+   "closing": []
+  },
+  {
+   "detail": {
+    "number": 18,
+    "state": "open",
+    "title": "[ASG/P0] Read-only GitHub security audit Skill",
+    "body": "Parent program: https://github.com/second-works/ai-security-governance/issues/1\n\n## Schedule\nPhase 1 / Weeks 2–3\n\n## Scope\nCreate separate, reusable ASG GitHub collector skill: scoped read-only API/token, repository settings, Actions permissions, CodeQL/Dependabot status where accessible. Normalized redacted evidence and actionable error states. No credential disclosure, write APIs or auto fixes. Contract owned by ASG: https://github.com/second-works/ai-security-governance/issues/1. Do not modify existing self-audit issue #4 scope; integrate separately.\n\n## Acceptance criteria\n- [ ] Design and inputs/outputs clearly described\n- [ ] Synthetic-data success, failure, and permission tests pass\n- [ ] No secret values or unsafe AI-generated writes\n- [ ] One focused PR linked to this issue, reviewed before merge\n- [ ] Evidence of verification and remaining limitations included in PR\n\n## Boundaries\nDo not merge, deploy, rotate credentials, grant permissions or alter live production without human approval. Confirm existing files and branches before changes.\n\nReferences: [development plan](https://github.com/second-works/ai-security-governance/blob/main/docs/DEVELOPMENT_PLAN.md) | [architecture](https://github.com/second-works/ai-security-governance/blob/main/docs/ARCHITECTURE.md).",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/issues/18",
+    "comments": 0,
+    "updated_at": "2026-10-19T23:58:38Z"
+   },
+   "comments": []
+  },
+  {
+   "detail": {
+    "number": 19,
+    "state": "open",
+    "title": "[ASG/P0] Read-only Cloudflare security audit Skill",
+    "body": "Parent program: https://github.com/second-works/ai-security-governance/issues/1\n\n## Schedule\nPhase 1 / Weeks 2–3\n\n## Scope\nBuild read-only audit Skill for explicitly allowlisted zones/accounts: exposure, access controls, token scope metadata (not token values), configuration posture. Include mock fixtures, API errors and redaction. No zone writes, rules changes or secret logging. Contract: https://github.com/second-works/ai-security-governance/issues/1.\n\n## Acceptance criteria\n- [ ] Design and inputs/outputs clearly described\n- [ ] Synthetic-data success, failure, and permission tests pass\n- [ ] No secret values or unsafe AI-generated writes\n- [ ] One focused PR linked to this issue, reviewed before merge\n- [ ] Evidence of verification and remaining limitations included in PR\n\n## Boundaries\nDo not merge, deploy, rotate credentials, grant permissions or alter live production without human approval. Confirm existing files and branches before changes.\n\nReferences: [development plan](https://github.com/second-works/ai-security-governance/blob/main/docs/DEVELOPMENT_PLAN.md) | [architecture](https://github.com/second-works/ai-security-governance/blob/main/docs/ARCHITECTURE.md).",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/issues/19",
+    "comments": 0,
+    "updated_at": "2026-10-19T23:58:40Z"
+   },
+   "comments": []
+  },
+  {
+   "detail": {
+    "number": 20,
+    "state": "open",
+    "title": "[ASG/P1] Scheduled audit orchestration and alerts",
+    "body": "Parent program: https://github.com/second-works/ai-security-governance/issues/1\n\n## Schedule\nPhase 3 / Weeks 6–7\n\n## Scope\nDevelop bounded/manual-first scheduled security audit trigger, duplicate prevention, failure reporting, Slack alert (redacted), retry budget, and emergency stop. Coordinate with preexisting Hermes #9 Cron/self-improvement issue; ASG-specific integration only. No automatic remediation.\n\n## Acceptance criteria\n- [ ] Design and inputs/outputs clearly described\n- [ ] Synthetic-data success, failure, and permission tests pass\n- [ ] No secret values or unsafe AI-generated writes\n- [ ] One focused PR linked to this issue, reviewed before merge\n- [ ] Evidence of verification and remaining limitations included in PR\n\n## Boundaries\nDo not merge, deploy, rotate credentials, grant permissions or alter live production without human approval. Confirm existing files and branches before changes.\n\nReferences: [development plan](https://github.com/second-works/ai-security-governance/blob/main/docs/DEVELOPMENT_PLAN.md) | [architecture](https://github.com/second-works/ai-security-governance/blob/main/docs/ARCHITECTURE.md).",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/issues/20",
+    "comments": 0,
+    "updated_at": "2026-10-19T23:58:51Z"
+   },
+   "comments": []
+  },
+  {
+   "detail": {
+    "number": 21,
+    "state": "closed",
+    "title": "[Task] worklog の --output が途中で失敗したとき、半端な出力を残さない",
+    "body": "# Goal\n\nworklog CLI の `--output` が途中で失敗したとき、`report.json` だけがあるような半端な出力ディレクトリを残さない。出力先には、両方のファイルがそろった完全な結果か、何もないかのどちらかだけが現れる。\n\n# Context\n\n- PR #17（#16）で入った `src/worklog_candidates/report.py` の `write_output` は、新しいディレクトリを作ってから `report.json`、`report.md` の順に書く。2つめの書き込みで失敗すると、`report.json` だけのディレクトリが残る。CLI は `FILESYSTEM_ERROR (input/output may be incomplete)` と表示するだけで、残った出力を片付けない。\n- 軽量構成の限定試行（second-works/ai-development#196）で、Claude Code が実装する1件として所有者が選んだ（2026-10-22）。\n\n# Scope / Boundaries\n\n- 変更してよい範囲: `src/worklog_candidates/report.py`（`write_output`）、`tests/test_worklog_candidates.py`、`docs/worklog-candidates.md`。\n- Risk Tier: MEDIUM。理由: ローカルのファイル出力の失敗時の扱いを変える。ネットワーク、認証、権限、本番、Gate は変えない。\n- 守ること:\n  - 既存の出力を上書きしない（create-only）。\n  - 親ディレクトリの symlink をたどらない。\n  - 一時的な名前は出力先と同じ親の下に作り、書き終えてから正式な名前に付け替える。\n  - 失敗したら、その回に作ったものだけを消す。\n\n# Non-goals\n\n- 出力の形式（JSON / Markdown の内容）、終了コード、CLI の引数を変えない。\n- 分類やルール基準の挙動を変えない。\n- `~/.hermes`、本番、実ログには触れない。\n\n# Done\n\n- [ ] `report.md` の書き込みで失敗しても、出力先の名前のディレクトリは作られず、一時的なディレクトリも残らない。終了コードは今と同じ2。\n- [ ] 成功したときの出力（`report.json` と `report.md` の内容と権限）は、今と変わらない。\n- [ ] 出力先が既にあるときは、今と同じく上書きせずに失敗する。親ディレクトリが symlink のときも、今と同じく拒否する。\n- [ ] `docs/worklog-candidates.md` の `--output` の説明が、この挙動と一致している。\n\n# Verification\n\n- `PATH=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin python3 -I -B -m unittest discover -s tests -p 'test_worklog_candidates*.py' -v`\n  - 2つめの書き込みが失敗したとき、出力先も一時ディレクトリも残らないこと（失敗を注入するテストで確かめる）。\n  - 成功時の内容と権限、既存の出力先、symlink の親についての回帰。\n- `PATH=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin ./scripts/verify.sh`\n- `PATH=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin /opt/homebrew/bin/bash scripts/security-preflight.sh .`\n\n# Dependencies\n\n- #16（PR #17）は merge 済み（3bd42e3）。\n- ほかの未完了 Issue には依存しない。#7、#18、#19 とは触るファイルが重ならない。\n",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/issues/21",
+    "comments": 0,
+    "updated_at": "2026-10-22T04:02:23Z"
+   },
+   "comments": []
+  },
+  {
+   "detail": {
+    "number": 22,
+    "state": "closed",
+    "title": "feat: 開発の指示を ai-development の軽量構成に切り替える",
+    "body": "Refs second-works/ai-development#196（軽量構成の限定試行。このrepoの Issue はない）\n\n## 概要\n\n所有者の判断（2026-10-22）で、このrepoの開発の指示を ai-development の軽量構成に切り替えます。今後も軽量版で運用します。配置には ai-development の `templates/lightweight/place.sh` を使いました（配置元 `7a6e56520ab1d0c7f6eb98aefa944042b519bade`、記録は `.ai/lightweight-placement.tsv`）。\n\n- **AGENTS.md**:\n  - 旧標準の汎用の節（作業境界、検証とレビュー、必要時の参照）を外した。外した節は、標準flow・レビュー正本・Security境界などを毎回読むよう指定していた。\n  - このrepo固有の節（固有の境界、Code Review Rules）は残した。\n  - 末尾に軽量ブロックを足した。\n  - 実装時に必ず読む量: 約 98.8 KB（AGENTS 6.3 KB と、指定先の文書6つ）→ 約 8.9 KB（AGENTS 3.9 KB、CLAUDE 0.6 KB、steward 4.5 KB）。\n- **置き換え**: `.agents/skills/plan-to-issues/SKILL.md`、`.github/ISSUE_TEMPLATE/parent-issue.md`・`child-issue.md`、`.github/pull_request_template.md` を軽量版にした。\n- **追加**:\n  - `CLAUDE.md`\n  - `.claude/settings.json`（`.env` の読み取り拒否、force push の拒否、main 宛ての push を止めるフック）\n  - `.claude/hooks/guard-git-push.sh`\n  - `.claude/skills/steward/SKILL.md`\n  - `scripts/check-pr-head.sh`\n- **残したもの**: `scripts/verify.sh` と `scripts/security-preflight.sh` は、このrepoの調整があるので変えていない。\n\n## 判断と前提\n\n- 軽量版に引き継がないルールがある（ai-development の削減計画 docs/lightweight-migration-plan.md で決めたもの）。\n  - 変更ごとの Risk Tier の記録\n  - P2 の4分類\n  - 標準flowなどの毎回の必読\n  \n  安全の結果（main への直接 push と force push の禁止、標準検証と自己レビュー、同じ head での CI・Security・正式レビュー、重要な操作の人間承認、人間による merge）は、軽量ブロックに残っている。このrepo固有の「通常レーンだけ、最終 Merge は人間」も残した。\n- `.agents/skills/pr-review-fix/` と `template-change-evaluator/` は、AGENTS.md からは参照しなくなったが、消していない。`tests/test_setup.py` が pr-review-fix の helper を参照しているため。外すかどうかは、ai-development#197 で判断する。\n- フックは文字列で判定するので、確実な保証ではない。確実に守るのは、GitHub のブランチ保護。\n\n## 検証\n\n- `./scripts/verify.sh`: 成功（test 30件。build は `scripts/build.sh` がないための既存の skip）。\n- `bash scripts/security-preflight.sh .`（stage 後）: SECURITY_PASSED。\n- 1回目の配置では、`test_agent_references_are_present` が失敗した。管理ブロックの印に、ai-development にしかない path が入っていたため。ai-development#203（PR #204）で印を直し、`place.sh --restore` で戻してから配置し直した。\n- 未確認: Claude Code が新しいセッションでフックを読み込むこと。後続の実装PR（#21）で確かめる。\n\n## Risk Tier\n\nHIGH。理由: このrepoの開発の指示、権限設定（deny）、フックを変えるため。Codex Review に加えて、別セッションでの独立レビューを行う。\n\n## マージ\n\n最終 Merge は人間が判断します（このrepoの通常レーン）。\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/pull/22",
+    "comments": 0,
+    "updated_at": "2026-10-22T03:50:38Z",
+    "merged": true,
+    "merged_at": "2026-10-22T03:50:38Z",
+    "head": {
+     "sha": "431f8b82fd98d42643b096c18622239329647999",
+     "ref": "lightweight-placement",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    },
+    "base": {
+     "sha": "3bd42e30a7c088c22a74c455c712a94fbfdb7f2b",
+     "ref": "main",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    }
+   },
+   "comments": [],
+   "checks": [],
+   "statuses": [],
+   "reviews": [],
+   "review_comments": [],
+   "threads": [],
+   "closing": []
+  },
+  {
+   "detail": {
+    "number": 23,
+    "state": "closed",
+    "title": "fix: worklog の --output が途中で失敗したとき、半端な出力を残さない (#21)",
+    "body": "Closes #21\n\n**#22（開発の指示を軽量構成に切り替える）に依存します。** CI と Security は main 宛ての PR でしか動かないため、main 宛てにしています。#22 が merge されるまでは、差分に #22 の commit（f4414d1）も含まれます。この PR の変更は最後の commit だけです。\n\n## 変更内容\n\n- `write_output` の書き方を変えた。\n  1. 出力先の名前を、空のディレクトリとして先に確保する（今と同じく、既にあれば `FileExistsError`）。\n  2. `report.json` と `report.md` を、同じ親の下の隠し一時ディレクトリ（`.<出力先>.partial-<乱数>`）に書く。\n  3. 書き終えたら `rename` で、確保した空のディレクトリと置き換える。\n- 途中で失敗したら、その回に作った一時ディレクトリと出力先を消して、元の `OSError` をそのまま返す。CLI は今と同じく `FILESYSTEM_ERROR` で exit 2。\n- 書く内容（JSON と Markdown）は、ディレクトリを作る前に組み立てる。\n- `docs/worklog-candidates.md` の `--output` の説明を、この挙動に合わせた。\n\n## 判断と前提\n\n- Risk Tier: MEDIUM。理由: ローカルのファイル出力の失敗時の扱いを変える。ネットワーク、認証、権限、本番、Gate は変えない。\n- 確認を待たずに選んだ前提:\n  - 名前を先に確保するので、書いている間は空の出力先が見える。中身が半端な状態は見えない。Issue の「完全な結果か、何もないか」は、失敗した後の状態として満たす。\n  - `rename` が置き換えられるのは空のディレクトリだけなので、確保した名前に別のものが入れられた場合は、置き換えずに失敗する。\n  - 強制終了（SIGKILL など）のときは、一時ディレクトリや空の出力先が残り得る。docs に書いた。\n\n## 検証\n\n- 対象head（full SHA）: 9e3da416fec5559ceb3a28ee3cf2fcba2394a905\n- ローカル:\n  - `python3 -I -B -m unittest discover -s tests -p 'test_worklog_candidates*.py'`: 29件成功。追加したテストは次のとおり。\n    - 2つめのファイルを書くとき、一時ディレクトリを作るとき、付け替えのときに失敗を注入し、出力先も一時ディレクトリも残らないこと。そのあと同じ名前で成功すること。\n    - 成功時の権限が 0700 / 0600 で、余分なディレクトリがないこと。\n  - 追加したテストは、変更前の `report.py` では3件とも失敗することを確かめた。\n  - `./scripts/verify.sh`: 成功（test。build は既存の skip）。\n  - Security Preflight: SECURITY_PASSED。\n- CI / Security: PR 作成後に確認する。\n- 正式レビュー: Codex Review を依頼する。\n- ユーザー検収: Done に含まれないので対象外。\n\n## 未完了と対象外\n\n- 出力の形式、終了コード、CLI の引数、分類の挙動は変えていない。\n- 軽量構成の限定試行（second-works/ai-development#196）で、Claude Code が実装した1件です。最終 Merge は人間が判断します。\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/pull/23",
+    "comments": 0,
+    "updated_at": "2026-10-22T04:02:22Z",
+    "merged": true,
+    "merged_at": "2026-10-22T04:02:22Z",
+    "head": {
+     "sha": "1934d160aa732b054fe27582cb163ed7f8e6e7ed",
+     "ref": "feature/issue-21-atomic-output",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    },
+    "base": {
+     "sha": "940d2b57181ad9fff376c2f0a95af6bdfd3b5479",
+     "ref": "main",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    }
+   },
+   "comments": [],
+   "checks": [],
+   "statuses": [],
+   "reviews": [],
+   "review_comments": [],
+   "threads": [],
+   "closing": [
+    {
+     "number": 21,
+     "repository": {
+      "nameWithOwner": "second-works/hermes-self-improvement"
+     }
+    }
+   ]
+  },
+  {
+   "detail": {
+    "number": 24,
+    "state": "closed",
+    "title": "feat: JEV / Local Judge のスクリプトと PoC を削除し、起動できないようにする",
+    "body": "## 背景\n\n所有者の判断（2026-10-23）は、「JEV は停止しているので、起動しないように直す」。\n\n- 呼び出し先の Cloudflare Worker `ai-development` は削除済み。\n- ai-development 側の JEV / Local Judge も削除済み（second-works/ai-development#209、#211）。\n- この repo には、JEV 用の Secret も変数もない（確認済み）。\n\nIssue は作っていない。\n\n## 変更内容\n\n- 次のファイルを削除した。\n  - `.agents/skills/pr-review-fix/scripts/triage-with-jev.sh`\n  - `.agents/skills/pr-review-fix/scripts/triage-with-providers.py`\n  - `templates/review-comment-auto-triage/` 一式（JEV の PoC と Local Judge）\n- `.agents/skills/pr-review-fix/SKILL.md`：\n  - JEV / Local Judge の手動評価の節と、「3.5. 実行しない」の手順を外した。\n  - 代わりに、「廃止した。呼び出す経路はない」という短い節を置いた。\n  - ほかの手順にあった JEV への言及も外した。\n- `docs/minimal-development-contract.md`：手動比較評価の行を「廃止」に変えた（削除したファイルへの参照が残るため）。\n- `docs/ai-development-harness-inventory.md` と `docs/simplification-inventory.md` は変えていない。ai-development から持ってきた当時の記録なので、消したファイルへの言及が残る。\n\n## 検証\n\n- `./scripts/verify.sh` は成功した。build は `scripts/build.sh` がないため skip で、変更前と同じ。\n\n## Risk Tier\n\nLOW。削除したのは手動評価用の資産で、通常の手順からはもともと呼ばれていなかった。CI、Security、通常レビューの動きは変わらない。\n\n## Merge\n\nこの repo では、Merge の前に所有者の確認を取る。\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/pull/24",
+    "comments": 0,
+    "updated_at": "2026-10-22T22:57:24Z",
+    "merged": true,
+    "merged_at": "2026-10-22T22:57:24Z",
+    "head": {
+     "sha": "d7b9b22cf91572d9205b943c4a4e1f6bdec1cd03",
+     "ref": "feature/disable-jev",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    },
+    "base": {
+     "sha": "fa6f354d96011d004c601613d9c27adfb443825c",
+     "ref": "main",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    }
+   },
+   "comments": [],
+   "checks": [],
+   "statuses": [],
+   "reviews": [],
+   "review_comments": [],
+   "threads": [],
+   "closing": []
+  },
+  {
+   "detail": {
+    "number": 25,
+    "state": "closed",
+    "title": "feat: AIの固定操作選択とハーネスによる検証付き実行 (#7)",
+    "body": "Refs #7\n\n## 変更内容\n\nAIが登録済みの2修正を選び、ハーネスが候補への適用、検証、隔離実行とJSON出力を担う構成を実装として確定します。実験用の固定runを用意しなくても、カタログ表示と選択ファイルからの候補準備ができます。\n\n- `catalog.py`に固定ID、version、前提条件、選択schemaを定義。固定PUBLIC候補と2操作から作れる4状態だけをhashで許可し、空配列にも入力制限を適用。\n- `run_registered_operations.py`はモデルに接続せず選択結果を受け取る入口。既定は`PREPARED_NOT_EXECUTED`、`--execute`指定時だけ既存Docker隔離へ渡す。元ファイルと既存出力を上書きしない。\n- 実行時は15公開課題で回帰と不完全修正を拒否し、別2入力の実stdoutから厳密JSONを保存。期待値を結果へ混入しない。\n- 旧checkoutの47ファイルの実証コードとPUBLIC証拠を保持して整理。元index、48ファイルの作業内容、logs/runsは保全し、最新main `75d09d8c52215a1060ec342562cef1492aaf62e1`の専用worktreeで実装。\n- 現在の構成と使い方は`docs/registered-operations.md`。以前の自由生成/再利用試験は履歴として区別し、不合格を成功へ変更していない。\n\n## 判断と前提\n\n- Risk Tier: HIGH。候補修正と隔離実行の境界を確定するため。固定PUBLIC課題だけを扱い、今回の追加モデル実験、Docker実行、本番/サービス操作は0。\n- 2026-10-23の人間合意でGoalを操作選択方式へ変更。自由生成、自律的なスキル再利用、汎用精度、本番採用、日次実行は今回のDoneに含めない。\n- 公開先は本repoの専用branch/PRだけ。検査済みPUBLICコードと証拠のみを送信し、実ログ、認証、Secretsは含めない。CI/workflow/権限設定は変更しない。\n- HIGHの独立レビューでP2 BLOCKING R1（空選択で任意repo内ソースをPUBLICとしてコピー可能）を再現。基準hashと4派生状態の許可制へ修正し、拒否回帰試験と独立再レビューで解消確認。\n\n## 検証\n\n対象head: `3dd1227d1f7905d04fce62c8a12393cd9336480e`\n\n- ローカル: delegation関連62テスト、新入口8テスト、標準verifyのlint/30テスト成功。typecheck/buildは既存script非実行で理由付きskip。\n- Bash 5 Security Preflight: `SECURITY_PASSED`。対応manifestなしで依存検査は`SECURITY_NOT_APPLICABLE`。\n- CLIのカタログ表示と候補準備を実行し`PREPARED_NOT_EXECUTED`を確認。新入口の実行制御試験はテストダブルであり、実Dockerやモデルの実行証拠にはしない。\n- 2026-10-17の実モデル証拠は`skill-delegation-controlled-execution-live.json`（6/15→15/15、修正不要判断、別2入力の実行）。新しいCLI全体の実モデル検証と区別。\n- 自己レビュー、別セッションの独立レビュー済み。修正の記録は`registered-operations-implementation-20261023.json`。\n- 同一headの[CI](https://github.com/second-works/hermes-self-improvement/actions/runs/39888530821)、[Security Preflight](https://github.com/second-works/hermes-self-improvement/actions/runs/39888528548)、[CodeQL](https://github.com/second-works/hermes-self-improvement/actions/runs/39888530841)がすべて成功。CodeQLは今回変更に新規alertなし。\n- [正式Codex Review](https://github.com/second-works/hermes-self-improvement/pull/25#issuecomment-6355532035): 現headでCompleted、has_any_findings=false、has_unresolved_findings=false。初回P2 1件はIN-SCOPE FIXとして修正し、Docker未導入条件で修正前fail→修正後passを確認。全1thread解決済み、未解決0。\n- 最終照合: `scripts/check-pr-head.sh 25`が同一full headで`PR_GATE_STATUS=READY`。local HEAD=remote head、必須check、正式レビュー、未解決thread、競合なしを照合。人間の最終Merge判断待ち。\n\n## 未完了と対象外\n\n- 新規70テストはローカルで明示実行し、既存の固定CI入口には追加していません。CI成功でその実行を主張しません。\n- 新入口の実モデル/実Docker検証、封印した独立品質評価、Product Acceptance、本番採用は未実施。\n- 最終MergeとIssue Closeは人間に残します。\n\nGitHub-hosted runnerのnotice: `ubuntu-latest`がUbuntu 26へ移行予定との通知を確認。検査失敗ではなく、runner/workflowの変更は今回行っていません。\n",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/pull/25",
+    "comments": 0,
+    "updated_at": "2026-10-23T02:21:24Z",
+    "merged": true,
+    "merged_at": "2026-10-23T02:21:22Z",
+    "head": {
+     "sha": "3dd1227d1f7905d04fce62c8a12393cd9336480e",
+     "ref": "issue-7-controlled-operations",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    },
+    "base": {
+     "sha": "75d09d8c52215a1060ec342562cef1492aaf62e1",
+     "ref": "main",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    }
+   },
+   "comments": [],
+   "checks": [],
+   "statuses": [],
+   "reviews": [],
+   "review_comments": [],
+   "threads": [],
+   "closing": []
+  },
+  {
+   "detail": {
+    "number": 26,
+    "state": "closed",
+    "title": "feat: GitHub作業指針の差分監視と実行直前確認を読み取り専用で検証する",
+    "body": "# Goal\nGitHub作業の効率化に向け、「取得 → 前回との差分 → 根拠付きの次操作 → 実行直前の状態再確認」を手動・読み取り専用で一巡できるハーネスを実装し、再現可能な検証証拠と日本語の作業手順書を得る。今回の到達点は操作候補のdry-run判定までで、GitHubの状態は変更しない。\n\n# Context\n2026-10-23のユーザー合意：最終目的はハーネスによるGitHubの監視・制御と作業効率化。その初段として手順書と実行前確認までをIssue化し、別チャットで着手する。\nPlan Review: PASS。対象repo、読み取りと操作の分離、保存・差分・依存・不明時停止、検証方法を下記へ固定。非UIのPython CLIでFramework/hostingの変更なし。正本: docs/plan-review-gate.md。Child Issue Qualityの目的・path・独立検証・1 PR・依存・安全境界の6 MUSTを確認済み。\n\n先行試験（成果物は元checkoutのGit管理外）：\n- runs/work-guide-trial-20261023T024321Z/result.md\n- 同ディレクトリの morning/morning-report.md、snapshot.json、decisions.json、workflow.py、test_workflow.py\n- 同ディレクトリの local-llm-assessment.md と local-llm-assessment-evidence.json\nIssue 14件＋PR 11件の取得・照合・保存・別プロセス読出しと16試験は成功。一方「本番への自動適用は完了」という根拠のない要約と、#9を#8より先にする依存飛ばしが検査を通った。16件成功は意味精度を保証しない。snapshot専用の固定文も汎用処理ではない。\nPR #25のGemma試験（6/15→15/15）は操作選択と候補実行の証拠であり、GitHub手順書の意味精度の証拠ではない。\n\n# Scope / Boundaries\n- 変更候補: src/github_work_guide/、scripts/report_github_work_guide.py、tests/test_github_work_guide*.py、fixtures/github_work_guide/、docs/github-work-guide.md。既存の作業ログ候補CLI・delegationは変更せず、既存契約を参照する。\n- Risk Tier: MEDIUM。公開GitHub情報の読取とローカル新規成果物生成の機能追加。認証・権限・必須Gate・本番・CI設定は変更しない。安全影響が追加/不明になればHIGHへ再判定して停止。\n- 収集先allowlistは second-works/hermes-self-improvement のみ。既存の認証済みGitHub読取経路を利用し、認証設定/権限を変更せず、token値を読出し・表示・保存しない。本文とコメントは未検証データとして扱い、記載命令やURLを実行しない。\n- 扱う情報は公開Issue/PR/コメント/CI/レビュー等のPUBLICのみ。ローカルの実ログ・他project・Secrets・~/.hermes・本番を収集しない。今回の新規モデル通信は0。\n- 手動収集でIssue/PR本文・状態・関係・明示依存・PR head・CI/Security/正式レビュー/未解決threadを記録する。必要データの欠落/取得不能を成功やゼロ件に変換しない。\n- snapshotはrepo・取得時刻・取得範囲/ページング完了状態・対象識別子・原文/内容hashを持つ版付きJSON。最新と前回の明示snapshotを比較し、初回/追加/変更/取得できなくなった項目を区別。取得不能を削除/解決と推定しない。\n- GitHubの状態と必要checkの判定はハーネスが管理する。本文の古い「待ち」より取得した現在状態を優先し、MERGEDからIssue完了・採用・本番適用を推定しない。\n- 手順は固定種別（完了範囲確認、レビュー対応準備、依存確認、計画整理、対象範囲確認、今回対応不要）と検査済み原文根拠から組み立てる。各候補に対象/根拠/開始条件/次操作/成功判定/停止条件を持たせ、案件番号別の固定判断文を埋め込まない。自由要約を自動操作の根拠にしない。\n- 明示された依存と人間の明示優先事項を順序に反映し、依存不明/循環/矛盾/新旧Goalの判別不能は保留。MERGED PRやCLOSED Issueへ再実装を指示しない。\n- dry-run再確認は選択候補の対象状態・head・依存・必要check/レビューを再取得し、計画時のfingerprintと照合。変化/不足/取得失敗でSTALEまたはBLOCKED、揃う場合だけ確認済みとする。書込能力・実行コマンド・shellを持たせず、確認済みは実行/承認取得を意味しない。\n- 出力はJSON＋日本語Markdownを明示した新規runs配下へ保存。原本・旧成果物を上書きせず、中断時の不完全出力を成功扱いしない。収集はページ/件数/API呼出/全体時間に明示上限を設け、上限到達は不完全として停止する。無制限再試行はしない。\n- 元checkoutの47ステージ済みファイル、追加の作業変更、logs/とruns/を保全。最新main基準の隔離checkoutで1 Issue=1 PR。検査済みPUBLICコード/合成fixture/要約証拠だけを本repo専用branch/PRへ提出可。生の実行ログや元checkout全体を送らない。最終Merge/Closeは人間判断。\n\n# Non-goals\nGitHubの自動コメント/Issue作成・更新/Close/Merge/コード修正実行、認証・repo保護変更、Cron/heartbeat等の予定変更や有効化、通知送信、他repoの監査、本番・Docker・モデルサービス操作、追加ローカルLLM推論、DB/RAG/UI。\nローカルLLMによる根拠ID/手順IDの選択精度比較は後続の別範囲とし、過去の呼出予算を流用しない。今回を監視・制御全体の完成とはしない。\n\n# Done\n- [ ] 特定snapshotやIssue番号へ依存せず、手動収集→版付き保存→前回差分→根拠付き手順→選択候補の再取得/dry-run判定が一巡する。\n- [ ] 初回、変更なし、Issue再開/Close、PR Merge、新コメント、head更新、check/レビュー変化を区別し、欠落や取得不能を明示する。\n- [ ] 根拠のない完了主張、依存飛ばし、古いheadの成功流用、対象外repo、未知根拠/捏造引用を拒否または保留する。安全な固定入力へ誤った手順種別/根拠を差し込む反例でも検証する。\n- [ ] 計画後の状態/head/依存/check変化を再確認で止め、変更なしだけ確認済みにできる。実際のGitHub書込0件をcollectorの経路と故障注入で確認する。\n- [ ] 合成fixtureのunit/integration検証に加え、対象repoの実読取を2回行い、保存→別プロセス読出し→差分→実再確認の証拠を記録する。実データの変化を起こすための書込はしない。実変化がなければ変更ケースは合成試験として区別。\n- [ ] 成果物に取得coverage、今回の変更、対応候補、保留理由、根拠リンク、停止条件、未検証事項を表示し、人が原文を追える。意味精度/人の確認時間/有用性検収は未測定なら未確認とする。\n- [ ] 標準検証・対象試験・Security・自己レビューを完了し、提出時は同一headのCI/Security/正式Codex Reviewを確認。未実施/失敗を成功扱いしない。\n\n# Verification\n- Unit: snapshot/schema/path/ID/hash/厳密JSON、差分、固定手順の根拠と状態整合、依存順/循環/不明、計画時fingerprintとの照合。\n- Integration: collectorの全ページ取得、空一覧、途中失敗、権限不足、rate limit、上限超過、部分check、本文内命令のデータ扱い、原本保持、保存中断と再実行、別プロセス読出し、再取得直前の状態変更を故障注入。read-only呼出のallowlistを検査。\n- Regression: 先行試験で通過した虚偽完了と依存飛ばしを固定反例にし、今回の実装では拒否/保留。MERGEDからIssue Closeや本番完了へ飛躍しない。\n- 目安: python3 -I -B -m unittest discover -s tests -p 'test_github_work_guide*.py'、./scripts/verify.sh、Bash 5以上で bash scripts/security-preflight.sh .。具体的CLIの取得/比較/再確認コマンドは実装時にdocsへ記録。\n- 既存CI/verify入口や既存testsの削除・緩和を行わない。追加試験は明示実行し、固定CIで走らなければその限界をPRに記録。\n- 実読取の認証/ネットワークが利用不能ならオフライン結果だけを記録し、実一巡のDoneは未達とする。\n\n# Dependencies\n未完了Issueへのコード依存なし。mainへマージ済みPR #25は責務分離の参考、#17/#23は原本保持・出力の参考。既存#8の採用/ロールバック、#9の自己改善Cron、#18のASGセキュリティ監査を代替・変更しない。\n元checkoutにある先行試験資料は参照専用。欠落時に本番/他projectを探索せず、利用できる合成試験と不足を記録する。\n",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/issues/26",
+    "comments": 0,
+    "updated_at": "2026-10-23T04:59:40Z"
+   },
+   "comments": []
+  },
+  {
+   "detail": {
+    "number": 27,
+    "state": "closed",
+    "title": "feat: GitHub作業指針の差分と直前確認を読み取り専用で実装 (#26)",
+    "body": "Closes #26\n\n## 変更内容\n\n公開Issue/PRを手動取得し、版付きsnapshotの保存、前回差分、原文根拠付きの固定手順、選択候補の実再取得によるCONFIRMED / STALE / BLOCKED判定までを一巡するPython CLIを追加します。自由要約や本文内の命令は操作根拠にせず、書込API・shell実行・モデル接続を製品の入口に持ちません。\n\n## 判断と前提\n\n- Risk Tier: MEDIUM。対象repoのPUBLIC読取と新規ローカル成果物生成に限定。認証・権限・CI・既存Gate・本番を変更しません。\n- 読取先はsecond-works/hermes-self-improvementだけ。既存gh認証を使い、token値を読出し/表示/保存しません。REST GETと固定GraphQL queryだけを許可します。\n- 自然文の依存やGoal変更の解釈は保留します。依存は明示形式に限定し、人間の優先順より依存順を先にします。CLOSED/MERGEDから採用・本番・検収完了を推定しません。\n- 同名checkの送信元ごとの最新結果とcommit statusの両方を照合し、別送信元の成功で失敗を隠さない回帰も追加しています。\n- 上限: 10ページ/系列、100件/ページ、5000 list nodes、500 calls、180秒、再試行0。不完全取得で手順生成を停止します。\n- 再確認は関係の追加/欠落も検知するためrepo全範囲を再取得し、無関係な更新でもSTALEになる保守的な実装です。\n- 元checkoutのステージ済み変更・logs/runsは保全し、最新main e4f6639313d1947f854a46f10cb36fbc5bec89bcから隔離checkoutで実装しました。\n\n## 検証\n\n- 対象head: 6d9b817e4bd76f0c66687b313b58c2a324d5aea7\n- 追加unit/integration: 35件成功。先行反例の虚偽完了と依存飛ばし、誤種別/未知根拠/捏造引用、旧head、循環/不明/1100段依存、ページ途中失敗/部分check/上限/時間、保存中断・原本保持・別プロセス読出し、read-only経路の故障注入を含みます。\n- 標準verify: lint + 既存30試験成功。typecheck/buildは既存設定なしの理由付き対象外。自己レビュー完了。\n- stage済みSecurity Preflight: SECURITY_PASSED。依存manifestなし、DEPENDENCY_STATUS=SECURITY_NOT_APPLICABLE。\n- 実読取: 2回とも26件（Issue 15 + PR 11）、121 calls、94系列を完全取得。別プロセス読出し成功、差分は全26件UNCHANGED。さらに実再取得しCLOSED issue:2の「今回対応不要」をCONFIRMED（読取dry-runのみ）。実変化を起こす書込は0、変化ケースは合成試験と区別しています。\n- 手順・hash付き証拠要約: docs/github-work-guide.md。raw API応答・元ログはpushしません。\n- 同一headのCI: [成功](https://github.com/second-works/hermes-self-improvement/actions/runs/39901273221)。Security Preflight: [SECURITY_PASSED](https://github.com/second-works/hermes-self-improvement/actions/runs/39901271215)。CodeQL: [成功](https://github.com/second-works/hermes-self-improvement/actions/runs/39901273323)。\n- 正式Codex Review: [6d9b817の再レビュー完了](https://github.com/second-works/hermes-self-improvement/pull/27#issuecomment-6357440119)、has_any_findings=false / has_unresolved_findings=false。初回の2指摘は修正・返信・解決済み。\n- 最終照合: scripts/check-pr-head.sh 27 → PR_GATE_STATUS=READY。local/remote/reviewのfull SHA一致、未解決thread 0、競合なし。作業ツリーclean。Merge/Closeは未実施。\n\n## レビュー対応\n\n- P1 / BLOCKING: 同名commit statusの失敗見落とし。check runとstatusを独立に評価し、送信元ごとの最新結果を照合。30794a5で修正、反例試験を追加。\n- P2 / BLOCKING: 空Goalの確認済み判定。Goal本文を抽出し、空/空白/改行/tabだけなら保留してBLOCKED。6d9b817で修正、回帰試験を追加。\n\n## 未完了と対象外\n\n- 既存の固定CIはtests/test_setup.pyを実行するため、追加35試験は自動実行されません。明示実行の証拠を記録し、CI/verify入口や既存testを変更していません。\n- 意味精度、人の確認時間、有用性検収は未確認。監視・制御全体の完成ではありません。botの要約/反応だけのレビュー完了は製品内で自動認定しません。\n- 新規モデル通信0。製品によるGitHub書込/操作実行0。予定変更/有効化・通知・Docker・サービス・本番は対象外。\n- この開発PRの提出とレビュー依頼のみIssueの承認範囲で行います。Merge/Issue Closeは人間判断です。",
+    "html_url": "https://github.com/second-works/hermes-self-improvement/pull/27",
+    "comments": 0,
+    "updated_at": "2026-10-23T05:00:28Z",
+    "merged": true,
+    "merged_at": "2026-10-23T04:59:37Z",
+    "head": {
+     "sha": "6d9b817e4bd76f0c66687b313b58c2a324d5aea7",
+     "ref": "codex/issue-26-github-work-guide",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    },
+    "base": {
+     "sha": "e4f6639313d1947f854a46f10cb36fbc5bec89bc",
+     "ref": "main",
+     "repo": {
+      "full_name": "second-works/hermes-self-improvement",
+      "open_issues_count": 10,
+      "pushed_at": "2026-10-23T04:59:36Z",
+      "updated_at": "2026-10-23T04:59:44Z"
+     }
+    }
+   },
+   "comments": [],
+   "checks": [],
+   "statuses": [],
+   "reviews": [],
+   "review_comments": [],
+   "threads": [],
+   "closing": [
+    {
+     "number": 26,
+     "repository": {
+      "nameWithOwner": "second-works/hermes-self-improvement"
+     }
+    }
+   ]
+  }
+ ]
+}

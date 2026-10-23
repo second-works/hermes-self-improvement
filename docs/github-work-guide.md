@@ -57,34 +57,69 @@ botの👍/要約コメントだけのレビュー完了は自動認定しない
 
 ## 手順と根拠
 
-自由要約を入力する機能はない。ハーネスが次の6種から決め、原文と現在状態を付ける。
+自由要約を入力する機能はない。ハーネスが次の6種から決め、原文の抜粋と現在状態を付ける（#28で、案件ごとの確認手順を追加）。
 
 | 種別 | 条件 / 次に人が確認すること |
 | --- | --- |
 | 今回対応不要 | CLOSED/MERGED。再実装を開始しない |
 | レビュー対応準備 | OPEN PR。現在head、check、レビュー、threadを確認 |
-| 依存確認 | 明示の依存番号がある。依存先と開始条件を確認 |
-| 対象範囲確認 | 依存不明、Goal不明、コメントにGoal/方針変更あり。保留理由を確認 |
-| 完了範囲確認 | 保留なしOPEN Issueに、MERGED PRからGitHubのclosing関係がある。Doneと実装範囲を照合 |
+| 依存確認 | 依存が番号だけで書かれている。依存先と開始条件を確認 |
+| 完了範囲確認 | OPEN Issueに、MERGED PRからのclosing関係、またはPR本文のRefs等による参照がある。Doneと実装範囲を照合 |
+| 対象範囲確認 | 上記以外で保留がある。保留ごとの問いと解除条件を確認 |
 | 計画整理 | その他の保留なしOPEN Issue。GoalとScopeを照合 |
 
-依存欄は `# Dependencies` 内の `none` / `なし` / `依存なし`、または `- depends-on: #番号` の行だけを確定的に扱う。
-自然文の依存、欄の欠落/重複、未取得依存、循環は保留する。空/空白だけのGoal、複数のGoal、コメントのGoal/目標/方針変更も保留する。
-この限定した文法は曖昧な意味判断を避けるための制限であり、既存Issueの本文を書き換える指示ではない。
-依存がCLOSEDでも成功・採用を推定せず、開始条件の人間確認を保留理由に残す。
-既存の自然文を安全に解釈する精度、人の確認時間、有用性は未検収。
+### 読み取る形式
 
-各候補は対象、根拠ID・原文・source hash・リンク、開始条件、次操作、成功判定、停止条件を持つ。
+見出し（`#`〜`######`、コードブロック内は除く）を次の名前で認識する。前方一致は直後が空白・`/`・括弧・コロンの場合だけ。
+
+| 欄 | 認識する見出し |
+| --- | --- |
+| goal | Goal / 目的 / 目標 |
+| scope | Scope（Scope / Boundaries を含む） / 作業 / 範囲 / 対象範囲 |
+| done | Done / 完了条件 / Acceptance criteria / 受入条件 |
+| verification | Verification / 検証 |
+| dependencies | Dependencies / 依存 |
+| non_goals | Non-goals / 対象外 |
+| boundaries | Boundaries / 境界 |
+
+本文中の `依存: …` / `Dependencies: …` / `Depends on: …` の行も依存の記載として読む。
+依存が `none` / `なし` / `依存なし`、または番号だけ（`- depends-on: #8`、`依存: #3, #5` など）のときだけ確定する。
+名前や文章を含む依存は確定せず、項目ごとに引用する。題名と語が一部一致するIssueを「候補（未確定）」として最大3件示すが、依存の順序には使わない。
+一致の基準は、項目の語（英単語と、それ以外の文字の2文字組）のうち題名にも含まれる割合が0.3以上であること。候補は手がかりであり、正しさは測っていない。
+
+### 保留の出し方
+
+保留は理由の種類を分ける。`format`は欄がない・空など形式の問題、`semantic`は複数の目的・自然文の依存・コメントでの方針変更・closingでない関係など意味の確定が必要なもの、`state`は依存先の状態、`gate`はPRの必須checkとレビュー。
+各保留は、原文の該当箇所（evidence）、確認対象、確認する問い、解除条件を持つ。解除条件は「人が確認」で終わらせず、何を決めれば保留が外れるかを書く。
+
+### 関連の扱い
+
+同じrepoの `#N`、`owner/repo#N`、Issue/PRのURLを読み、両方向（本文が言及／相手が言及）で「関連候補」として出す。
+`Refs` / `Related` / `Part of` / `Closes` / `関連` の直後にある参照は、参照の関係として区別する。GitHubのclosing関係（`closingIssuesReferences`）は別に表示する。
+関連候補は依存の確定でも完了の証拠でもない。Refsだけの関係は `relation_not_closing` の保留になり、Issueのどの完了条件を満たしたかを人が確定する。
+対象外repoのURLは「取得しない」と表示するだけで、内容を取得しない。
+関連PRのMergeがIssueの最終更新より後なら、本文の状態の記述はMerge前の時点として読むよう注意を出す。
+
+### 計画の検証
+
+各候補は対象、原文の抜粋（1件300文字まで。切った場合は「抜粋」）、source hash、リンク、確認手順、保留、開始条件、成功判定、停止条件を持つ。
+抜粋は原文の完全な部分文字列で、識別子は行番号（`issue:7:L34-L39`、コメントは `issue:4:c1:L3:53`）。
 保存planはsnapshotからの再生成と全体一致が必要。種別変更、未知ID、捏造引用、余分な完了主張、順序改変を拒否する。
+planの形式は #28 でversion 2になった。version 1のplanを持つ旧runは再確認で拒否されるため、新しくcollectし直す。snapshotの形式（version 1）は変わらない。
 hashはローカル破損/改変の検知でありGitHub署名や発行元の証明ではない。snapshotを信頼できない人から受け取って実行根拠にしない。
 MERGEDからIssue Close、本番適用、検収済みを推定しない。本文中の完了主張も引用された未検証データであり、ハーネスの結論ではない。
+確認手順は固定の文型と、番号・head・日時・件数・根拠IDだけで作る。原文の文章は引用（JSON文字列として無害化）でだけ表示する。Issue番号ごとの判断文はコードにない。
 
 ## 差分と再確認
 
 `FIRST` / `ADDED` / `UNCHANGED` / `CHANGED` / `UNAVAILABLE` を区別する。
 取得できなくなった項目は削除・解決と呼ばない。変更フィールドにstate、body、headを含むdetail、comments、checks、statuses、reviews、threads等を表示する。
 
-再確認は保存planを検証後、実際に再取得する。対象・依存・関係の追加/欠落も検知するため、計画範囲の全item hashを照合する。
+差分と再確認は、原本hashとは別の作業fingerprintで比べる。fingerprintは原本から、PRの `head.repo` / `base.repo` のrepo全体のメタデータ（`open_issues_count`、`pushed_at`、`updated_at` など）を `full_name` だけに縮めたもののhash。
+これらだけが変わったitemは `UNCHANGED`（`metadata_only: true`）で、reportに件数を出す。state、title、本文、head SHA/ref、コメント、check、status、レビュー、thread、closing関係の変化は引き続き `CHANGED` / `STALE` になる。
+原本と原本hashはそのまま保存し、読出し時に検証する。
+
+再確認は保存planを検証後、実際に再取得する。対象・依存・関係の追加/欠落も検知するため、計画範囲の全itemのfingerprintを照合する。
 関係のないコメント更新も `STALE` になる保守的な実装である。
 
 | 結果 | 意味 |
@@ -107,7 +142,9 @@ python3 -I -B -m unittest discover -s tests -p 'test_github_work_guide*.py' -v
 追加試験は標準ライブラリだけ。合成APIを使い、read allowlist、ページング、失敗/上限/時間、部分check、厳密JSON、状態/依存/根拠整合、旧head、保存中断・原本保持、別プロセス読出しを検証する。
 先行試験の「本番自動適用完了」挿入と#9を#8より先にする依存飛ばしを拒否する回帰を含む。
 `fixtures/github_work_guide/synthetic.json` はPUBLIC合成snapshot。実ログ/認証値は含まない。
-既存のverify/CI/既存testを変更しない。固定CIの標準test入口は `tests/test_setup.py` のため、今回の追加試験はCIでは自動実行されない。提出時に明示実行した結果を記録する。
+`fixtures/github_work_guide/real_20261023.json` は、2026-10-23に公開REST GETで取得した本repoのIssue 15件・PR 12件の原文（PUBLIC）。案内に使わないCLOSED/MERGEDのコメント・check・レビュー・threadは省き、closing関係はPR本文の `Closes #N` 行から再現した。
+`tests/test_github_work_guide_real.py` は、このfixtureで #7 / #8 / #9 / #18 の期待する案内、OPEN Issueの手順がすべて異なること、reportが本文合計より短いこと、メタデータだけの変化の扱い、番号を100ずらした複製で同じ構造になることを確かめる。意味の正確さの測定ではない。
+既存のverify/CI/既存testを変更しない。固定CIの標準test入口は `tests/test_setup.py` のため、`test_github_work_guide*.py` はCIでは自動実行されない（#28の追加試験も同じ）。提出時に明示実行した結果を記録する。
 
 既存の `scripts/collect-github-state.py` は最小メタデータの観測、作業ログ候補CLIはofflineログ抽出、delegationは登録済み操作の隔離実行が責務。
 今回はこれらを変更せず、差分と固定手順・直前dry-runの失敗モードだけを担当する。自動適用や常駐機能を追加しない。
@@ -143,3 +180,21 @@ OPEN案件は自然文の依存などを保留し、開始や完了を承認し�
 追加試験は35件成功。標準verifyはlintと既存30試験に成功し、typecheck/buildは既存設定なしの理由付き対象外。
 Security Preflightはstage済み成果を検査してSECURITY_PASSED。依存manifestなしで依存監査はSECURITY_NOT_APPLICABLE。
 PRのCI/Security/正式レビューは提出後の同一headで別途照合する。意味精度・人の確認時間・有用性検収は未確認であり、監視/制御全体の完成とはしない。
+
+## #28: 実Issueでの案内の改善（2026-10-23）
+
+#26の追加検収で、OPEN Issueがすべて同じ一般文の保留になると分かったため、`fixtures/github_work_guide/real_20261023.json` で期待結果を先に固定し、修正前のコードで不足を再現してから直した。
+
+| 観点 | 修正前 | 修正後 |
+| --- | --- | --- |
+| OPEN Issue 10件の次操作 | 1種類（「対象範囲と保留理由を人が確認する。」） | 確認手順が10件すべて異なる。完了範囲確認5件、対象範囲確認5件 |
+| #7 | 対象範囲確認、関連根拠なし | 完了範囲確認。PR #25（MERGED、head `3dd1227…`、Refs、closingではない）と、Done 6/6チェックの照合を案内。目的2箇所・依存2箇所を引用。Merge後にIssue本文が更新されていないことを注意として出す |
+| #8 | 「依存欄がない」「Goalを一意に確認できない」 | 目的・作業・完了条件を認識。検証欄がないこと、依存3項目が番号未確定であることを、未確定の候補とともに示す |
+| #9 | 同上 | 依存6項目を引用。「GitHub承認フロー」の候補に#8が出るが、未確定のままで依存順序には使わない |
+| #18 | 同上 | 目的欄・依存欄がないこと（format）、Acceptance criteria 0/5、#4との境界の引用、対象外repo 3件は取得しないことを示す |
+| report | 84,276文字（本文合計55,050文字より長い） | 34,934文字。本文全文ではなく抜粋とリンク |
+| repoメタデータだけの変化 | 過去PR 12件がCHANGED / 再確認はSTALE | UNCHANGED（metadata_only）。state・head・本文の変化はCHANGED / STALE |
+
+検証: `test_github_work_guide_real.py` の10件は修正前のコードで8件が失敗し、修正後は既存35件と合わせて45件が成功した。
+番号を100ずらした複製でも、同じ種別・保留・関係・手順数になる（番号ごとの規則がない）。
+意味の正確さ（名称一致の候補が正しいか、保留の判断が妥当か）と人の確認時間は測っていない。実際の作業再開に役立つかは、利用者の確認が必要。

@@ -187,7 +187,8 @@ def dependency_value(value):
         return [], None
     numbers = [int(x) for x in SHORT.findall(text)]
     rest = SHORT.sub(' ', text)
-    rest = re.sub(r'(?i)\b(pr|issues?|pull|and)\b', ' ', rest)
+    # A PR named as a dependency ("PR #25") stays prose: confirmed numbers are resolved as issues only.
+    rest = re.sub(r'(?i)\b(issues?|and)\b', ' ', rest)
     if numbers and not re.sub(r'[\s、,，/／・;；\-*と及び。.]+', '', rest):
         return sorted(set(numbers)), None
     terms = [t.strip(' \t\r-*。.') for t in re.split(r'[、,，;；\n]', value)]
@@ -195,7 +196,9 @@ def dependency_value(value):
 
 
 def done_counts(text, section):
-    marks = [CHECKBOX.match(line) for line in text.lines[section['line'] + 1:section['end']]]
+    start = section['line'] + 1
+    marks = [CHECKBOX.match(line) for i, line in enumerate(text.lines[start:section['end']], start)
+             if i not in text.fenced]  # checklist examples in code blocks are not conditions
     marks = [m.group(1) for m in marks if m]
     return sum(m in 'xX' for m in marks), len(marks)
 

@@ -241,5 +241,29 @@ class RealIssueGuidanceTests(unittest.TestCase):
             self.assertEqual(shape(other[f'{kind}:{int(n) + offset}']), shape(c), key)
 
 
+    def edited(self, number, old, new):
+        rows = copy.deepcopy(self.rows)
+        raw = next(r for r in rows if 'checks' not in r and r['detail']['number'] == number)
+        self.assertEqual(raw['detail']['body'].count(old), 1)
+        raw['detail']['body'] = raw['detail']['body'].replace(old, new)
+        return build_plan(snapshot(rows))['candidates'][f'issue:{number}']
+
+    def test_pr_named_dependency_stays_unconfirmed(self):
+        # pr:25 exists; "PR #25" must not become the unknown issue:25 or a confirmed order edge.
+        c = self.edited(8, '依存: 共通テンプレート、評価基盤、隔離スキル作成。', '依存: PR #25')
+        self.assertIn('dependency_prose', codes(c))
+        self.assertNotEqual(c['kind'], 'dependency')
+        self.assertFalse(any('issue:25' in h['reason'] for h in c['holds']))
+        c = self.edited(8, '依存: 共通テンプレート、評価基盤、隔離スキル作成。', '依存: issue #5')
+        self.assertEqual(c['kind'], 'dependency')
+        self.assertTrue(any(h['reason'].startswith('issue:5:') for h in c['holds']))
+
+    def test_done_counts_ignore_code_block_examples(self):
+        c = self.edited(18, '- [ ] Evidence of verification and remaining limitations included in PR\n',
+                        '- [ ] Evidence of verification and remaining limitations included in PR\n'
+                        '```md\n- [x] Example only\n```\n')
+        self.assertEqual([(d['checked'], d['total']) for d in c['done']], [(0, 5)])
+
+
 if __name__ == '__main__':
     unittest.main()

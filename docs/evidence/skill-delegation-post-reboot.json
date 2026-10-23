@@ -1,0 +1,122 @@
+{
+  "classification": "PUBLIC",
+  "status": "INCOMPLETE",
+  "candidate_complete": false,
+  "reuse": "NOT_RUN",
+  "evaluation": "NOT_RUN",
+  "trial_results": [
+    {
+      "service_run": "context64-20261017T103625Z",
+      "actor_run": "delegation-20261017T103627Z-41c23c303ae3",
+      "reason": "WORKER_PIPE_CLOSED",
+      "service": {
+        "baseline_resources": {
+          "memory_free_percent": 23,
+          "swap_mib": 303.69
+        },
+        "compact_memory": false,
+        "controller_exit": 1,
+        "last_resources": {
+          "memory_free_percent": 31,
+          "swap_mib": 247.69
+        },
+        "memory_saving": true,
+        "original_context": 32768,
+        "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+        "reason": "DELEGATION_STOPPED",
+        "restoration": "VERIFIED",
+        "status": "STOPPED",
+        "temporary_context": 65536,
+        "temporary_hash": "41f8f669acedbf0a90d861765ed0e178d7a6cf0a79653ccb15ea9171eeb6342e"
+      },
+      "cumulative_usage": {
+        "calls": 47,
+        "input_tokens": 150188,
+        "output_tokens": 32704,
+        "accounting": "SETTLED"
+      }
+    },
+    {
+      "service_run": "context64-20261017T104105Z",
+      "actor_run": "delegation-20261017T104107Z-2c26781ce163",
+      "reason": "SKILL_FRONTMATTER",
+      "service": {
+        "baseline_resources": {
+          "memory_free_percent": 24,
+          "swap_mib": 414.75
+        },
+        "compact_memory": false,
+        "controller_exit": 1,
+        "last_resources": {
+          "memory_free_percent": 35,
+          "swap_mib": 406.75
+        },
+        "memory_saving": true,
+        "original_context": 32768,
+        "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+        "reason": "DELEGATION_STOPPED",
+        "restoration": "VERIFIED",
+        "status": "STOPPED",
+        "temporary_context": 65536,
+        "temporary_hash": "41f8f669acedbf0a90d861765ed0e178d7a6cf0a79653ccb15ea9171eeb6342e"
+      },
+      "cumulative_usage": {
+        "calls": 53,
+        "input_tokens": 164655,
+        "output_tokens": 37040,
+        "accounting": "RESERVED_ON_FAILURE"
+      }
+    },
+    {
+      "service_run": "context64-20261017T104340Z",
+      "actor_run": "delegation-20261017T104343Z-bcb57b9085b8",
+      "reason": "CHILD_LIMIT",
+      "service": {
+        "baseline_resources": {
+          "memory_free_percent": 25,
+          "swap_mib": 406.75
+        },
+        "compact_memory": false,
+        "controller_exit": 1,
+        "last_resources": {
+          "memory_free_percent": 34,
+          "swap_mib": 406.75
+        },
+        "memory_saving": true,
+        "original_context": 32768,
+        "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+        "reason": "DELEGATION_STOPPED",
+        "restoration": "VERIFIED",
+        "status": "STOPPED",
+        "temporary_context": 65536,
+        "temporary_hash": "41f8f669acedbf0a90d861765ed0e178d7a6cf0a79653ccb15ea9171eeb6342e"
+      },
+      "cumulative_usage": {
+        "calls": 59,
+        "input_tokens": 179813,
+        "output_tokens": 41533,
+        "accounting": "RESERVED_ON_FAILURE"
+      }
+    }
+  ],
+  "interpretation": "No SWAP_GROWTH or MODEL_TIMEOUT in these post-reboot trials. Incomplete generation remains a tool/protocol issue. This does not prove reboot alone resolved memory pressure permanently.",
+  "verification": {
+    "related_tests": 38,
+    "standard_tests": 30,
+    "typecheck_build": "SKIPPED: existing scripts not executable"
+  },
+  "next_trial": "Requires new approved call budget; 59 of 60 used. Simplify nested tool examples before another model run.",
+  "prepared_next_repairs": [
+    "Keep worker alive until actual background child completion within both deadlines",
+    "Describe fixed Markdown directly in tool schema",
+    "Remove nested JSON from delegated context",
+    "Reject missing goal/context before actual delegation"
+  ],
+  "latest_verification": {
+    "related_tests": 39,
+    "standard_tests": 30,
+    "security": "SECURITY_PASSED",
+    "dependencies": "NOT_APPLICABLE"
+  },
+  "next_budget_status": "PENDING_USER_APPROVAL"
+}

@@ -1,0 +1,422 @@
+{
+  "classification": "PUBLIC",
+  "risk_tier": "HIGH",
+  "acceptance": "NOT_MET",
+  "authorization": "User approved up to 3 trials, aggregate 20 inference requests / 20 minutes; each restores original settings",
+  "trial_count": 3,
+  "elapsed_seconds_including_intertrial_repairs": 781,
+  "deadline_utc": "2026-10-17T06:25:15Z",
+  "aggregate_inference_attempts": 14,
+  "aggregate_input_tokens_reserved": 52111,
+  "aggregate_output_tokens_reserved": 12501,
+  "token_accounting_note": "Failed requests retain full output reservations. Reserved totals are not actual decoded output. Cumulative values already include earlier trials; do not sum them.",
+  "candidate_artifacts_exported": 0,
+  "skill_creation": "NOT_VERIFIED",
+  "child_delegation": "NOT_VERIFIED",
+  "reuse": "NOT_RUN",
+  "independent_evaluation": "NOT_RUN",
+  "trials": [
+    {
+      "trial": 1,
+      "service_run": "context64-20261017T060519Z",
+      "actor_run": "delegation-20261017T060523Z-73aca69cf43a",
+      "start_utc": "2026-10-17T06:05:19Z",
+      "restored_utc": "2026-10-17T06:08:19Z",
+      "reason": "LOCAL_MODEL_UNAVAILABLE",
+      "service_report": {
+        "baseline_resources": {
+          "memory_free_percent": 20,
+          "swap_mib": 5019.69
+        },
+        "controller_exit": 1,
+        "last_resources": {
+          "memory_free_percent": 21,
+          "swap_mib": 4811.44
+        },
+        "memory_saving": true,
+        "original_context": 32768,
+        "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+        "reason": "DELEGATION_STOPPED",
+        "restoration": "VERIFIED",
+        "status": "STOPPED",
+        "temporary_context": 65536,
+        "temporary_hash": "41f8f669acedbf0a90d861765ed0e178d7a6cf0a79653ccb15ea9171eeb6342e"
+      },
+      "cumulative_usage": {
+        "accounting": "RESERVED_ON_FAILURE",
+        "calls": 4,
+        "cost_usd": 0,
+        "input_tokens": 14610,
+        "output_tokens": 4120,
+        "records": [
+          {
+            "call": 1,
+            "input_tokens": 2836,
+            "output_tokens": 9
+          },
+          {
+            "call": 2,
+            "input_tokens": 2883,
+            "output_tokens": 6
+          },
+          {
+            "call": 3,
+            "input_tokens": 4422,
+            "output_tokens": 9
+          }
+        ],
+        "usage_observations": [
+          {
+            "preflight_input_tokens": 2836,
+            "reported_input_tokens": 2836,
+            "reported_output_tokens": 9
+          },
+          {
+            "preflight_input_tokens": 2883,
+            "reported_input_tokens": 2883,
+            "reported_output_tokens": 6
+          },
+          {
+            "preflight_input_tokens": 4422,
+            "reported_input_tokens": 4422,
+            "reported_output_tokens": 9
+          }
+        ]
+      },
+      "inference_attempts_this_trial": 4,
+      "gate_categories_verified": [
+        "boundaries",
+        "cpu",
+        "disk",
+        "memory",
+        "output",
+        "pids",
+        "timeout"
+      ],
+      "hermes_boot": {
+        "kind": "result",
+        "status": "VERIFIED",
+        "tools": [
+          "delegate_task",
+          "skill_manage",
+          "skill_view",
+          "skills_list"
+        ]
+      },
+      "capability": {
+        "api_calls": 2,
+        "final": "No skills are available.",
+        "initial_skill_names": [],
+        "kind": "result",
+        "status": "VERIFIED"
+      },
+      "source_hashes": {
+        "fixtures/audit/delegation.json": "838c4747e87b702e964594006b9c976cefb1ee343dcb730b86c536b750bc0f82",
+        "fixtures/delegation/prepare.py": "44e45b3a907012200a16d733c3391cdff691e13140faa07f9fb438085bc94b09",
+        "fixtures/delegation/worker.py": "117155a43147f8dfca6fe90789dc0d0e0d56b2f7f8bffb89272fb5fd30d95f29",
+        "fixtures/self-evolution/hermes-agent/skills/github-code-review/SKILL.md": "7afb0ea3ea8312b1b5eb68770d1e5ef2c921b1f918826a4e8b787bd5e44b6a27",
+        "fixtures/self-evolution/isolation_probe.py": "c3bef46648bc131b8ecf61811685e50be5c15b4d349138557cdc16101ff9a9ab",
+        "scripts/delegate_skill.py": "ed483222ca9b2b7471efcc0b8e57d0ed716e6c38de3562cc7c446a4029d59e0f",
+        "scripts/self_evolution_spike.py": "b507ee9d91784730fcf718e5349108990065d99f42ff969d75680c88cae28686",
+        "src/audit/core.py": "36d53c9b489006bd2dc7d22e12fa959240fcc79587bea32d5b49c691288f82c6",
+        "src/delegation/context.py": "3ed53d1baf0adb481daf9cd5ca948d8eb981e5ebfc66596b128e8ece52623b39",
+        "src/delegation/core.py": "7e552a30393360808614c48ad161630779afcd7303a96fb2f2f91c72769d9954",
+        "src/delegation/relay.py": "4a7ffe41e04fc13daef9cbdd9143cba8486a7aa9def5ecbe45877490df0c0cbc",
+        "src/delegation/sandbox.py": "0d0de085075071bc283ce3197607f90c376e3c5f4940ec551fe9e2f00bf043e5",
+        "src/evaluation/core.py": "71f2648fc05790f58a571571c9fafc42c121b4a6f6f1693dd5e5c2f0dcd53fdb",
+        "src/evaluation/sandbox.py": "d136d5d46e6bafa4939560595fe8ccd52958ea7363fd18a36ce29a29735f8cc5",
+        "src/self_evolution/sandbox.py": "ffdb480773bc331f24e425a91a966461ea56e2eac8f7b5f132081a14d28812a3"
+      },
+      "report_hashes": {
+        "runs/context64-20261017T060519Z/service-report.json": "e42f2976ddd7f7089701a08548f6e3150111d8ea3cd830cc37ae033a86ba85bd",
+        "runs/context64-20261017T060519Z/service-events.jsonl": "dbe9d633ca248c64992f1771817d1db6992bac8d7a5253dfd51c536aa62ef8c7",
+        "runs/delegation-20261017T060523Z-73aca69cf43a/report.json": "7a9bc8d323c5cc91f6ddeaac8e98752507b4b4a23ef0ab84660b2db02252e99d",
+        "runs/delegation-20261017T060523Z-73aca69cf43a/boot.json": "167ff94201f20d4d97a24916cc5a34d71fa0b09492d0400ddbf398c73560ad69",
+        "runs/delegation-20261017T060523Z-73aca69cf43a/capability.json": "e7f7972d3345e79c62993a31fe8f42cdbb63514970ab055be15121f634ba8e52"
+      }
+    },
+    {
+      "trial": 2,
+      "service_run": "context64-20261017T061013Z",
+      "actor_run": "delegation-20261017T061017Z-e28a44a8cc62",
+      "start_utc": "2026-10-17T06:10:13Z",
+      "restored_utc": "2026-10-17T06:13:04Z",
+      "reason": "LOCAL_MODEL_UNAVAILABLE",
+      "service_report": {
+        "baseline_resources": {
+          "memory_free_percent": 17,
+          "swap_mib": 5427.19
+        },
+        "controller_exit": 1,
+        "last_resources": {
+          "memory_free_percent": 23,
+          "swap_mib": 5267.12
+        },
+        "memory_saving": true,
+        "original_context": 32768,
+        "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+        "reason": "DELEGATION_STOPPED",
+        "restoration": "VERIFIED",
+        "status": "STOPPED",
+        "temporary_context": 65536,
+        "temporary_hash": "41f8f669acedbf0a90d861765ed0e178d7a6cf0a79653ccb15ea9171eeb6342e"
+      },
+      "cumulative_usage": {
+        "accounting": "RESERVED_ON_FAILURE",
+        "calls": 8,
+        "cost_usd": 0,
+        "input_tokens": 29284,
+        "output_tokens": 8240,
+        "records": [
+          {
+            "call": 5,
+            "input_tokens": 2836,
+            "output_tokens": 9
+          },
+          {
+            "call": 6,
+            "input_tokens": 2883,
+            "output_tokens": 6
+          },
+          {
+            "call": 7,
+            "input_tokens": 4454,
+            "output_tokens": 9
+          }
+        ],
+        "usage_observations": [
+          {
+            "preflight_input_tokens": 2836,
+            "reported_input_tokens": 2836,
+            "reported_output_tokens": 9
+          },
+          {
+            "preflight_input_tokens": 2883,
+            "reported_input_tokens": 2883,
+            "reported_output_tokens": 6
+          },
+          {
+            "preflight_input_tokens": 4454,
+            "reported_input_tokens": 4454,
+            "reported_output_tokens": 9
+          }
+        ]
+      },
+      "inference_attempts_this_trial": 4,
+      "gate_categories_verified": [
+        "boundaries",
+        "cpu",
+        "disk",
+        "memory",
+        "output",
+        "pids",
+        "timeout"
+      ],
+      "hermes_boot": {
+        "kind": "result",
+        "status": "VERIFIED",
+        "tools": [
+          "delegate_task",
+          "skill_manage",
+          "skill_view",
+          "skills_list"
+        ]
+      },
+      "capability": {
+        "api_calls": 2,
+        "final": "No skills were found.",
+        "initial_skill_names": [],
+        "kind": "result",
+        "status": "VERIFIED"
+      },
+      "source_hashes": {
+        "fixtures/audit/delegation.json": "838c4747e87b702e964594006b9c976cefb1ee343dcb730b86c536b750bc0f82",
+        "fixtures/delegation/prepare.py": "44e45b3a907012200a16d733c3391cdff691e13140faa07f9fb438085bc94b09",
+        "fixtures/delegation/worker.py": "c3b0bd94d6aebf32fe0b235608c6b533ff096ae78deb1b787fd7a47d01a852b6",
+        "fixtures/self-evolution/hermes-agent/skills/github-code-review/SKILL.md": "7afb0ea3ea8312b1b5eb68770d1e5ef2c921b1f918826a4e8b787bd5e44b6a27",
+        "fixtures/self-evolution/isolation_probe.py": "c3bef46648bc131b8ecf61811685e50be5c15b4d349138557cdc16101ff9a9ab",
+        "scripts/delegate_skill.py": "28ffa1713d946b256bac28a458eb09b480bfd08d0ccc0af8eadaa1253bee8c8b",
+        "scripts/self_evolution_spike.py": "b507ee9d91784730fcf718e5349108990065d99f42ff969d75680c88cae28686",
+        "src/audit/core.py": "36d53c9b489006bd2dc7d22e12fa959240fcc79587bea32d5b49c691288f82c6",
+        "src/delegation/context.py": "e36e974633162f3cdd203245de3ee8b80f7bc9ec0b497ee5a47a0b333fb244fa",
+        "src/delegation/core.py": "7e552a30393360808614c48ad161630779afcd7303a96fb2f2f91c72769d9954",
+        "src/delegation/relay.py": "aa0d0bf8b43c6fd11da388c2f278c3916ad59f735bf3d4ddffd8d920b6aed871",
+        "src/delegation/sandbox.py": "0d0de085075071bc283ce3197607f90c376e3c5f4940ec551fe9e2f00bf043e5",
+        "src/evaluation/core.py": "71f2648fc05790f58a571571c9fafc42c121b4a6f6f1693dd5e5c2f0dcd53fdb",
+        "src/evaluation/sandbox.py": "d136d5d46e6bafa4939560595fe8ccd52958ea7363fd18a36ce29a29735f8cc5",
+        "src/self_evolution/sandbox.py": "ffdb480773bc331f24e425a91a966461ea56e2eac8f7b5f132081a14d28812a3"
+      },
+      "report_hashes": {
+        "runs/context64-20261017T061013Z/service-report.json": "cede4cd0bffd010e8bce04bc583209680bbe2f645efa636987c8e343f5339ad7",
+        "runs/context64-20261017T061013Z/service-events.jsonl": "5cdb2b42dbf28cf0914e994a3d34538c187f06bc5f4ae49cd3f4099e45ab7aa0",
+        "runs/delegation-20261017T061017Z-e28a44a8cc62/report.json": "560a2f7e2acbeae55e96321587a3d811ac9acf27113050120fdea1ee3d6e0088",
+        "runs/delegation-20261017T061017Z-e28a44a8cc62/boot.json": "167ff94201f20d4d97a24916cc5a34d71fa0b09492d0400ddbf398c73560ad69",
+        "runs/delegation-20261017T061017Z-e28a44a8cc62/capability.json": "36cb546701af1ab8c57592f125b2b8125fa1125ca954fbfe643afd2ae9fd8083"
+      }
+    },
+    {
+      "trial": 3,
+      "service_run": "context64-20261017T061507Z",
+      "actor_run": "delegation-20261017T061512Z-2f22c560f382",
+      "start_utc": "2026-10-17T06:15:07Z",
+      "restored_utc": "2026-10-17T06:18:20Z",
+      "reason": "MODEL_TIMEOUT",
+      "service_report": {
+        "baseline_resources": {
+          "memory_free_percent": 18,
+          "swap_mib": 5537.44
+        },
+        "controller_exit": 1,
+        "last_resources": {
+          "memory_free_percent": 27,
+          "swap_mib": 5129.31
+        },
+        "memory_saving": true,
+        "original_context": 32768,
+        "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+        "reason": "DELEGATION_STOPPED",
+        "restoration": "VERIFIED",
+        "status": "STOPPED",
+        "temporary_context": 65536,
+        "temporary_hash": "41f8f669acedbf0a90d861765ed0e178d7a6cf0a79653ccb15ea9171eeb6342e"
+      },
+      "cumulative_usage": {
+        "accounting": "RESERVED_ON_FAILURE",
+        "calls": 14,
+        "cost_usd": 0,
+        "input_tokens": 52111,
+        "output_tokens": 12501,
+        "records": [
+          {
+            "call": 9,
+            "input_tokens": 2836,
+            "output_tokens": 9
+          },
+          {
+            "call": 10,
+            "input_tokens": 2883,
+            "output_tokens": 7
+          },
+          {
+            "call": 11,
+            "input_tokens": 4478,
+            "output_tokens": 9
+          },
+          {
+            "call": 12,
+            "input_tokens": 4525,
+            "output_tokens": 139
+          },
+          {
+            "call": 13,
+            "input_tokens": 5009,
+            "output_tokens": 1
+          }
+        ],
+        "transport_failure": {
+          "elapsed_seconds": 90.008,
+          "reason": "MODEL_TIMEOUT",
+          "stage": "completion"
+        },
+        "usage_observations": [
+          {
+            "preflight_input_tokens": 2836,
+            "reported_input_tokens": 2836,
+            "reported_output_tokens": 9
+          },
+          {
+            "preflight_input_tokens": 2883,
+            "reported_input_tokens": 2883,
+            "reported_output_tokens": 7
+          },
+          {
+            "preflight_input_tokens": 4478,
+            "reported_input_tokens": 4478,
+            "reported_output_tokens": 9
+          },
+          {
+            "preflight_input_tokens": 4525,
+            "reported_input_tokens": 4525,
+            "reported_output_tokens": 139
+          },
+          {
+            "preflight_input_tokens": 5009,
+            "reported_input_tokens": 5009,
+            "reported_output_tokens": 1
+          }
+        ]
+      },
+      "inference_attempts_this_trial": 6,
+      "gate_categories_verified": [
+        "boundaries",
+        "cpu",
+        "disk",
+        "memory",
+        "output",
+        "pids",
+        "timeout"
+      ],
+      "hermes_boot": {
+        "kind": "result",
+        "status": "VERIFIED",
+        "tools": [
+          "delegate_task",
+          "skill_manage",
+          "skill_view",
+          "skills_list"
+        ]
+      },
+      "capability": {
+        "api_calls": 2,
+        "final": "No skills are currently available.",
+        "initial_skill_names": [],
+        "kind": "result",
+        "status": "VERIFIED"
+      },
+      "source_hashes": {
+        "fixtures/audit/delegation.json": "838c4747e87b702e964594006b9c976cefb1ee343dcb730b86c536b750bc0f82",
+        "fixtures/delegation/prepare.py": "44e45b3a907012200a16d733c3391cdff691e13140faa07f9fb438085bc94b09",
+        "fixtures/delegation/worker.py": "60aeb1180d33844de16f4fa7b6cd0045c74a7ae54b8b5cb153c9d23658149306",
+        "fixtures/self-evolution/hermes-agent/skills/github-code-review/SKILL.md": "7afb0ea3ea8312b1b5eb68770d1e5ef2c921b1f918826a4e8b787bd5e44b6a27",
+        "fixtures/self-evolution/isolation_probe.py": "c3bef46648bc131b8ecf61811685e50be5c15b4d349138557cdc16101ff9a9ab",
+        "scripts/delegate_skill.py": "474503374a445489534ef22edccc1514bc79d078f31f683ce1bd8f71a2566cb3",
+        "scripts/self_evolution_spike.py": "b507ee9d91784730fcf718e5349108990065d99f42ff969d75680c88cae28686",
+        "src/audit/core.py": "36d53c9b489006bd2dc7d22e12fa959240fcc79587bea32d5b49c691288f82c6",
+        "src/delegation/context.py": "e36e974633162f3cdd203245de3ee8b80f7bc9ec0b497ee5a47a0b333fb244fa",
+        "src/delegation/core.py": "7e552a30393360808614c48ad161630779afcd7303a96fb2f2f91c72769d9954",
+        "src/delegation/relay.py": "7763b5260710ef9b566a5bc8e55184ece8f7d8142820cb1281586a264bb8c5a4",
+        "src/delegation/sandbox.py": "0d0de085075071bc283ce3197607f90c376e3c5f4940ec551fe9e2f00bf043e5",
+        "src/evaluation/core.py": "71f2648fc05790f58a571571c9fafc42c121b4a6f6f1693dd5e5c2f0dcd53fdb",
+        "src/evaluation/sandbox.py": "d136d5d46e6bafa4939560595fe8ccd52958ea7363fd18a36ce29a29735f8cc5",
+        "src/self_evolution/sandbox.py": "ffdb480773bc331f24e425a91a966461ea56e2eac8f7b5f132081a14d28812a3"
+      },
+      "report_hashes": {
+        "runs/context64-20261017T061507Z/service-report.json": "8951c626d47700ffe377085c0e4dddb425a32dc6827e179810af091ca73b0dbe",
+        "runs/context64-20261017T061507Z/service-events.jsonl": "5cba8f5f01cc564f7a59ef65b9950e77ead32dced7fac6455bd08e4548cfe889",
+        "runs/delegation-20261017T061512Z-2f22c560f382/report.json": "c9091bdb2f05fff4d87ff1ec0e42ba37a2039b12a5307ac2a3f52b6ab4670402",
+        "runs/delegation-20261017T061512Z-2f22c560f382/boot.json": "167ff94201f20d4d97a24916cc5a34d71fa0b09492d0400ddbf398c73560ad69",
+        "runs/delegation-20261017T061512Z-2f22c560f382/capability.json": "68b379d5ab876f5f7b6dbe045c651e96978f3d9a33e06a2e33fbe0a0a10ac525"
+      }
+    }
+  ],
+  "final_restoration": {
+    "installed_plist_sha256": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+    "8081": {
+      "health": "ok",
+      "model": "gemma-4-e4b",
+      "n_ctx": 32768
+    },
+    "8082": {
+      "health": "ok",
+      "model": "gemma-4-e4b",
+      "n_ctx": 32768
+    },
+    "running_docker_containers": 0
+  },
+  "limitations": [
+    "Tool/child events from failed create phases were not persisted by these source snapshots; no child success inferred. A post-trial fix now preserves bounded protocol events and has a regression test.",
+    "Final trial confirmed a completion-stage timeout of 90.008 seconds. Earlier LOCAL_MODEL_UNAVAILABLE results did not distinguish socket timeout.",
+    "Memory stop gate was not triggered during these 3 trials; this is not sustained-load or quality acceptance.",
+    "No further service trial was run after trial 3."
+  ]
+}

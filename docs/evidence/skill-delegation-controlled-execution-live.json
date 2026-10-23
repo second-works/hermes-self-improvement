@@ -1,0 +1,408 @@
+{
+  "classification": "PUBLIC",
+  "risk_tier": "HIGH",
+  "run": "runs/delegation-20261017T143114Z-cdb80f512c0f",
+  "status": "VERIFIED",
+  "state": "CONTROLLED_EXECUTION_VERIFIED",
+  "cycle": {
+    "adoption": "NOT_REQUESTED",
+    "baseline": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ],
+    "classification": "PUBLIC",
+    "execution": {
+      "checks": [
+        true,
+        true
+      ],
+      "limitation": "Predefined repairs and two fixed public jobs; not autonomous skill interpretation.",
+      "model_role": "bounded_operation_selection_only",
+      "result_owner": "controller_from_actual_script_stdout",
+      "results_hash": "a288f3986a08c762d83d2872514d334d751e2dc0a429b0cbb0db6b594c377281"
+    },
+    "final_hashes": {
+      "SKILL.md": {
+        "bytes": 205,
+        "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+      },
+      "scripts/review.py": {
+        "bytes": 2594,
+        "sha256": "85f3aee699f9821646ae1787ae1fbc20ebd3a687442b66a282a85725c0f95262"
+      }
+    },
+    "final_results": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "limitations": "Predefined repair selection; transfer fixtures are separate from the prompt, not a sealed independent evaluation.",
+    "public_case_count": 9,
+    "reuse": "NOT_APPLICABLE_DIRECT_EXECUTION",
+    "rounds": [
+      {
+        "after": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "before": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false
+        ],
+        "before_hashes": {
+          "SKILL.md": {
+            "bytes": 205,
+            "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+          },
+          "scripts/review.py": {
+            "bytes": 2487,
+            "sha256": "1804f0badf98b154e4793d8e3a86ed10733fa2073a609f7a19d7d8247ac20d3c"
+          }
+        },
+        "candidate_hashes": {
+          "SKILL.md": {
+            "bytes": 205,
+            "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+          },
+          "scripts/review.py": {
+            "bytes": 2594,
+            "sha256": "85f3aee699f9821646ae1787ae1fbc20ebd3a687442b66a282a85725c0f95262"
+          }
+        },
+        "decision": "ACCEPTED",
+        "operations": [
+          "count_context_lines",
+          "count_added_comments"
+        ],
+        "round": 1
+      },
+      {
+        "after": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "before": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "before_hashes": {
+          "SKILL.md": {
+            "bytes": 205,
+            "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+          },
+          "scripts/review.py": {
+            "bytes": 2594,
+            "sha256": "85f3aee699f9821646ae1787ae1fbc20ebd3a687442b66a282a85725c0f95262"
+          }
+        },
+        "candidate_hashes": {
+          "SKILL.md": {
+            "bytes": 205,
+            "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+          },
+          "scripts/review.py": {
+            "bytes": 2594,
+            "sha256": "85f3aee699f9821646ae1787ae1fbc20ebd3a687442b66a282a85725c0f95262"
+          }
+        },
+        "decision": "UNCHANGED",
+        "operations": [],
+        "round": 2
+      }
+    ],
+    "source_hashes": {
+      "SKILL.md": {
+        "bytes": 205,
+        "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+      },
+      "scripts/review.py": {
+        "bytes": 2487,
+        "sha256": "1804f0badf98b154e4793d8e3a86ed10733fa2073a609f7a19d7d8247ac20d3c"
+      }
+    },
+    "transfer_case_count": 6
+  },
+  "actual_execution_outputs": [
+    {
+      "cpu_seconds": 0,
+      "findings": [
+        {
+          "line": 23,
+          "path": "case_cyclereuse00.py",
+          "rule": "dynamic-eval"
+        }
+      ]
+    },
+    {
+      "cpu_seconds": 0,
+      "findings": [
+        {
+          "line": 62,
+          "path": "case_batchshell01.py",
+          "rule": "shell-execution"
+        }
+      ]
+    }
+  ],
+  "model_usage": {
+    "accounting": "SETTLED",
+    "calls": 102,
+    "cost_usd": 0,
+    "input_tokens": 302510,
+    "output_tokens": 59363,
+    "records": [
+      {
+        "call": 101,
+        "input_tokens": 2478,
+        "output_tokens": 892
+      },
+      {
+        "call": 102,
+        "input_tokens": 2507,
+        "output_tokens": 1041
+      }
+    ],
+    "transport_failure": null,
+    "usage_observations": [
+      {
+        "preflight_input_tokens": 2478,
+        "reported_input_tokens": 2478,
+        "reported_output_tokens": 892
+      },
+      {
+        "preflight_input_tokens": 2507,
+        "reported_input_tokens": 2507,
+        "reported_output_tokens": 1041
+      }
+    ]
+  },
+  "condition_observations": [
+    {
+      "condition": [
+        true,
+        true
+      ],
+      "reasoning_characters": 3460,
+      "thinking_prompt_observed": true
+    },
+    {
+      "condition": [
+        true,
+        true
+      ],
+      "reasoning_characters": 4010,
+      "thinking_prompt_observed": true
+    }
+  ],
+  "isolation_gates": {
+    "boundaries": {
+      "checks": [
+        "canary_unmounted",
+        "capabilities",
+        "cpu_quota",
+        "deps_readonly",
+        "env",
+        "fixture_readonly",
+        "hidden_unmounted",
+        "lock_readonly",
+        "memory_limit",
+        "network_denied",
+        "no_new_privileges",
+        "no_shared_memory",
+        "non_root",
+        "pids_limit",
+        "root_readonly",
+        "seccomp",
+        "skill_readonly",
+        "socket_unmounted",
+        "source_readonly",
+        "swap_limit",
+        "tmpfs_size",
+        "work_writable"
+      ],
+      "python": "3.12.15",
+      "status": "VERIFIED"
+    },
+    "cpu": {
+      "checks": [
+        "cpu_throttled"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "disk": {
+      "checks": [
+        "disk_denied"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "memory": {
+      "checks": [
+        "memory_denied"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "output": {
+      "probe_started": true,
+      "reason": "OUTPUT_LIMIT",
+      "status": "VERIFIED"
+    },
+    "pids": {
+      "checks": [
+        "pids_denied"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "timeout": {
+      "probe_started": true,
+      "reason": "TIMEOUT",
+      "status": "VERIFIED"
+    }
+  },
+  "control_hashes": {
+    "fixtures/audit/delegation.json": "838c4747e87b702e964594006b9c976cefb1ee343dcb730b86c536b750bc0f82",
+    "fixtures/delegation/prepare.py": "44e45b3a907012200a16d733c3391cdff691e13140faa07f9fb438085bc94b09",
+    "fixtures/delegation/worker.py": "7b77f863b48c0f8bf518786120f8a87b5887d345bfbe9e9c696805a3fbe0623d",
+    "fixtures/self-evolution/hermes-agent/skills/github-code-review/SKILL.md": "7afb0ea3ea8312b1b5eb68770d1e5ef2c921b1f918826a4e8b787bd5e44b6a27",
+    "fixtures/self-evolution/isolation_probe.py": "c3bef46648bc131b8ecf61811685e50be5c15b4d349138557cdc16101ff9a9ab",
+    "scripts/delegate_skill.py": "54f46570cfb6c7acb45fc19f9a12cd18d39aee54b8c2270104117152586c17fb",
+    "scripts/self_evolution_spike.py": "b507ee9d91784730fcf718e5349108990065d99f42ff969d75680c88cae28686",
+    "src/audit/core.py": "36d53c9b489006bd2dc7d22e12fa959240fcc79587bea32d5b49c691288f82c6",
+    "src/delegation/context.py": "90de9e36f51cb5b096ca2fcfe3d07b8602dfba7a38697f72828bef55bee33894",
+    "src/delegation/core.py": "08f0ec7c0796c59fa17f14bb2dffdb84e13c0e62da1a66291f6e25b6846f5dae",
+    "src/delegation/cycle.py": "73ab8ef5c0b0166c6e1495167d40f9f236842a065eb6fd250255ecffda3ceeb4",
+    "src/delegation/execution.py": "a16087824449019a0ac0da801398c2d63d20f44d1ec3ddcd368509a027305094",
+    "src/delegation/experiment.py": "c402c382525c842040eef7030191c6839ae09a5217bca7603bffebf72a623387",
+    "src/delegation/patch.py": "f79c764409abf2a3a0f56997118da0f6a49c1c09d67a4a3e2023844b52e221c7",
+    "src/delegation/relay.py": "9db53be1430d003e97d3601f81dee4088ad2035db230d58c742fb2a99a22a18a",
+    "src/delegation/sandbox.py": "b317b493953416c43c0c91469e00edaa17a6c8428f69c5a33861cdee00a4396f",
+    "src/evaluation/core.py": "71f2648fc05790f58a571571c9fafc42c121b4a6f6f1693dd5e5c2f0dcd53fdb",
+    "src/evaluation/sandbox.py": "d136d5d46e6bafa4939560595fe8ccd52958ea7363fd18a36ce29a29735f8cc5",
+    "src/self_evolution/sandbox.py": "ffdb480773bc331f24e425a91a966461ea56e2eac8f7b5f132081a14d28812a3"
+  },
+  "preparation_hash": "015357cdda59f0f468099208b3f8a7fa0512e5d5e2c74121a91de562a4a50214",
+  "service": {
+    "baseline_resources": {
+      "memory_free_percent": 30,
+      "swap_mib": 1244.31
+    },
+    "compact_memory": false,
+    "controller_exit": 0,
+    "last_resources": {
+      "memory_free_percent": 38,
+      "swap_mib": 1236.31
+    },
+    "matrix_profile": true,
+    "memory_saving": true,
+    "original_context": 32768,
+    "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+    "reason": null,
+    "restoration": "VERIFIED",
+    "status": "VERIFIED",
+    "temporary_context": 65536,
+    "temporary_hash": "36cdadd0f09996a7e6c0e52daf88b7597033881f57a6db1fd9497668ac2bfe87"
+  },
+  "restoration": {
+    "8081": {
+      "health": "ok",
+      "context": [
+        32768
+      ]
+    },
+    "8082": {
+      "health": "ok",
+      "context": [
+        32768
+      ]
+    },
+    "plist_sha256": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+    "docker_exit": 0,
+    "running_containers": 0
+  },
+  "limitations": [
+    "Predefined two-operation repair choice with fixed public source.",
+    "15 checks plus two fixed execution jobs; no general accuracy estimate.",
+    "Actual script execution and JSON serialization are controller responsibilities.",
+    "No autonomous saved-skill interpretation, independent evaluation, production adoption, or daily scheduling."
+  ]
+}

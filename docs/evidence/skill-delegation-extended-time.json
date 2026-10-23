@@ -1,0 +1,383 @@
+{
+  "classification": "PUBLIC",
+  "status": "NOT_MET_AWAITING_BUDGET_DECISION",
+  "trial_count": 3,
+  "cumulative_inference_attempts": 18,
+  "input_tokens_reserved": 68518,
+  "output_tokens_reserved": 13200,
+  "accounting_note": "Failure output reservations are retained, not actual generated token totals.",
+  "trials": [
+    {
+      "actor_run": "delegation-20261017T074646Z-447fd95f10c3",
+      "service_run": "context64-20261017T074638Z",
+      "reason": "SKILL_METADATA",
+      "request_timeout_seconds": 180,
+      "child_started_observed": true,
+      "inference_attempts_this_trial": 6,
+      "cumulative_usage": {
+        "accounting": "RESERVED_ON_FAILURE",
+        "calls": 6,
+        "cost_usd": 0,
+        "input_tokens": 22809,
+        "output_tokens": 4323,
+        "records": [
+          {
+            "call": 1,
+            "input_tokens": 2836,
+            "output_tokens": 9
+          },
+          {
+            "call": 2,
+            "input_tokens": 2883,
+            "output_tokens": 10
+          },
+          {
+            "call": 3,
+            "input_tokens": 4488,
+            "output_tokens": 9
+          },
+          {
+            "call": 4,
+            "input_tokens": 4535,
+            "output_tokens": 198
+          },
+          {
+            "call": 5,
+            "input_tokens": 5060,
+            "output_tokens": 1
+          }
+        ],
+        "transport_failure": {
+          "elapsed_seconds": 32.091,
+          "reason": "SKILL_METADATA",
+          "stage": "completion"
+        },
+        "usage_observations": [
+          {
+            "preflight_input_tokens": 2836,
+            "reported_input_tokens": 2836,
+            "reported_output_tokens": 9
+          },
+          {
+            "preflight_input_tokens": 2883,
+            "reported_input_tokens": 2883,
+            "reported_output_tokens": 10
+          },
+          {
+            "preflight_input_tokens": 4488,
+            "reported_input_tokens": 4488,
+            "reported_output_tokens": 9
+          },
+          {
+            "preflight_input_tokens": 4535,
+            "reported_input_tokens": 4535,
+            "reported_output_tokens": 198
+          },
+          {
+            "preflight_input_tokens": 5060,
+            "reported_input_tokens": 5060,
+            "reported_output_tokens": 1
+          },
+          {
+            "preflight_input_tokens": 3007,
+            "reported_input_tokens": 3007,
+            "reported_output_tokens": 83
+          }
+        ]
+      },
+      "service_report": {
+        "baseline_resources": {
+          "memory_free_percent": 60,
+          "swap_mib": 4673.69
+        },
+        "controller_exit": 1,
+        "last_resources": {
+          "memory_free_percent": 22,
+          "swap_mib": 3719.56
+        },
+        "memory_saving": true,
+        "original_context": 32768,
+        "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+        "reason": "DELEGATION_STOPPED",
+        "restoration": "VERIFIED",
+        "status": "STOPPED",
+        "temporary_context": 65536,
+        "temporary_hash": "41f8f669acedbf0a90d861765ed0e178d7a6cf0a79653ccb15ea9171eeb6342e"
+      },
+      "control_hashes": {
+        "fixtures/audit/delegation.json": "838c4747e87b702e964594006b9c976cefb1ee343dcb730b86c536b750bc0f82",
+        "fixtures/delegation/prepare.py": "44e45b3a907012200a16d733c3391cdff691e13140faa07f9fb438085bc94b09",
+        "fixtures/delegation/worker.py": "b0a84306a0f16d1693ef86315b7f9b1d56d6295d217eba159a17bfc79a16cf2a",
+        "fixtures/self-evolution/hermes-agent/skills/github-code-review/SKILL.md": "7afb0ea3ea8312b1b5eb68770d1e5ef2c921b1f918826a4e8b787bd5e44b6a27",
+        "fixtures/self-evolution/isolation_probe.py": "c3bef46648bc131b8ecf61811685e50be5c15b4d349138557cdc16101ff9a9ab",
+        "scripts/delegate_skill.py": "e51a5b5ccd52088a2f6f019b7ce74f5b46c49768b5d0a9e81f2c89cb35b20928",
+        "scripts/self_evolution_spike.py": "b507ee9d91784730fcf718e5349108990065d99f42ff969d75680c88cae28686",
+        "src/audit/core.py": "36d53c9b489006bd2dc7d22e12fa959240fcc79587bea32d5b49c691288f82c6",
+        "src/delegation/context.py": "9652f0a9620283931ce62fc46ac339dab10300e98d460e40869e8c1519b5c02d",
+        "src/delegation/core.py": "7e552a30393360808614c48ad161630779afcd7303a96fb2f2f91c72769d9954",
+        "src/delegation/relay.py": "1452f950803cf8b0e4e158fd7263f8fa601a8c05285a502310bd6252238a1ad7",
+        "src/delegation/sandbox.py": "b317b493953416c43c0c91469e00edaa17a6c8428f69c5a33861cdee00a4396f",
+        "src/evaluation/core.py": "71f2648fc05790f58a571571c9fafc42c121b4a6f6f1693dd5e5c2f0dcd53fdb",
+        "src/evaluation/sandbox.py": "d136d5d46e6bafa4939560595fe8ccd52958ea7363fd18a36ce29a29735f8cc5",
+        "src/self_evolution/sandbox.py": "ffdb480773bc331f24e425a91a966461ea56e2eac8f7b5f132081a14d28812a3"
+      },
+      "hashes": {
+        "runs/delegation-20261017T074646Z-447fd95f10c3/report.json": "34d631137c002171a454339670d7dca5f62bfc5afeca3ec5e86f00fb58e6ea05",
+        "runs/delegation-20261017T074646Z-447fd95f10c3/create.events.json": "4a399860e968b01c1f34f7d6d5a485c42afd9796c13f3df8306158b12af6987a",
+        "runs/context64-20261017T074638Z/service-report.json": "70d909e2497f45c40c7b8aca1d54865642c5e044c4c42018e82be21176f97f03"
+      }
+    },
+    {
+      "actor_run": "delegation-20261017T075042Z-09adcce18155",
+      "service_run": "context64-20261017T075039Z",
+      "reason": "SKILL_WRITE_BOUNDARY",
+      "request_timeout_seconds": 180,
+      "child_started_observed": true,
+      "inference_attempts_this_trial": 6,
+      "cumulative_usage": {
+        "accounting": "RESERVED_ON_FAILURE",
+        "calls": 12,
+        "cost_usd": 0,
+        "input_tokens": 46225,
+        "output_tokens": 8754,
+        "records": [
+          {
+            "call": 7,
+            "input_tokens": 2836,
+            "output_tokens": 9
+          },
+          {
+            "call": 8,
+            "input_tokens": 2883,
+            "output_tokens": 6
+          },
+          {
+            "call": 9,
+            "input_tokens": 4556,
+            "output_tokens": 9
+          },
+          {
+            "call": 10,
+            "input_tokens": 4603,
+            "output_tokens": 310
+          },
+          {
+            "call": 11,
+            "input_tokens": 5271,
+            "output_tokens": 1
+          }
+        ],
+        "transport_failure": {
+          "elapsed_seconds": 67.034,
+          "reason": "SKILL_WRITE_BOUNDARY",
+          "stage": "completion"
+        },
+        "usage_observations": [
+          {
+            "preflight_input_tokens": 2836,
+            "reported_input_tokens": 2836,
+            "reported_output_tokens": 9
+          },
+          {
+            "preflight_input_tokens": 2883,
+            "reported_input_tokens": 2883,
+            "reported_output_tokens": 6
+          },
+          {
+            "preflight_input_tokens": 4556,
+            "reported_input_tokens": 4556,
+            "reported_output_tokens": 9
+          },
+          {
+            "preflight_input_tokens": 4603,
+            "reported_input_tokens": 4603,
+            "reported_output_tokens": 310
+          },
+          {
+            "preflight_input_tokens": 5271,
+            "reported_input_tokens": 5271,
+            "reported_output_tokens": 1
+          },
+          {
+            "preflight_input_tokens": 3267,
+            "reported_input_tokens": 3267,
+            "reported_output_tokens": 618
+          }
+        ]
+      },
+      "service_report": {
+        "baseline_resources": {
+          "memory_free_percent": 21,
+          "swap_mib": 4416.19
+        },
+        "controller_exit": 1,
+        "last_resources": {
+          "memory_free_percent": 30,
+          "swap_mib": 4344.19
+        },
+        "memory_saving": true,
+        "original_context": 32768,
+        "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+        "reason": "DELEGATION_STOPPED",
+        "restoration": "VERIFIED",
+        "status": "STOPPED",
+        "temporary_context": 65536,
+        "temporary_hash": "41f8f669acedbf0a90d861765ed0e178d7a6cf0a79653ccb15ea9171eeb6342e"
+      },
+      "control_hashes": {
+        "fixtures/audit/delegation.json": "838c4747e87b702e964594006b9c976cefb1ee343dcb730b86c536b750bc0f82",
+        "fixtures/delegation/prepare.py": "44e45b3a907012200a16d733c3391cdff691e13140faa07f9fb438085bc94b09",
+        "fixtures/delegation/worker.py": "ee6cfe8b7a040552863ac1fa07741e65f1ef264b49152c7e5f55db2521b776df",
+        "fixtures/self-evolution/hermes-agent/skills/github-code-review/SKILL.md": "7afb0ea3ea8312b1b5eb68770d1e5ef2c921b1f918826a4e8b787bd5e44b6a27",
+        "fixtures/self-evolution/isolation_probe.py": "c3bef46648bc131b8ecf61811685e50be5c15b4d349138557cdc16101ff9a9ab",
+        "scripts/delegate_skill.py": "3f6d1b454464c150fed4d19d83968799185f090b61152fd1cc9c65143ff85b22",
+        "scripts/self_evolution_spike.py": "b507ee9d91784730fcf718e5349108990065d99f42ff969d75680c88cae28686",
+        "src/audit/core.py": "36d53c9b489006bd2dc7d22e12fa959240fcc79587bea32d5b49c691288f82c6",
+        "src/delegation/context.py": "9652f0a9620283931ce62fc46ac339dab10300e98d460e40869e8c1519b5c02d",
+        "src/delegation/core.py": "7e552a30393360808614c48ad161630779afcd7303a96fb2f2f91c72769d9954",
+        "src/delegation/relay.py": "62e9dc705eb8225240b858803327992ed7fae20ce927a75f345a78c6897cd29f",
+        "src/delegation/sandbox.py": "b317b493953416c43c0c91469e00edaa17a6c8428f69c5a33861cdee00a4396f",
+        "src/evaluation/core.py": "71f2648fc05790f58a571571c9fafc42c121b4a6f6f1693dd5e5c2f0dcd53fdb",
+        "src/evaluation/sandbox.py": "d136d5d46e6bafa4939560595fe8ccd52958ea7363fd18a36ce29a29735f8cc5",
+        "src/self_evolution/sandbox.py": "ffdb480773bc331f24e425a91a966461ea56e2eac8f7b5f132081a14d28812a3"
+      },
+      "hashes": {
+        "runs/delegation-20261017T075042Z-09adcce18155/report.json": "545c2c6a5828bd3db8f681d82fce14dfb54abcd846996cf26a507d7b5815b602",
+        "runs/delegation-20261017T075042Z-09adcce18155/create.events.json": "4a399860e968b01c1f34f7d6d5a485c42afd9796c13f3df8306158b12af6987a",
+        "runs/context64-20261017T075039Z/service-report.json": "471989ffd7d02a7a5cedc8647549bc0246dfe264620faaa90aee2651ae46bb3e"
+      }
+    },
+    {
+      "actor_run": "delegation-20261017T075542Z-1d67052b5cca",
+      "service_run": "context64-20261017T075539Z",
+      "reason": "SKILL_WRITE_BOUNDARY",
+      "request_timeout_seconds": 180,
+      "child_started_observed": true,
+      "inference_attempts_this_trial": 6,
+      "cumulative_usage": {
+        "accounting": "RESERVED_ON_FAILURE",
+        "calls": 18,
+        "cost_usd": 0,
+        "input_tokens": 68518,
+        "output_tokens": 13200,
+        "records": [
+          {
+            "call": 13,
+            "input_tokens": 2836,
+            "output_tokens": 9
+          },
+          {
+            "call": 14,
+            "input_tokens": 2883,
+            "output_tokens": 6
+          },
+          {
+            "call": 15,
+            "input_tokens": 4180,
+            "output_tokens": 9
+          },
+          {
+            "call": 16,
+            "input_tokens": 4227,
+            "output_tokens": 325
+          },
+          {
+            "call": 17,
+            "input_tokens": 4879,
+            "output_tokens": 1
+          }
+        ],
+        "transport_failure": {
+          "elapsed_seconds": 26.191,
+          "reason": "SKILL_WRITE_BOUNDARY",
+          "stage": "completion"
+        },
+        "usage_observations": [
+          {
+            "preflight_input_tokens": 2836,
+            "reported_input_tokens": 2836,
+            "reported_output_tokens": 9
+          },
+          {
+            "preflight_input_tokens": 2883,
+            "reported_input_tokens": 2883,
+            "reported_output_tokens": 6
+          },
+          {
+            "preflight_input_tokens": 4180,
+            "reported_input_tokens": 4180,
+            "reported_output_tokens": 9
+          },
+          {
+            "preflight_input_tokens": 4227,
+            "reported_input_tokens": 4227,
+            "reported_output_tokens": 325
+          },
+          {
+            "preflight_input_tokens": 4879,
+            "reported_input_tokens": 4879,
+            "reported_output_tokens": 1
+          },
+          {
+            "preflight_input_tokens": 3288,
+            "reported_input_tokens": 3288,
+            "reported_output_tokens": 218
+          }
+        ]
+      },
+      "service_report": {
+        "baseline_resources": {
+          "memory_free_percent": 25,
+          "swap_mib": 4232.12
+        },
+        "controller_exit": 1,
+        "last_resources": {
+          "memory_free_percent": 31,
+          "swap_mib": 4176.12
+        },
+        "memory_saving": true,
+        "original_context": 32768,
+        "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+        "reason": "DELEGATION_STOPPED",
+        "restoration": "VERIFIED",
+        "status": "STOPPED",
+        "temporary_context": 65536,
+        "temporary_hash": "41f8f669acedbf0a90d861765ed0e178d7a6cf0a79653ccb15ea9171eeb6342e"
+      },
+      "control_hashes": {
+        "fixtures/audit/delegation.json": "838c4747e87b702e964594006b9c976cefb1ee343dcb730b86c536b750bc0f82",
+        "fixtures/delegation/prepare.py": "44e45b3a907012200a16d733c3391cdff691e13140faa07f9fb438085bc94b09",
+        "fixtures/delegation/worker.py": "9c6369d5006fc4538ddbfc59400111ab62d212ac8df9eda8dccef84fab358088",
+        "fixtures/self-evolution/hermes-agent/skills/github-code-review/SKILL.md": "7afb0ea3ea8312b1b5eb68770d1e5ef2c921b1f918826a4e8b787bd5e44b6a27",
+        "fixtures/self-evolution/isolation_probe.py": "c3bef46648bc131b8ecf61811685e50be5c15b4d349138557cdc16101ff9a9ab",
+        "scripts/delegate_skill.py": "3f6d1b454464c150fed4d19d83968799185f090b61152fd1cc9c65143ff85b22",
+        "scripts/self_evolution_spike.py": "b507ee9d91784730fcf718e5349108990065d99f42ff969d75680c88cae28686",
+        "src/audit/core.py": "36d53c9b489006bd2dc7d22e12fa959240fcc79587bea32d5b49c691288f82c6",
+        "src/delegation/context.py": "9652f0a9620283931ce62fc46ac339dab10300e98d460e40869e8c1519b5c02d",
+        "src/delegation/core.py": "7e552a30393360808614c48ad161630779afcd7303a96fb2f2f91c72769d9954",
+        "src/delegation/relay.py": "62e9dc705eb8225240b858803327992ed7fae20ce927a75f345a78c6897cd29f",
+        "src/delegation/sandbox.py": "b317b493953416c43c0c91469e00edaa17a6c8428f69c5a33861cdee00a4396f",
+        "src/evaluation/core.py": "71f2648fc05790f58a571571c9fafc42c121b4a6f6f1693dd5e5c2f0dcd53fdb",
+        "src/evaluation/sandbox.py": "d136d5d46e6bafa4939560595fe8ccd52958ea7363fd18a36ce29a29735f8cc5",
+        "src/self_evolution/sandbox.py": "ffdb480773bc331f24e425a91a966461ea56e2eac8f7b5f132081a14d28812a3"
+      },
+      "hashes": {
+        "runs/delegation-20261017T075542Z-1d67052b5cca/report.json": "b8a99ff612c5ab9afa18624efd75df7f94500efe665736e325755d5a37ae5610",
+        "runs/delegation-20261017T075542Z-1d67052b5cca/create.events.json": "4a399860e968b01c1f34f7d6d5a485c42afd9796c13f3df8306158b12af6987a",
+        "runs/context64-20261017T075539Z/service-report.json": "e7f755bd3c8ccc7f8ebd3e4b601c5adfbd9456dc3a4e885b24ec8b8fb63edc3a"
+      }
+    }
+  ],
+  "generated_candidate_exported": false,
+  "actual_skill_creation": "NOT_VERIFIED",
+  "reuse": "NOT_RUN",
+  "independent_evaluation": "NOT_RUN",
+  "synthetic_tool_contract_probe": {
+    "exit": 0,
+    "container_exit": 0,
+    "error": null,
+    "stdout": "{\"status\": \"VERIFIED\", \"scope\": \"synthetic standard tool contract only; no model-generated candidate\", \"create_success\": true, \"write_success\": true, \"files_verified\": true}\n",
+    "stderr_bytes": 0
+  },
+  "followup": "Exact standard tool argument examples now supplied to child; tested only through synthetic tool calls, not yet model-generated live trial. Default budget remains20; extended40 profile prepared but not activated."
+}

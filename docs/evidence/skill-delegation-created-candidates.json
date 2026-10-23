@@ -1,0 +1,127 @@
+{
+  "classification": "PUBLIC",
+  "risk_tier": "HIGH",
+  "status": "CREATED_NOT_QUALIFIED",
+  "candidate_created": true,
+  "public_tests": "FAILED",
+  "reuse": "NOT_RUN",
+  "independent_evaluation": "NOT_RUN",
+  "production_adoption": "NOT_REQUESTED",
+  "trials": [
+    {
+      "service_run": "context64-20261017T110211Z",
+      "actor_run": "delegation-20261017T110214Z-4d921e01caf2",
+      "status": "STOPPED",
+      "reason": "PUBLIC_UNIT_FAILED",
+      "real_child_completed": true,
+      "files_created": {
+        "SKILL.md": {
+          "bytes": 205,
+          "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+        },
+        "scripts/review.py": {
+          "bytes": 3772,
+          "sha256": "c4a7607eb80a42c2c73b1b227c3bfe123700143710f828cd815cbc1c770de791"
+        }
+      },
+      "public_tests": [
+        true,
+        true,
+        true,
+        false,
+        true,
+        false
+      ],
+      "public_pass_count": 4,
+      "service": {
+        "baseline_resources": {
+          "memory_free_percent": 30,
+          "swap_mib": 595.06
+        },
+        "compact_memory": false,
+        "controller_exit": 1,
+        "last_resources": {
+          "memory_free_percent": 33,
+          "swap_mib": 571.06
+        },
+        "memory_saving": true,
+        "original_context": 32768,
+        "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+        "reason": "DELEGATION_STOPPED",
+        "restoration": "VERIFIED",
+        "status": "STOPPED",
+        "temporary_context": 65536,
+        "temporary_hash": "41f8f669acedbf0a90d861765ed0e178d7a6cf0a79653ccb15ea9171eeb6342e"
+      },
+      "cumulative_usage": {
+        "calls": 66,
+        "input_tokens": 198171,
+        "output_tokens": 42969,
+        "accounting": "SETTLED"
+      },
+      "candidate_directory": "runs/delegation-20261017T110214Z-4d921e01caf2/candidate"
+    },
+    {
+      "service_run": "context64-20261017T110542Z",
+      "actor_run": "delegation-20261017T110544Z-96453489c2d9",
+      "status": "STOPPED",
+      "reason": "PUBLIC_UNIT_FAILED",
+      "real_child_completed": true,
+      "files_created": {
+        "SKILL.md": {
+          "bytes": 205,
+          "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+        },
+        "scripts/review.py": {
+          "bytes": 4410,
+          "sha256": "eb07e798b631c9119657c283819a5dd2e739d3df2bcfc2b7909bb557dd4798bb"
+        }
+      },
+      "public_tests": [
+        false,
+        false,
+        true,
+        true,
+        true,
+        false
+      ],
+      "public_pass_count": 3,
+      "service": {
+        "baseline_resources": {
+          "memory_free_percent": 26,
+          "swap_mib": 662.62
+        },
+        "compact_memory": false,
+        "controller_exit": 1,
+        "last_resources": {
+          "memory_free_percent": 35,
+          "swap_mib": 654.62
+        },
+        "memory_saving": true,
+        "original_context": 32768,
+        "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+        "reason": "DELEGATION_STOPPED",
+        "restoration": "VERIFIED",
+        "status": "STOPPED",
+        "temporary_context": 65536,
+        "temporary_hash": "41f8f669acedbf0a90d861765ed0e178d7a6cf0a79653ccb15ea9171eeb6342e"
+      },
+      "cumulative_usage": {
+        "calls": 74,
+        "input_tokens": 220722,
+        "output_tokens": 44813,
+        "accounting": "SETTLED"
+      },
+      "candidate_directory": "runs/delegation-20261017T110544Z-96453489c2d9/candidate"
+    }
+  ],
+  "changes_between_trials": "Added only PUBLIC comment/context-line failure feedback and diff/AST instructions; no hidden feedback.",
+  "conclusion": "Real parent/child generation now succeeds. Two generated candidates fail the fixed public contract. More waiting is not supported as a remedy by these results. No inference timeout or swap stop in either trial.",
+  "limitations": "No stable reusable skill or quality acceptance. Six calls remain unused of approved80.",
+  "latest_verification": {
+    "related_tests": 39,
+    "standard_tests": 30,
+    "security": "SECURITY_PASSED",
+    "dependency_scan": "NOT_APPLICABLE"
+  }
+}

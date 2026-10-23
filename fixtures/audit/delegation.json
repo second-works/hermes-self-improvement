@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "classification": "PUBLIC",
+  "source_kind": "synthetic-fixture",
+  "upstream_sha": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "baseline_sha": "10419e1a49b62b28c6862102c7f08d8c9d03f4b2",
+  "profile": "default",
+  "profiles": [
+    "default"
+  ],
+  "inventory_complete": true,
+  "skills": [],
+  "observations": [
+    {
+      "id": "patch-workflow-gap",
+      "capability": "patch-review-workflow",
+      "outcome": "failed",
+      "selected_skill": null,
+      "model_id": "model",
+      "tool_id": "tool",
+      "auth_id": "auth",
+      "delegation_id": "delegation",
+      "logs": [
+        {
+          "line": 1,
+          "code": "SEARCH_COMPLETE"
+        }
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "id": "tool",
+      "state": "ready",
+      "capabilities": [
+        "patch-review-workflow"
+      ]
+    }
+  ],
+  "models": [
+    {
+      "id": "model",
+      "state": "ready",
+      "capabilities": [
+        "patch-review-workflow"
+      ]
+    }
+  ],
+  "auth": [
+    {
+      "id": "auth",
+      "state": "ready",
+      "capabilities": [
+        "patch-review-workflow"
+      ]
+    }
+  ],
+  "delegation": [
+    {
+      "id": "delegation",
+      "state": "ready",
+      "capabilities": [
+        "patch-review-workflow"
+      ]
+    }
+  ],
+  "fixture_id": "delegation-skill-gap-v1",
+  "observed_at": "2026-10-16T00:00:00Z",
+  "issue_url": "https://github.com/second-works/hermes-self-improvement/issues/4"
+}

@@ -1,0 +1,153 @@
+{
+  "acceptance": "BLOCKED",
+  "adoption": "NOT_REQUESTED",
+  "boot_sha256": "a034163444d1d2fd3fa920bc4998bf36d36770c32f4c9896fc72ac8649a35437",
+  "candidate_commit_sha": null,
+  "classification": "PUBLIC",
+  "context": {
+    "hermes_minimum_tokens": 64000,
+    "model_id": "gemma-4-e4b",
+    "runtime_tokens": 32768
+  },
+  "control_hashes": {
+    "fixtures/audit/delegation.json": "838c4747e87b702e964594006b9c976cefb1ee343dcb730b86c536b750bc0f82",
+    "fixtures/delegation/prepare.py": "44e45b3a907012200a16d733c3391cdff691e13140faa07f9fb438085bc94b09",
+    "fixtures/delegation/worker.py": "117155a43147f8dfca6fe90789dc0d0e0d56b2f7f8bffb89272fb5fd30d95f29",
+    "fixtures/self-evolution/hermes-agent/skills/github-code-review/SKILL.md": "7afb0ea3ea8312b1b5eb68770d1e5ef2c921b1f918826a4e8b787bd5e44b6a27",
+    "fixtures/self-evolution/isolation_probe.py": "c3bef46648bc131b8ecf61811685e50be5c15b4d349138557cdc16101ff9a9ab",
+    "scripts/delegate_skill.py": "e3e2b10c0a550e032c704efb486957159d85e381a0c11d7caf6643907b02e3ae",
+    "scripts/self_evolution_spike.py": "b507ee9d91784730fcf718e5349108990065d99f42ff969d75680c88cae28686",
+    "src/audit/core.py": "36d53c9b489006bd2dc7d22e12fa959240fcc79587bea32d5b49c691288f82c6",
+    "src/delegation/core.py": "21a032e0fd26f8b1d28e0db3eaa3ecd54b21fa48fe269afea317b12aa25d8004",
+    "src/delegation/relay.py": "23fa98100404a8525acf71e921bf4a774525cec0aa604d122101ed9f383de17f",
+    "src/delegation/sandbox.py": "0d0de085075071bc283ce3197607f90c376e3c5f4940ec551fe9e2f00bf043e5",
+    "src/evaluation/core.py": "71f2648fc05790f58a571571c9fafc42c121b4a6f6f1693dd5e5c2f0dcd53fdb",
+    "src/evaluation/sandbox.py": "d136d5d46e6bafa4939560595fe8ccd52958ea7363fd18a36ce29a29735f8cc5",
+    "src/self_evolution/sandbox.py": "ffdb480773bc331f24e425a91a966461ea56e2eac8f7b5f132081a14d28812a3"
+  },
+  "dependency_wheel_bytes": 20067723,
+  "dependency_wheels": 54,
+  "environment": {
+    "Architecture": "aarch64",
+    "CgroupVersion": "2",
+    "KernelVersion": "7.0.14-linuxkit",
+    "MemTotal": 6210043904,
+    "NCPU": 8,
+    "ServerVersion": "29.8.2"
+  },
+  "evaluation": "NOT_RUN",
+  "gate": {
+    "boundaries": {
+      "checks": [
+        "canary_unmounted",
+        "capabilities",
+        "cpu_quota",
+        "deps_readonly",
+        "env",
+        "fixture_readonly",
+        "hidden_unmounted",
+        "lock_readonly",
+        "memory_limit",
+        "network_denied",
+        "no_new_privileges",
+        "no_shared_memory",
+        "non_root",
+        "pids_limit",
+        "root_readonly",
+        "seccomp",
+        "skill_readonly",
+        "socket_unmounted",
+        "source_readonly",
+        "swap_limit",
+        "tmpfs_size",
+        "work_writable"
+      ],
+      "python": "3.12.15",
+      "status": "VERIFIED"
+    },
+    "cpu": {
+      "checks": [
+        "cpu_throttled"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "disk": {
+      "checks": [
+        "disk_denied"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "memory": {
+      "checks": [
+        "memory_denied"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "output": {
+      "probe_started": true,
+      "reason": "OUTPUT_LIMIT",
+      "status": "VERIFIED"
+    },
+    "pids": {
+      "checks": [
+        "pids_denied"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "timeout": {
+      "probe_started": true,
+      "reason": "TIMEOUT",
+      "status": "VERIFIED"
+    }
+  },
+  "image": {
+    "architecture": "arm64",
+    "bytes": 156922204,
+    "id": "sha256:eb7d16fec874f15b584063275012ac719885a2b87574d124c0da9c156d504629",
+    "os": "linux",
+    "repo_digests": [
+      "python@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258"
+    ]
+  },
+  "implementation_status": "IN_PROGRESS",
+  "issue": 7,
+  "local_verification": {
+    "audit_tests": 15,
+    "delegation_tests": 18,
+    "dependency_audit": "SECURITY_NOT_APPLICABLE",
+    "evaluation_tests": 34,
+    "remote_checks": "NOT_RUN",
+    "security": "SECURITY_PASSED",
+    "spike_regression_tests": 14,
+    "standard_setup_tests": 30
+  },
+  "model_usage": {
+    "calls": 0,
+    "cost_usd": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "records": []
+  },
+  "not_verified": [
+    "Hermes agent initialization at the actual context",
+    "real parent/child delegation",
+    "candidate generation",
+    "candidate unit tests",
+    "new-session skill reuse",
+    "handoff to independent evaluation"
+  ],
+  "production_changes": false,
+  "reason": "RUNTIME_CONTEXT_UNSUPPORTED",
+  "report_sha256": "b90051d7fead5c6fcfbf562da0e8bc21c672f75566124662e18fa821686dd2c0",
+  "requirements_lock_sha256": "d5c583b9b2c8c07b6ef0479effd42149652f62688f32afc21b4ebb76c96d71c3",
+  "run_id": "delegation-20261016T092509Z-0c0fa7364d0f",
+  "schema_version": 1,
+  "source_bytes": 49893579,
+  "source_files": 2384,
+  "status": "STOPPED",
+  "upstream_sha": "74e7a25c949625479487c009a2fd64d14d5b5c06"
+}

@@ -1,0 +1,106 @@
+{
+  "classification": "PUBLIC",
+  "risk_tier": "HIGH",
+  "status": "NO_PATCH_ACCEPTED",
+  "source_mode": "Verified complete numbered source supplied directly; no model tools and no skill_view prerequisite.",
+  "max_proposals": 2,
+  "attempts": [
+    {
+      "service_run": "context64-20261017T114952Z",
+      "actor_run": "delegation-20261017T114954Z-d206405b3dd6",
+      "reason": "PATCH_REJECTED",
+      "worker_result": {
+        "api_calls": 1,
+        "final": "{\"insertions\":[{\"after_line\":34,\"text\":\"                # Ignore Python comments\\n                continue\"},{\"after_line\":38,\"text\":\"                # Ignore Python comments\\n                continue\"}\n]",
+        "kind": "result",
+        "source_sha256": "1804f0badf98b154e4793d8e3a86ed10733fa2073a609f7a19d7d8247ac20d3c",
+        "status": "VERIFIED"
+      },
+      "source_hash_verified": true,
+      "service": {
+        "baseline_resources": {
+          "memory_free_percent": 34,
+          "swap_mib": 1213.5
+        },
+        "compact_memory": false,
+        "controller_exit": 1,
+        "last_resources": {
+          "memory_free_percent": 40,
+          "swap_mib": 1213.5
+        },
+        "memory_saving": true,
+        "original_context": 32768,
+        "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+        "reason": "DELEGATION_STOPPED",
+        "restoration": "VERIFIED",
+        "status": "STOPPED",
+        "temporary_context": 65536,
+        "temporary_hash": "41f8f669acedbf0a90d861765ed0e178d7a6cf0a79653ccb15ea9171eeb6342e"
+      },
+      "cumulative_usage": {
+        "calls": 85,
+        "input_tokens": 257487,
+        "output_tokens": 46621,
+        "accounting": "SETTLED"
+      }
+    },
+    {
+      "service_run": "context64-20261017T115123Z",
+      "actor_run": "delegation-20261017T115125Z-d511b76def2e",
+      "reason": "PATCH_REJECTED",
+      "worker_result": {
+        "api_calls": 1,
+        "final": "```json\n{\"insertions\": [{\"after_line\": 34, \"text\": \"                current_line_num += 1\\n\"}, {\"after_line\": 52, \"text\": \"                current_line_num += 1\\n\"}]}\n```",
+        "kind": "result",
+        "source_sha256": "1804f0badf98b154e4793d8e3a86ed10733fa2073a609f7a19d7d8247ac20d3c",
+        "status": "VERIFIED"
+      },
+      "source_hash_verified": true,
+      "service": {
+        "baseline_resources": {
+          "memory_free_percent": 30,
+          "swap_mib": 1213.5
+        },
+        "compact_memory": false,
+        "controller_exit": 1,
+        "last_resources": {
+          "memory_free_percent": 39,
+          "swap_mib": 1213.5
+        },
+        "memory_saving": true,
+        "original_context": 32768,
+        "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+        "reason": "DELEGATION_STOPPED",
+        "restoration": "VERIFIED",
+        "status": "STOPPED",
+        "temporary_context": 65536,
+        "temporary_hash": "41f8f669acedbf0a90d861765ed0e178d7a6cf0a79653ccb15ea9171eeb6342e"
+      },
+      "cumulative_usage": {
+        "calls": 86,
+        "input_tokens": 260376,
+        "output_tokens": 46682,
+        "accounting": "SETTLED"
+      }
+    }
+  ],
+  "applied_patches": 0,
+  "first_failure": "Missing final JSON object brace; proposed comment/continue insertions rather than counter updates.",
+  "second_failure": "Markdown code fence violates JSON-only output. Offline inspection without fences still rejects the second insertion at after_line52 as outside scope. No normalization or scope relaxation used for actual application.",
+  "allowed_anchors": {
+    "29": "Context-line branch before original line30 addition branch.",
+    "34": "Counter increment after original line34 comment check."
+  },
+  "original_best_candidate": "runs/delegation-20261017T112524Z-cdfed6305bab/repair-candidate-1",
+  "original_candidate_public_tests": "5/6 original, 5/9 expanded",
+  "reuse": "NOT_RUN",
+  "independent_evaluation": "NOT_RUN",
+  "production_adoption": "NOT_REQUESTED",
+  "latest_verification": {
+    "related_tests": 46,
+    "standard_tests": 30,
+    "security": "SECURITY_PASSED",
+    "dependencies": "NOT_APPLICABLE"
+  },
+  "conclusion": "The prior read-evidence condition no longer blocks proposal evaluation. Both actual model proposals fail output/scope constraints. Best candidate remains unchanged; maximum2 proposals reached, stopped with86 of88 calls used."
+}

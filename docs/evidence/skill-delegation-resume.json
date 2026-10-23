@@ -1,0 +1,90 @@
+{
+  "classification": "PUBLIC",
+  "status": "INCOMPLETE",
+  "candidate_complete": false,
+  "reuse": "NOT_RUN",
+  "evaluation": "NOT_RUN",
+  "trials": [
+    {
+      "service_run": "context64-20261017T080339Z",
+      "actor_run": "delegation-20261017T080343Z-b460cb776f59",
+      "service_status": "STOPPED",
+      "service_reason": "DELEGATION_STOPPED",
+      "restoration": "VERIFIED",
+      "baseline_resources": {
+        "memory_free_percent": 25,
+        "swap_mib": 5105.12
+      },
+      "last_resources": {
+        "memory_free_percent": 32,
+        "swap_mib": 4873.12
+      },
+      "actor_reason": "CHILD_LIMIT",
+      "cumulative_usage": {
+        "calls": 24,
+        "input_tokens": 93064,
+        "output_tokens": 18226
+      },
+      "accounting": "RESERVED_ON_FAILURE"
+    },
+    {
+      "service_run": "context64-20261017T080958Z",
+      "actor_run": "delegation-20261017T081001Z-9312c021ebc6",
+      "service_status": "STOPPED",
+      "service_reason": "SWAP_GROWTH",
+      "restoration": "VERIFIED",
+      "baseline_resources": {
+        "memory_free_percent": 24,
+        "swap_mib": 4536.81
+      },
+      "last_resources": {
+        "memory_free_percent": 18,
+        "swap_mib": 4579.31
+      },
+      "actor_reason": "OPERATOR_STOP",
+      "cumulative_usage": {
+        "calls": 32,
+        "input_tokens": 113839,
+        "output_tokens": 22839
+      },
+      "accounting": "RESERVED_ON_FAILURE"
+    },
+    {
+      "service_run": "context64-20261017T091456Z",
+      "actor_run": "delegation-20261017T091504Z-5bf1fbfe5609",
+      "service_status": "STOPPED",
+      "service_reason": "SWAP_GROWTH",
+      "restoration": "VERIFIED",
+      "baseline_resources": {
+        "memory_free_percent": 60,
+        "swap_mib": 3598.81
+      },
+      "last_resources": {
+        "memory_free_percent": 20,
+        "swap_mib": 3748.56
+      },
+      "actor_reason": "OPERATOR_STOP",
+      "cumulative_usage": {
+        "calls": 35,
+        "input_tokens": 120385,
+        "output_tokens": 26949
+      },
+      "accounting": "RESERVED_ON_FAILURE"
+    }
+  ],
+  "usage_note": "Counters are cumulative, not additive. Failed requests retain worst-case output reservations.",
+  "pending_proposal": "runs/context64-memory-plan2-20261017/proposal.json",
+  "proposal_executed": false,
+  "restoration_live_check": {
+    "installed_plist_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+    "ports_8081_8082_health": "ok",
+    "context": 32768
+  },
+  "verification": {
+    "delegation_tests": 37,
+    "standard_tests": 30,
+    "security": "SECURITY_PASSED",
+    "dependencies": "NOT_APPLICABLE",
+    "typecheck_build": "SKIPPED: existing scripts not executable"
+  }
+}

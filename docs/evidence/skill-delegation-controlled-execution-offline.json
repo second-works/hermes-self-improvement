@@ -1,0 +1,203 @@
+{
+  "classification": "PUBLIC",
+  "risk_tier": "HIGH",
+  "run": "runs/cycle-offline-20261017T142826Z-caad8604",
+  "mode": "CONTROLLER_REHEARSAL_NO_MODEL",
+  "report": {
+    "adoption": "NOT_REQUESTED",
+    "baseline": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ],
+    "classification": "PUBLIC",
+    "decision": "ACCEPTED",
+    "environment": {
+      "Architecture": "aarch64",
+      "CgroupVersion": "2",
+      "KernelVersion": "7.0.14-linuxkit",
+      "MemTotal": 6210043904,
+      "NCPU": 8,
+      "ServerVersion": "29.8.2"
+    },
+    "execution_checks": [
+      true,
+      true
+    ],
+    "execution_result_owner": "controller_from_actual_script_stdout",
+    "gates": {
+      "boundaries": {
+        "checks": [
+          "canary_unmounted",
+          "capabilities",
+          "cpu_quota",
+          "deps_readonly",
+          "env",
+          "fixture_readonly",
+          "hidden_unmounted",
+          "lock_readonly",
+          "memory_limit",
+          "network_denied",
+          "no_new_privileges",
+          "no_shared_memory",
+          "non_root",
+          "pids_limit",
+          "root_readonly",
+          "seccomp",
+          "skill_readonly",
+          "socket_unmounted",
+          "source_readonly",
+          "swap_limit",
+          "tmpfs_size",
+          "work_writable"
+        ],
+        "python": "3.12.15",
+        "status": "VERIFIED"
+      },
+      "cpu": {
+        "checks": [
+          "cpu_throttled"
+        ],
+        "python": null,
+        "status": "VERIFIED"
+      },
+      "disk": {
+        "checks": [
+          "disk_denied"
+        ],
+        "python": null,
+        "status": "VERIFIED"
+      },
+      "memory": {
+        "checks": [
+          "memory_denied"
+        ],
+        "python": null,
+        "status": "VERIFIED"
+      },
+      "output": {
+        "probe_started": true,
+        "reason": "OUTPUT_LIMIT",
+        "status": "VERIFIED"
+      },
+      "pids": {
+        "checks": [
+          "pids_denied"
+        ],
+        "python": null,
+        "status": "VERIFIED"
+      },
+      "timeout": {
+        "probe_started": true,
+        "reason": "TIMEOUT",
+        "status": "VERIFIED"
+      }
+    },
+    "image": {
+      "architecture": "arm64",
+      "bytes": 156922204,
+      "id": "sha256:eb7d16fec874f15b584063275012ac719885a2b87574d124c0da9c156d504629",
+      "os": "linux",
+      "repo_digests": [
+        "python@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258"
+      ]
+    },
+    "improved": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "limitation": "Trusted operation replay, not a new Gemma judgment or sealed independent evaluation.",
+    "mode": "CONTROLLER_REHEARSAL",
+    "model_calls": 0,
+    "public_cases": 9,
+    "regression": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ],
+    "regression_decision": "REJECTED_REGRESSION",
+    "retained_hashes": {
+      "SKILL.md": {
+        "bytes": 205,
+        "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+      },
+      "scripts/review.py": {
+        "bytes": 2594,
+        "sha256": "85f3aee699f9821646ae1787ae1fbc20ebd3a687442b66a282a85725c0f95262"
+      }
+    },
+    "risk_tier": "HIGH",
+    "source_hashes": {
+      "SKILL.md": {
+        "bytes": 205,
+        "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+      },
+      "scripts/review.py": {
+        "bytes": 2487,
+        "sha256": "1804f0badf98b154e4793d8e3a86ed10733fa2073a609f7a19d7d8247ac20d3c"
+      }
+    },
+    "status": "VERIFIED",
+    "transfer_cases": 6
+  },
+  "execution_results": [
+    {
+      "cpu_seconds": 0,
+      "findings": [
+        {
+          "line": 23,
+          "path": "case_cyclereuse00.py",
+          "rule": "dynamic-eval"
+        }
+      ]
+    },
+    {
+      "cpu_seconds": 0,
+      "findings": [
+        {
+          "line": 62,
+          "path": "case_batchshell01.py",
+          "rule": "shell-execution"
+        }
+      ]
+    }
+  ],
+  "limitations": "Trusted operation replay and fixed public inputs; live Gemma selection for this combined execution flow is not yet run."
+}

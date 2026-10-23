@@ -179,6 +179,14 @@ class RealIssueGuidanceTests(unittest.TestCase):
         self.assertIn('issue:7', report)
         self.assertNotIn('<script', report)
 
+    def test_report_shows_done_counts(self):
+        # The quoted Done excerpt may be truncated, so the count must appear on its own line.
+        report = markdown(self.snap, diff(self.snap), self.plan)
+        section = report.split('## issue:18 ')[1].split('\n## ')[0]
+        self.assertIn('- 完了条件: L9 0/5チェック', section)
+        section = report.split('## issue:7 ')[1].split('\n## ')[0]
+        self.assertIn('- 完了条件: L11 チェック項目なし、L34 6/6チェック', section)
+
     def test_repository_metadata_only_is_not_a_work_change(self):
         moved = copy.deepcopy(self.rows)
         for raw in moved:

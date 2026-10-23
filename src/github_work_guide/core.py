@@ -586,6 +586,10 @@ def markdown(snapshot, changes, plan=None, result=None):
             lines += ['', f'## {key} — {c["label"]}', '',
                       f'- 現在: {s["state"]} / 最終更新 {s["updated_at"] or "不明"} / コメント{s["comments"]}件',
                       '- 認識した欄: ' + ('、'.join(f'{x["name"]}(L{x["line"]})' for x in c['sections']) or 'なし')]
+            if c['done']:
+                lines.append('- 完了条件: ' + '、'.join(
+                    f'L{d["line"]} ' + (f'{d["checked"]}/{d["total"]}チェック' if d['total'] else 'チェック項目なし')
+                    for d in c['done']))
             if c['other_headings']:
                 lines.append('- 判断に使っていない見出し: ' + '、'.join(f'L{x["line"]}' for x in c['other_headings']))
             grouped = {}

@@ -243,7 +243,9 @@ def build_plan(snapshot, priority=()):
             nums, unknown = dependencies(item)
             if unknown:
                 reasons.append(unknown)
-            if len(re.findall(r'^#+\s+Goal\s*$', item['body'], re.M | re.I)) != 1:
+            goals = re.findall(r'^#+[ \t]+Goal[ \t]*\r?\n(.*?)(?=^#+[ \t]|\Z)',
+                               item['body'], re.M | re.S | re.I)
+            if len(goals) != 1 or not goals[0].strip():
                 reasons.append('現行Goalを一意に確認できない')
             if any(re.search(r'Goal|目標|方針', c.get('body') or '', re.I) for c in item['raw']['comments']):
                 reasons.append('コメントのGoal/方針変更は人の確認が必要')

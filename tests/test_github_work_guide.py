@@ -215,6 +215,15 @@ class PlanTests(unittest.TestCase):
             with self.assertRaises(Invalid):
                 validate_plan(snap, plan)
 
+    def test_empty_or_whitespace_goal_is_blocked(self):
+        for content in ('', '   ', '\n\n', '\t\n   '):
+            value = item(7)
+            body(value, f'# Goal\n{content}\n# Dependencies\nnone')
+            snap = snapshot(value)
+            plan = build_plan(snap)
+            self.assertEqual(plan['candidates']['issue:7']['kind'], 'scope')
+            self.assertEqual(recheck(snap, plan, 'issue:7', snap)['status'], 'BLOCKED')
+
     def test_unknown_cyclic_dependencies_and_goal_conflict(self):
         a, b = item(7), item(8)
         body(a, '# Goal\nx\n# Dependencies\n- depends-on: #8')

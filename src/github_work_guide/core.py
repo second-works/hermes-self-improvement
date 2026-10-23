@@ -317,6 +317,8 @@ def analyze(key, item, a):
 
     for c_text in a.texts[key][1:]:
         for i, line in enumerate(c_text.lines):
+            if i in c_text.fenced:
+                continue
             m = re.search(r'Goal|目標|方針', line, re.I)
             if m:
                 holds.append(hold('comment_change', 'semantic', 'コメントのGoal/方針変更は人の確認が必要',

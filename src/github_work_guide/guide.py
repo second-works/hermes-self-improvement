@@ -23,7 +23,7 @@ NONE_WORDS = {'none', 'なし', '依存なし', 'n/a'}
 QUOTE_LIMIT = 300
 NAME_SCORE = 0.3  # share of a dependency term's tokens found in an Issue title; a hint, never a decision
 
-FENCE = re.compile(r'^\s{0,3}(```|~~~)')
+FENCE = re.compile(r'^ {0,3}(`{3,}|~{3,})(.*)$')
 HEADING = re.compile(r'^\s{0,3}(#{1,6})[ \t]+(.*?)[ \t#]*$')
 LABEL = re.compile(r'^\s*(?:[-*]\s+)?(依存|dependencies|depends on)\s*[:：]\s*(.*?)\s*$', re.I)
 URL = re.compile(r'https://github\.com/([\w.-]+/[\w.-]+)(?:/(issues|pull)/(\d+))?[A-Za-z0-9_./%#?=&+~:@!$,;-]*')
@@ -54,14 +54,17 @@ class Text:
             self.offsets.append(pos)
             pos += len(line) + 1
         self.headings, self.fenced = [], set()
-        fence = False
+        fence = None  # opening marker; a block closes only with the same character, at least as long, and nothing after
         for i, line in enumerate(self.lines):
-            if FENCE.match(line):
-                fence = not fence
+            m = FENCE.match(line.rstrip('\r'))
+            if fence is None and m and not (m.group(1)[0] == '`' and '`' in m.group(2)):
+                fence = m.group(1)
                 self.fenced.add(i)
                 continue
-            if fence:
+            if fence is not None:
                 self.fenced.add(i)
+                if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and not m.group(2).strip():
+                    fence = None
                 continue
             m = HEADING.match(line.rstrip('\r'))
             if m:

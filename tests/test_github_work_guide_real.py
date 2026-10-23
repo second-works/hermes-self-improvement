@@ -284,5 +284,28 @@ class RealIssueGuidanceTests(unittest.TestCase):
                         '## 目的\n')
         self.assertIn('goal_empty', codes(c))
 
+    def test_nested_fences_close_only_with_matching_marker(self):
+        from github_work_guide.guide import Text
+        body = ('## Goal\nReal goal\n\n````md\n## Goal\n```sh\nexample\n```\n## Goal\n````\n'
+                '~~~\n```\n## Goal\n~~~\n```\n## Goal\n```` \n## Scope\nx')
+        self.assertEqual([h[2] for h in Text('issue:1', 'body', body).headings], ['Goal', 'Scope'])
+        # An unclosed fence runs to the end of the text, as in Markdown.
+        self.assertEqual([h[2] for h in Text('issue:1', 'body', '## Goal\n```\n## Goal').headings], ['Goal'])
+        c = self.edited(8, '## 作業\n', '````md\n## 目的\n```sh\nx\n```\n## 目的\n````\n\n## 作業\n')
+        self.assertNotIn('goal_multiple', codes(c))
+
+    def test_comment_goal_inside_code_block_is_not_a_change(self):
+        def with_comment(text):
+            rows = copy.deepcopy(self.rows)
+            four = next(r for r in rows if 'checks' not in r and r['detail']['number'] == 4)
+            raw = next(r for r in rows if 'checks' not in r and r['detail']['number'] == 8)
+            comment = copy.deepcopy(four['comments'][0])
+            comment['body'] = text
+            raw['comments'] = [comment]
+            raw['detail']['comments'] = 1
+            return build_plan(snapshot(rows))['candidates']['issue:8']
+        self.assertNotIn('comment_change', codes(with_comment('例:\n```md\n## Goal\n```\n')))
+        self.assertIn('comment_change', codes(with_comment('Goalを変更します。')))
+
 if __name__ == '__main__':
     unittest.main()

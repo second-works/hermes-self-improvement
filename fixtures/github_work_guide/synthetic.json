@@ -1,0 +1,151 @@
+{
+  "version": 1,
+  "repo": "second-works/hermes-self-improvement",
+  "classification": "PUBLIC",
+  "captured_at": "2026-10-23T04:25:01.040871+00:00",
+  "coverage": {
+    "status": "COMPLETE",
+    "errors": [],
+    "calls": 1,
+    "limits": {
+      "pages": 10,
+      "items": 5000,
+      "calls": 500,
+      "seconds": 180
+    },
+    "connections": [
+      {
+        "route": "repos/second-works/hermes-self-improvement/issues",
+        "complete": true
+      }
+    ]
+  },
+  "items": {
+    "issue:8": {
+      "kind": "issue",
+      "number": 8,
+      "state": "OPEN",
+      "title": "Synthetic 8",
+      "body": "# Goal\n合成課題\n# Dependencies\nnone",
+      "url": "https://github.com/second-works/hermes-self-improvement/issues/8",
+      "raw": {
+        "detail": {
+          "number": 8,
+          "state": "open",
+          "title": "Synthetic 8",
+          "body": "# Goal\n合成課題\n# Dependencies\nnone",
+          "html_url": "https://github.com/second-works/hermes-self-improvement/issues/8",
+          "comments": 0,
+          "updated_at": "2026-10-23T00:00:00Z"
+        },
+        "comments": []
+      },
+      "hash": "5a7430cc74d8975e1e97dc70e429df2f377a9e388479f7eabee7221c356c261a"
+    },
+    "issue:9": {
+      "kind": "issue",
+      "number": 9,
+      "state": "OPEN",
+      "title": "Synthetic 9",
+      "body": "# Goal\n合成の依存関係\n# Dependencies\n- depends-on: #8",
+      "url": "https://github.com/second-works/hermes-self-improvement/issues/9",
+      "raw": {
+        "detail": {
+          "number": 9,
+          "state": "open",
+          "title": "Synthetic 9",
+          "body": "# Goal\n合成の依存関係\n# Dependencies\n- depends-on: #8",
+          "html_url": "https://github.com/second-works/hermes-self-improvement/issues/9",
+          "comments": 0,
+          "updated_at": "2026-10-23T00:00:00Z"
+        },
+        "comments": []
+      },
+      "hash": "632c728c0089ab0fc9473248e5a735f783e53a907944edd26a27c29e0b8aafa8"
+    },
+    "issue:7": {
+      "kind": "issue",
+      "number": 7,
+      "state": "OPEN",
+      "title": "Synthetic 7",
+      "body": "# Goal\n合成課題\n# Dependencies\nnone",
+      "url": "https://github.com/second-works/hermes-self-improvement/issues/7",
+      "raw": {
+        "detail": {
+          "number": 7,
+          "state": "open",
+          "title": "Synthetic 7",
+          "body": "# Goal\n合成課題\n# Dependencies\nnone",
+          "html_url": "https://github.com/second-works/hermes-self-improvement/issues/7",
+          "comments": 0,
+          "updated_at": "2026-10-23T00:00:00Z"
+        },
+        "comments": []
+      },
+      "hash": "c614718a5000bac557e6bbfe6b4a3173038dc0c64ae84360b03fff7b381b5ee5"
+    },
+    "pr:25": {
+      "kind": "pr",
+      "number": 25,
+      "state": "OPEN",
+      "title": "Synthetic 25",
+      "body": "# Goal\n合成課題\n# Dependencies\nnone",
+      "url": "https://github.com/second-works/hermes-self-improvement/pull/25",
+      "raw": {
+        "detail": {
+          "number": 25,
+          "state": "open",
+          "title": "Synthetic 25",
+          "body": "# Goal\n合成課題\n# Dependencies\nnone",
+          "html_url": "https://github.com/second-works/hermes-self-improvement/pull/25",
+          "comments": 0,
+          "updated_at": "2026-10-23T00:00:00Z",
+          "merged": false,
+          "head": {
+            "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "comments": [],
+        "checks": [
+          {
+            "id": 1,
+            "name": "ci",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 2,
+            "name": "Security Preflight",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "id": 3,
+            "name": "Analyze (python)",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ],
+        "statuses": [],
+        "reviews": [
+          {
+            "id": 1,
+            "state": "COMMENTED",
+            "commit_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "user": {
+              "login": "chatgpt-codex-connector[bot]"
+            }
+          }
+        ],
+        "threads": [],
+        "closing": [],
+        "review_comments": []
+      },
+      "hash": "b8f251c685c908a91aac678fa931b08e5446bbe8ff165a9e3bc4bfeb4c32f6e4"
+    }
+  },
+  "hash": "c8e082a093419b89b089ea1d4e48cc16542e562c5ddf66d3df8042207ad5a5b6"
+}

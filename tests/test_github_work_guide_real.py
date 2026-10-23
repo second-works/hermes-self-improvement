@@ -265,5 +265,24 @@ class RealIssueGuidanceTests(unittest.TestCase):
         self.assertEqual([(d['checked'], d['total']) for d in c['done']], [(0, 5)])
 
 
+    def test_done_counts_include_subheadings(self):
+        old = '- [ ] Evidence of verification and remaining limitations included in PR\n'
+        c = self.edited(18, old, old + '### Backend\n- [x] Sub item done\n### Tests\n- [ ] Sub item open\n')
+        self.assertEqual([(d['checked'], d['total']) for d in c['done']], [(1, 7)])
+        # A named section nested under Done (e.g. ### Verification) is not a completion condition.
+        c = self.edited(18, old, old + '### Verification\n- [x] Ran tests\n')
+        self.assertEqual([(d['checked'], d['total']) for d in c['done']], [(0, 5)])
+        # A Done heading made only of subheadings counts their items instead of reporting none.
+        c = self.edited(8, '## 完了条件\n評価済み候補がPRとして出され、人間の承認で採用でき、想定した問題に対してロールバックできる。\n',
+                        '## 完了条件\n### Backend\n- [ ] One\n### Tests\n- [x] Two\n')
+        self.assertEqual([(d['checked'], d['total']) for d in c['done']], [(1, 2)])
+
+    def test_goal_with_only_subheadings_is_not_empty(self):
+        c = self.edited(8, '## 目的\nHermesが作成した変更', '## 目的\n### 管理\nHermesが作成した変更')
+        self.assertNotIn('goal_empty', codes(c))
+        c = self.edited(8, '## 目的\nHermesが作成した変更をGitHub上の追跡可能なIssue/PRとして管理し、安全に適用・復旧する。\n',
+                        '## 目的\n')
+        self.assertIn('goal_empty', codes(c))
+
 if __name__ == '__main__':
     unittest.main()

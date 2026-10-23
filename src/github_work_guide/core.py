@@ -276,7 +276,7 @@ def analyze(key, item, a):
                           f'{key} の各目的欄（' + '、'.join(f'L{s["line"] + 1}' for s in goals) + '）と、上位の見出し',
                           'どの欄が現行の目的か。後の欄は前の欄を置き換えるか。',
                           '現行の目的を1つに決め、本文に反映するか人の判断として記録する。'))
-    elif not goals[0]['content']:
+    elif not guide.subtree_content(body, goals[0]):
         holds.append(hold('goal_empty', 'format', '目的/Goal欄が空', [section_excerpt(goals[0], 2)],
                           f'{key} L{goals[0]["line"] + 1} の目的欄', 'このIssueで達成することは何か。',
                           '目的/Goal欄に内容を書く、または目的を人が判断して記録する。'))

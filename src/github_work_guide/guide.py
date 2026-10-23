@@ -195,9 +195,22 @@ def dependency_value(value):
     return None, [t for t in terms if t]
 
 
+def subtree_end(text, section):
+    """End of a section including its plain subheadings (### Backend); another named section ends it."""
+    level = next(lv for line, lv, _ in text.headings if line == section['line'])
+    for line, lv, heading in text.headings:
+        if line > section['line'] and (lv <= level or canonical(heading) is not None):
+            return line
+    return len(text.lines)
+
+
+def subtree_content(text, section):
+    return '\n'.join(text.lines[section['line'] + 1:subtree_end(text, section)]).strip()
+
+
 def done_counts(text, section):
     start = section['line'] + 1
-    marks = [CHECKBOX.match(line) for i, line in enumerate(text.lines[start:section['end']], start)
+    marks = [CHECKBOX.match(line) for i, line in enumerate(text.lines[start:subtree_end(text, section)], start)
              if i not in text.fenced]  # checklist examples in code blocks are not conditions
     marks = [m.group(1) for m in marks if m]
     return sum(m in 'xX' for m in marks), len(marks)

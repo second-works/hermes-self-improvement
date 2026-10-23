@@ -524,7 +524,9 @@ class RuntimeBoundaryTests(unittest.TestCase):
             for name in ('source', 'packages/site'):
                 (prep / name).mkdir(parents=True)
             (prep / 'requirements.lock').write_text('# test')
-            box = DelegationSandbox(ROOT, work, 'sha256:' + 'a' * 64, preparation=prep)
+            # This test inspects options only; it must not depend on installed Docker.
+            with patch('evaluation.sandbox.shutil.which', return_value=sys.executable):
+                box = DelegationSandbox(ROOT, work, 'sha256:' + 'a' * 64, preparation=prep)
             args = box.options('synthetic', ROOT / 'fixtures/delegation/worker.py')
             self.assertIn('--network=none', args)
             self.assertTrue(all(not writable for _, _, writable in box.mounts(ROOT / 'fixtures/delegation/worker.py')))

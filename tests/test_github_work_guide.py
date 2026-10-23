@@ -255,6 +255,16 @@ class PlanTests(unittest.TestCase):
             mutate(value['raw'])
             self.assertTrue(gate(value))
 
+    def test_success_cannot_hide_failed_status_or_other_provider(self):
+        pr = item(25, True)
+        pr['raw']['statuses'] = [{'id': 100, 'context': 'ci', 'state': 'failure'}]
+        self.assertTrue(gate(pr))
+        pr['raw']['statuses'] = []
+        pr['raw']['checks'][0].update(app={'id': 1}, conclusion='failure')
+        pr['raw']['checks'].append({'id': 900, 'app': {'id': 2}, 'name': 'ci', 'head_sha': SHA,
+                                   'status': 'completed', 'conclusion': 'success'})
+        self.assertTrue(gate(pr))
+
     def test_latest_failure_not_old_success(self):
         pr = item(25, True)
         pr['raw']['checks'].append({'id': 900, 'name': 'ci', 'head_sha': SHA, 'status': 'completed', 'conclusion': 'failure'})

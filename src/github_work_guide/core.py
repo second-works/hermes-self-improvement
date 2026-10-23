@@ -189,16 +189,19 @@ def gate(item):
     for name in REQUIRED:
         matches = [c for c in raw['checks'] if c.get('name') == name]
         states = [c for c in raw['statuses'] if c.get('context') == name]
-        # Never borrow a successful earlier attempt or another commit's result.
-        if matches:
-            latest = max(matches, key=lambda c: c['id'])
-            if latest.get('head_sha') != head or latest.get('status') != 'completed' or latest.get('conclusion') != 'success':
-                failures.append(f'{name}: 未成功/旧head')
-        elif states:
-            latest = max(states, key=lambda c: c['id'])
-            if latest.get('state') != 'success':
-                failures.append(f'{name}: 未成功')
-        else:
+        # Keep each check provider independent; another provider cannot hide failure.
+        providers = {}
+        for check in matches:
+            app = check.get('app') or {}
+            provider = app.get('id')
+            if provider not in providers or providers[provider]['id'] < check['id']:
+                providers[provider] = check
+        if any(c.get('head_sha') != head or c.get('status') != 'completed'
+               or c.get('conclusion') != 'success' for c in providers.values()):
+            failures.append(f'{name}: 未成功/旧head')
+        if states and max(states, key=lambda c: c['id']).get('state') != 'success':
+            failures.append(f'{name}: 未成功status')
+        if not matches and not states:
             failures.append(f'{name}: 未取得')
     formal = [r for r in raw['reviews'] if r.get('user', {}).get('login') == 'chatgpt-codex-connector[bot]'
               and r.get('commit_id') == head and r.get('state') in ('APPROVED', 'COMMENTED')]

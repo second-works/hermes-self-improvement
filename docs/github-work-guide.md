@@ -51,7 +51,7 @@ RESTは固定repo・固定routeのGETだけ。shellは使わず、`gh api` の�
 coverageは取得完了の判定であり、必須checkやレビュー成功の判定とは別。
 `COMPLETE` でも0件のcheck/レビューは必要条件の未確認となる。
 必須名はこのrepoの `ci` / `Security Preflight` / `Analyze (python)` に固定。
-現head・最新attemptの成功と正式Codex reviewを確認し、skip・古いhead・未解決thread・変更要求は保留する。
+現head・送信元ごとの最新attemptと同名commit status両方の成功、正式Codex reviewを確認し、skip・古いhead・未解決thread・変更要求は保留する。
 botの👍/要約コメントだけのレビュー完了は自動認定しないため、人の確認が残る。
 この判定はrepoの正式Merge Gateを代替しない。
 
@@ -140,6 +140,6 @@ OPEN案件は自然文の依存などを保留し、開始や完了を承認し�
 | 直前確認 → 旧headの流用 | 状態/head/依存/check/レビュー/コメントの変化はSTALE、欠落/失敗はBLOCKED。上記実再確認では不変のみCONFIRMED |
 | 保存 → 上書き/改変/中断 | 新規directoryのみ、manifest/hash、保存中断・同名再実行拒否、別プロセス読出しに成功 |
 
-追加試験は33件成功。標準verifyはlintと既存30試験に成功し、typecheck/buildは既存設定なしの理由付き対象外。
+追加試験は34件成功。標準verifyはlintと既存30試験に成功し、typecheck/buildは既存設定なしの理由付き対象外。
 Security Preflightはstage済み成果を検査してSECURITY_PASSED。依存manifestなしで依存監査はSECURITY_NOT_APPLICABLE。
 PRのCI/Security/正式レビューは提出後の同一headで別途照合する。意味精度・人の確認時間・有用性検収は未確認であり、監視/制御全体の完成とはしない。

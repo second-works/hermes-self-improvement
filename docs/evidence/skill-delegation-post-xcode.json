@@ -1,0 +1,54 @@
+{
+  "classification": "PUBLIC",
+  "recorded_utc": "2026-10-17T10:27:52.958148+00:00",
+  "status": "STOPPED",
+  "service_run": "context64-20261017T102509Z",
+  "actor_run": "delegation-20261017T102527Z-278cff63be11",
+  "xcodebuild_terminated_pid": 95943,
+  "xcode_related_remaining": false,
+  "service": {
+    "baseline_resources": {
+      "memory_free_percent": 64,
+      "swap_mib": 2825.62
+    },
+    "compact_memory": false,
+    "last_resources": {
+      "memory_free_percent": 19,
+      "swap_mib": 3054.06
+    },
+    "memory_saving": true,
+    "original_context": 32768,
+    "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+    "reason": "SWAP_GROWTH",
+    "restoration": "VERIFIED",
+    "status": "STOPPED",
+    "temporary_context": 65536,
+    "temporary_hash": "41f8f669acedbf0a90d861765ed0e178d7a6cf0a79653ccb15ea9171eeb6342e"
+  },
+  "cumulative_usage": {
+    "calls": 39,
+    "input_tokens": 129441,
+    "output_tokens": 31069,
+    "accounting": "RESERVED_ON_FAILURE"
+  },
+  "swap_growth_mib": 228.44,
+  "candidate_complete": false,
+  "reuse": "NOT_RUN",
+  "evaluation": "NOT_RUN",
+  "restoration_check": {
+    "ports_8081_8082_health": "ok",
+    "context": 32768,
+    "installed_plist_hash_unchanged": true,
+    "running_containers": 0
+  },
+  "post_restoration_memory": {
+    "swap_mib": 3444.56,
+    "free_indicator_percent": 21,
+    "page_size": 16384,
+    "wired_pages": 553726,
+    "compressor_pages": 224633
+  },
+  "interpretation": "Xcode was absent at final inspection. Similar swap stop persisted after terminating xcodebuild. This does not establish the owner or cause of wired/compressed memory.",
+  "next_action": "PAUSED_PENDING_HOST_RESET_AND_TEST_BUDGET",
+  "unapproved_compact_or_extended60_used": false
+}

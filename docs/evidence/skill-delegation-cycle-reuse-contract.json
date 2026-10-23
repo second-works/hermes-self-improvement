@@ -1,0 +1,227 @@
+{
+  "classification": "PUBLIC",
+  "risk_tier": "HIGH",
+  "run": "runs/delegation-20261017T142052Z-89215c2533ff",
+  "status": "STOPPED",
+  "state": "STOPPED",
+  "reason": "JSON_INVALID",
+  "reuse": {
+    "classification": "PUBLIC",
+    "limitations": "Actual skill reads and model interpretation; generated script runs separately in unit-test sandbox.",
+    "reuse": "FAILED_JSON_INVALID",
+    "source_hashes": {
+      "SKILL.md": {
+        "bytes": 205,
+        "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+      },
+      "scripts/review.py": {
+        "bytes": 2594,
+        "sha256": "85f3aee699f9821646ae1787ae1fbc20ebd3a687442b66a282a85725c0f95262"
+      }
+    },
+    "tests": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "strict_raw_json_valid": false,
+  "diagnostic_only_wrapped_payload_matches_expected": true,
+  "diagnostic_note": "Inspecting the fenced inner payload is diagnosis only. The raw output remains rejected; no normalization was adopted.",
+  "final_response": "```json\n{\"findings\": [{\"path\": \"case_cyclereuse00.py\", \"line\": 23, \"rule\": \"dynamic-eval\"}], \"cpu_seconds\": 0}\n```",
+  "tool_events": [
+    {
+      "event": "tool_started",
+      "kind": "event",
+      "phase": "reuse",
+      "tool": "skills_list"
+    },
+    {
+      "event": "tool_started",
+      "kind": "event",
+      "phase": "reuse",
+      "tool": "skill_view"
+    },
+    {
+      "event": "tool_started",
+      "kind": "event",
+      "phase": "reuse",
+      "tool": "skill_view"
+    },
+    {
+      "event": "script_viewed",
+      "kind": "event",
+      "phase": "reuse",
+      "tool": "skill_view"
+    }
+  ],
+  "model_usage": {
+    "accounting": "SETTLED",
+    "calls": 100,
+    "cost_usd": 0,
+    "input_tokens": 297525,
+    "output_tokens": 57430,
+    "records": [
+      {
+        "call": 99,
+        "input_tokens": 2163,
+        "output_tokens": 563
+      },
+      {
+        "call": 100,
+        "input_tokens": 3886,
+        "output_tokens": 631
+      }
+    ],
+    "transport_failure": null,
+    "usage_observations": [
+      {
+        "preflight_input_tokens": 2163,
+        "reported_input_tokens": 2163,
+        "reported_output_tokens": 563
+      },
+      {
+        "preflight_input_tokens": 3886,
+        "reported_input_tokens": 3886,
+        "reported_output_tokens": 631
+      }
+    ]
+  },
+  "condition_observations": [
+    {
+      "condition": [
+        true,
+        false
+      ],
+      "reasoning_characters": 1735,
+      "thinking_prompt_observed": true
+    },
+    {
+      "condition": [
+        true,
+        false
+      ],
+      "reasoning_characters": 1711,
+      "thinking_prompt_observed": true
+    }
+  ],
+  "gate": {
+    "boundaries": {
+      "checks": [
+        "canary_unmounted",
+        "capabilities",
+        "cpu_quota",
+        "deps_readonly",
+        "env",
+        "fixture_readonly",
+        "hidden_unmounted",
+        "lock_readonly",
+        "memory_limit",
+        "network_denied",
+        "no_new_privileges",
+        "no_shared_memory",
+        "non_root",
+        "pids_limit",
+        "root_readonly",
+        "seccomp",
+        "skill_readonly",
+        "socket_unmounted",
+        "source_readonly",
+        "swap_limit",
+        "tmpfs_size",
+        "work_writable"
+      ],
+      "python": "3.12.15",
+      "status": "VERIFIED"
+    },
+    "cpu": {
+      "checks": [
+        "cpu_throttled"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "disk": {
+      "checks": [
+        "disk_denied"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "memory": {
+      "checks": [
+        "memory_denied"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "output": {
+      "probe_started": true,
+      "reason": "OUTPUT_LIMIT",
+      "status": "VERIFIED"
+    },
+    "pids": {
+      "checks": [
+        "pids_denied"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "timeout": {
+      "probe_started": true,
+      "reason": "TIMEOUT",
+      "status": "VERIFIED"
+    }
+  },
+  "service": {
+    "baseline_resources": {
+      "memory_free_percent": 71,
+      "swap_mib": 1125.5
+    },
+    "compact_memory": false,
+    "controller_exit": 1,
+    "last_resources": {
+      "memory_free_percent": 37,
+      "swap_mib": 1125.5
+    },
+    "matrix_profile": true,
+    "memory_saving": true,
+    "original_context": 32768,
+    "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+    "reason": "DELEGATION_STOPPED",
+    "restoration": "VERIFIED",
+    "status": "STOPPED",
+    "temporary_context": 65536,
+    "temporary_hash": "36cdadd0f09996a7e6c0e52daf88b7597033881f57a6db1fd9497668ac2bfe87"
+  },
+  "restoration": {
+    "8081": {
+      "health": "ok",
+      "context": [
+        32768
+      ]
+    },
+    "8082": {
+      "health": "ok",
+      "context": [
+        32768
+      ]
+    },
+    "plist_sha256": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+    "docker_exit": 0,
+    "running_containers": 0
+  },
+  "production_adoption": "NOT_REQUESTED"
+}

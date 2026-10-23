@@ -1,0 +1,81 @@
+{
+  "classification": "PUBLIC",
+  "status": "REPAIR_PARTIAL_IMPROVEMENT_THEN_REGRESSION",
+  "source_candidate": "runs/delegation-20261017T110214Z-4d921e01caf2/candidate",
+  "repair_run": "runs/delegation-20261017T112524Z-cdfed6305bab",
+  "baseline_passes": 4,
+  "case_count": 6,
+  "attempts": [
+    {
+      "target": "comment",
+      "passes": 5,
+      "results": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        false
+      ],
+      "regressions": 0,
+      "candidate": "runs/delegation-20261017T112524Z-cdfed6305bab/repair-candidate-1"
+    },
+    {
+      "target": "context_line",
+      "passes": 1,
+      "results": [
+        false,
+        false,
+        false,
+        true,
+        false,
+        false
+      ],
+      "invalid_json_cases": 5,
+      "candidate": "runs/delegation-20261017T112524Z-cdfed6305bab/repair-candidate-2",
+      "diagnosis": "Generated regex has an unmatched closing parenthesis; broad exception handler suppresses the error and returns no JSON. Context-line advancement remains absent."
+    }
+  ],
+  "best_candidate": "runs/delegation-20261017T112524Z-cdfed6305bab/repair-candidate-1",
+  "best_candidate_hashes": {
+    "SKILL.md": {
+      "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+    },
+    "scripts/review.py": {
+      "sha256": "1804f0badf98b154e4793d8e3a86ed10733fa2073a609f7a19d7d8247ac20d3c"
+    }
+  },
+  "best_candidate_status": "NOT_QUALIFIED_5_OF_6",
+  "cumulative_usage": {
+    "calls": 80,
+    "input_tokens": 240863,
+    "output_tokens": 46413,
+    "accounting": "SETTLED"
+  },
+  "model_call_limit": 80,
+  "reuse": "NOT_RUN",
+  "independent_evaluation": "NOT_RUN",
+  "production_adoption": "NOT_REQUESTED",
+  "service": {
+    "baseline_resources": {
+      "memory_free_percent": 34,
+      "swap_mib": 1095.81
+    },
+    "compact_memory": false,
+    "controller_exit": 1,
+    "last_resources": {
+      "memory_free_percent": 38,
+      "swap_mib": 1087.81
+    },
+    "memory_saving": true,
+    "original_context": 32768,
+    "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+    "reason": "DELEGATION_STOPPED",
+    "restoration": "VERIFIED",
+    "status": "STOPPED",
+    "temporary_context": 65536,
+    "temporary_hash": "41f8f669acedbf0a90d861765ed0e178d7a6cf0a79653ccb15ea9171eeb6342e"
+  },
+  "postcheck": "runs/repair-second-postcheck-20261017T112842Z/report.json",
+  "conclusion": "A specific repair improved one failure without regressing the initial four passes, but the next repair broke prior behavior. Unattended repair is not accepted. Stopped after the approved two attempts."
+}

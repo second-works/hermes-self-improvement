@@ -1,0 +1,235 @@
+{
+  "classification": "PUBLIC",
+  "risk_tier": "HIGH",
+  "status": "MATRIX_MEASURED_NO_PATCH_ACCEPTED",
+  "actor_run": "runs/delegation-20261017T121446Z-91cb91ecc0b8",
+  "service_run": "runs/context64-20261017T121444Z",
+  "experiment": {
+    "baseline": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ],
+    "classification": "PUBLIC",
+    "limitations": "Exploratory fixed-order comparison; not a reliability estimate.",
+    "rows": [
+      {
+        "elapsed_seconds": 20.406,
+        "json_valid": false,
+        "label": "matrix-off-plain",
+        "model_calls": 1,
+        "observations": [
+          {
+            "condition": [
+              false,
+              false
+            ],
+            "reasoning_characters": 0,
+            "thinking_prompt_observed": false
+          }
+        ],
+        "resources_after": {
+          "memory_free_percent": 39,
+          "swap_mib": 1173.5
+        },
+        "resources_before": {
+          "memory_free_percent": 40,
+          "swap_mib": 1173.5
+        },
+        "schema_requested": false,
+        "scope_valid": false,
+        "shape_valid": false,
+        "tests": null,
+        "thinking_output_observed": false,
+        "thinking_requested": false,
+        "thinking_verified": true
+      },
+      {
+        "elapsed_seconds": 10.468,
+        "json_valid": true,
+        "label": "matrix-off-schema",
+        "model_calls": 1,
+        "observations": [
+          {
+            "condition": [
+              false,
+              true
+            ],
+            "reasoning_characters": 0,
+            "thinking_prompt_observed": false
+          }
+        ],
+        "resources_after": {
+          "memory_free_percent": 40,
+          "swap_mib": 1173.5
+        },
+        "resources_before": {
+          "memory_free_percent": 39,
+          "swap_mib": 1173.5
+        },
+        "schema_requested": true,
+        "scope_valid": false,
+        "shape_valid": true,
+        "tests": null,
+        "thinking_output_observed": false,
+        "thinking_requested": false,
+        "thinking_verified": true,
+        "proposal_diagnostics": [
+          {
+            "after_line": 34,
+            "contains_real_newline": true,
+            "contains_literal_backslash_n": false,
+            "text_characters": 95
+          },
+          {
+            "after_line": 44,
+            "contains_real_newline": true,
+            "contains_literal_backslash_n": false,
+            "text_characters": 107
+          }
+        ]
+      },
+      {
+        "elapsed_seconds": 93.902,
+        "json_valid": false,
+        "label": "matrix-on-plain",
+        "model_calls": 1,
+        "observations": [
+          {
+            "condition": [
+              true,
+              false
+            ],
+            "reasoning_characters": 3869,
+            "thinking_prompt_observed": true
+          }
+        ],
+        "resources_after": {
+          "memory_free_percent": 40,
+          "swap_mib": 1173.5
+        },
+        "resources_before": {
+          "memory_free_percent": 40,
+          "swap_mib": 1173.5
+        },
+        "schema_requested": false,
+        "scope_valid": false,
+        "shape_valid": false,
+        "tests": null,
+        "thinking_output_observed": true,
+        "thinking_requested": true,
+        "thinking_verified": true
+      },
+      {
+        "elapsed_seconds": 83.262,
+        "json_valid": true,
+        "label": "matrix-on-schema",
+        "model_calls": 1,
+        "observations": [
+          {
+            "condition": [
+              true,
+              true
+            ],
+            "reasoning_characters": 3719,
+            "thinking_prompt_observed": true
+          }
+        ],
+        "resources_after": {
+          "memory_free_percent": 40,
+          "swap_mib": 1173.5
+        },
+        "resources_before": {
+          "memory_free_percent": 40,
+          "swap_mib": 1173.5
+        },
+        "schema_requested": true,
+        "scope_valid": false,
+        "shape_valid": true,
+        "tests": null,
+        "thinking_output_observed": true,
+        "thinking_requested": true,
+        "thinking_verified": true,
+        "proposal_diagnostics": [
+          {
+            "after_line": 28,
+            "contains_real_newline": true,
+            "contains_literal_backslash_n": false,
+            "text_characters": 69
+          },
+          {
+            "after_line": 35,
+            "contains_real_newline": true,
+            "contains_literal_backslash_n": false,
+            "text_characters": 34
+          }
+        ]
+      }
+    ],
+    "source_hashes": {
+      "SKILL.md": {
+        "bytes": 205,
+        "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+      },
+      "scripts/review.py": {
+        "bytes": 2487,
+        "sha256": "1804f0badf98b154e4793d8e3a86ed10733fa2073a609f7a19d7d8247ac20d3c"
+      }
+    },
+    "trials_per_condition": 1
+  },
+  "service": {
+    "baseline_resources": {
+      "memory_free_percent": 71,
+      "swap_mib": 1173.5
+    },
+    "compact_memory": false,
+    "controller_exit": 0,
+    "last_resources": {
+      "memory_free_percent": 40,
+      "swap_mib": 1173.5
+    },
+    "matrix_profile": true,
+    "memory_saving": true,
+    "original_context": 32768,
+    "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+    "reason": null,
+    "restoration": "VERIFIED",
+    "status": "VERIFIED",
+    "temporary_context": 65536,
+    "temporary_hash": "36cdadd0f09996a7e6c0e52daf88b7597033881f57a6db1fd9497668ac2bfe87"
+  },
+  "model_usage": {
+    "calls": 90,
+    "input_tokens": 271616,
+    "output_tokens": 49100,
+    "accounting": "SETTLED"
+  },
+  "call_limit": 94,
+  "remaining_calls_not_used": 4,
+  "applied_patches": 0,
+  "reuse": "NOT_RUN: no candidate passed scope and all9 tests",
+  "independent_evaluation": "NOT_RUN",
+  "production_adoption": "NOT_REQUESTED",
+  "conclusions": [
+    "All4 requested thinking conditions verified by template markers and reasoning output presence/absence.",
+    "Both schema conditions returned valid JSON with correct shape; both plain conditions had Markdown fences and failed strict JSON parsing.",
+    "No proposal passed exact insertion scope, so candidate9-case tests were not executed on the model proposals. The hash-verified baseline was tested and remained5/9.",
+    "Thinking ON plus schema proposed a context-counter branch, but wrong anchors/indentation/escaped newlines remained.",
+    "Each condition had one fixed-order trial with seed20261017; this is exploratory and does not establish a general success rate or the model capability ceiling.",
+    "The thinking budget was1024 of4096 output tokens; larger budgets and different runtimes were not evaluated."
+  ],
+  "latest_verification": {
+    "related_tests": 52,
+    "standard_tests": 30,
+    "typecheck_build": "SKIPPED: existing scripts are not executable",
+    "security": "SECURITY_PASSED",
+    "dependencies": "NOT_APPLICABLE"
+  }
+}

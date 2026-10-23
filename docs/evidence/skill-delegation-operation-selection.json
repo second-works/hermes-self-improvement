@@ -1,0 +1,457 @@
+{
+  "classification": "PUBLIC",
+  "issue": 7,
+  "risk_tier": "HIGH",
+  "run": "runs/delegation-20261017T123251Z-bfe201086100",
+  "report_status": "VERIFIED",
+  "report_state": "OPERATION_SELECTION_MEASURED",
+  "limitations": "Predefined trusted repairs and four controlled fixtures. Selection success is not autonomous code generation, reliability proof, saved-skill reuse, or production acceptance.",
+  "rows": [
+    {
+      "baseline": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_hashes": {
+        "SKILL.md": {
+          "bytes": 205,
+          "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+        },
+        "scripts/review.py": {
+          "bytes": 2594,
+          "sha256": "85f3aee699f9821646ae1787ae1fbc20ebd3a687442b66a282a85725c0f95262"
+        }
+      },
+      "elapsed_seconds": 74.219,
+      "expected_operations": [
+        "count_context_lines",
+        "count_added_comments"
+      ],
+      "fixture_hashes": {
+        "SKILL.md": {
+          "bytes": 205,
+          "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+        },
+        "scripts/review.py": {
+          "bytes": 2487,
+          "sha256": "1804f0badf98b154e4793d8e3a86ed10733fa2073a609f7a19d7d8247ac20d3c"
+        }
+      },
+      "json_valid": true,
+      "label": "both-missing",
+      "model_calls": 1,
+      "resources_after": {
+        "memory_free_percent": 43,
+        "swap_mib": 1173.5
+      },
+      "resources_before": {
+        "memory_free_percent": 41,
+        "swap_mib": 1173.5
+      },
+      "scope_valid": true,
+      "selected_operations": [
+        "count_context_lines",
+        "count_added_comments"
+      ],
+      "selection_correct": true,
+      "tests": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "baseline": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "candidate_hashes": {
+        "SKILL.md": {
+          "bytes": 205,
+          "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+        },
+        "scripts/review.py": {
+          "bytes": 2594,
+          "sha256": "85f3aee699f9821646ae1787ae1fbc20ebd3a687442b66a282a85725c0f95262"
+        }
+      },
+      "elapsed_seconds": 74.135,
+      "expected_operations": [],
+      "fixture_hashes": {
+        "SKILL.md": {
+          "bytes": 205,
+          "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+        },
+        "scripts/review.py": {
+          "bytes": 2594,
+          "sha256": "85f3aee699f9821646ae1787ae1fbc20ebd3a687442b66a282a85725c0f95262"
+        }
+      },
+      "json_valid": true,
+      "label": "none-missing",
+      "model_calls": 1,
+      "resources_after": {
+        "memory_free_percent": 42,
+        "swap_mib": 1173.5
+      },
+      "resources_before": {
+        "memory_free_percent": 43,
+        "swap_mib": 1173.5
+      },
+      "scope_valid": true,
+      "selected_operations": [],
+      "selection_correct": true,
+      "tests": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "baseline": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false
+      ],
+      "candidate_hashes": {
+        "SKILL.md": {
+          "bytes": 205,
+          "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+        },
+        "scripts/review.py": {
+          "bytes": 2594,
+          "sha256": "85f3aee699f9821646ae1787ae1fbc20ebd3a687442b66a282a85725c0f95262"
+        }
+      },
+      "elapsed_seconds": 77.391,
+      "expected_operations": [
+        "count_added_comments"
+      ],
+      "fixture_hashes": {
+        "SKILL.md": {
+          "bytes": 205,
+          "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+        },
+        "scripts/review.py": {
+          "bytes": 2556,
+          "sha256": "948b4996426dba51e18f0974c8fb855271fbd10eab20a27d5367411dbfef175b"
+        }
+      },
+      "json_valid": true,
+      "label": "comment-missing",
+      "model_calls": 1,
+      "resources_after": {
+        "memory_free_percent": 43,
+        "swap_mib": 1173.5
+      },
+      "resources_before": {
+        "memory_free_percent": 42,
+        "swap_mib": 1173.5
+      },
+      "scope_valid": true,
+      "selected_operations": [
+        "count_added_comments"
+      ],
+      "selection_correct": true,
+      "tests": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "baseline": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        true
+      ],
+      "candidate_hashes": {
+        "SKILL.md": {
+          "bytes": 205,
+          "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+        },
+        "scripts/review.py": {
+          "bytes": 2594,
+          "sha256": "85f3aee699f9821646ae1787ae1fbc20ebd3a687442b66a282a85725c0f95262"
+        }
+      },
+      "elapsed_seconds": 66.43,
+      "expected_operations": [
+        "count_context_lines"
+      ],
+      "fixture_hashes": {
+        "SKILL.md": {
+          "bytes": 205,
+          "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+        },
+        "scripts/review.py": {
+          "bytes": 2525,
+          "sha256": "2762ae537eba713ad35abb8b5c3acc78c26ed2c9384a929216ccdee96fd7a332"
+        }
+      },
+      "json_valid": true,
+      "label": "context-missing",
+      "model_calls": 1,
+      "resources_after": {
+        "memory_free_percent": 41,
+        "swap_mib": 1165.5
+      },
+      "resources_before": {
+        "memory_free_percent": 43,
+        "swap_mib": 1173.5
+      },
+      "scope_valid": true,
+      "selected_operations": [
+        "count_context_lines"
+      ],
+      "selection_correct": true,
+      "tests": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    }
+  ],
+  "model_usage": {
+    "accounting": "SETTLED",
+    "calls": 94,
+    "cost_usd": 0,
+    "input_tokens": 281586,
+    "output_tokens": 52937,
+    "records": [
+      {
+        "call": 91,
+        "input_tokens": 2478,
+        "output_tokens": 892
+      },
+      {
+        "call": 92,
+        "input_tokens": 2507,
+        "output_tokens": 1041
+      },
+      {
+        "call": 93,
+        "input_tokens": 2497,
+        "output_tokens": 1048
+      },
+      {
+        "call": 94,
+        "input_tokens": 2488,
+        "output_tokens": 856
+      }
+    ],
+    "transport_failure": null,
+    "usage_observations": [
+      {
+        "preflight_input_tokens": 2478,
+        "reported_input_tokens": 2478,
+        "reported_output_tokens": 892
+      },
+      {
+        "preflight_input_tokens": 2507,
+        "reported_input_tokens": 2507,
+        "reported_output_tokens": 1041
+      },
+      {
+        "preflight_input_tokens": 2497,
+        "reported_input_tokens": 2497,
+        "reported_output_tokens": 1048
+      },
+      {
+        "preflight_input_tokens": 2488,
+        "reported_input_tokens": 2488,
+        "reported_output_tokens": 856
+      }
+    ]
+  },
+  "condition_observations": [
+    {
+      "condition": [
+        true,
+        true
+      ],
+      "reasoning_characters": 3460,
+      "thinking_prompt_observed": true
+    },
+    {
+      "condition": [
+        true,
+        true
+      ],
+      "reasoning_characters": 4010,
+      "thinking_prompt_observed": true
+    },
+    {
+      "condition": [
+        true,
+        true
+      ],
+      "reasoning_characters": 4061,
+      "thinking_prompt_observed": true
+    },
+    {
+      "condition": [
+        true,
+        true
+      ],
+      "reasoning_characters": 3319,
+      "thinking_prompt_observed": true
+    }
+  ],
+  "isolation_gates": {
+    "boundaries": {
+      "checks": [
+        "canary_unmounted",
+        "capabilities",
+        "cpu_quota",
+        "deps_readonly",
+        "env",
+        "fixture_readonly",
+        "hidden_unmounted",
+        "lock_readonly",
+        "memory_limit",
+        "network_denied",
+        "no_new_privileges",
+        "no_shared_memory",
+        "non_root",
+        "pids_limit",
+        "root_readonly",
+        "seccomp",
+        "skill_readonly",
+        "socket_unmounted",
+        "source_readonly",
+        "swap_limit",
+        "tmpfs_size",
+        "work_writable"
+      ],
+      "python": "3.12.15",
+      "status": "VERIFIED"
+    },
+    "cpu": {
+      "checks": [
+        "cpu_throttled"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "disk": {
+      "checks": [
+        "disk_denied"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "memory": {
+      "checks": [
+        "memory_denied"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "output": {
+      "probe_started": true,
+      "reason": "OUTPUT_LIMIT",
+      "status": "VERIFIED"
+    },
+    "pids": {
+      "checks": [
+        "pids_denied"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "timeout": {
+      "probe_started": true,
+      "reason": "TIMEOUT",
+      "status": "VERIFIED"
+    }
+  },
+  "service": {
+    "baseline_resources": {
+      "memory_free_percent": 36,
+      "swap_mib": 1173.5
+    },
+    "compact_memory": false,
+    "controller_exit": 0,
+    "last_resources": {
+      "memory_free_percent": 41,
+      "swap_mib": 1165.5
+    },
+    "matrix_profile": true,
+    "memory_saving": true,
+    "original_context": 32768,
+    "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+    "reason": null,
+    "restoration": "VERIFIED",
+    "status": "VERIFIED",
+    "temporary_context": 65536,
+    "temporary_hash": "36cdadd0f09996a7e6c0e52daf88b7597033881f57a6db1fd9497668ac2bfe87"
+  },
+  "restoration": {
+    "8081": {
+      "health": "ok",
+      "context": [
+        32768
+      ]
+    },
+    "8082": {
+      "health": "ok",
+      "context": [
+        32768
+      ]
+    },
+    "plist_sha256": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+    "docker_exit": 0,
+    "running_containers": 0
+  }
+}

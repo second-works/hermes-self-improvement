@@ -1,0 +1,45 @@
+{
+  "classification": "PUBLIC",
+  "acceptance": "BLOCKED",
+  "run": "context64-20261017T054712Z",
+  "report": {
+    "baseline_resources": {
+      "memory_free_percent": 64,
+      "swap_mib": 3454.81
+    },
+    "last_resources": {
+      "memory_free_percent": 17,
+      "swap_mib": 3647.44
+    },
+    "original_context": 32768,
+    "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+    "reason": "SWAP_GROWTH",
+    "restoration": "VERIFIED",
+    "status": "STOPPED",
+    "temporary_context": 65536,
+    "temporary_hash": "ab5b0c95cdc16a79c364e15c45c30a5d1b5a4643588db38d7ae31d57d25ef446"
+  },
+  "report_sha256": "6b8061f8e6927be197e4686d4ade30e0f620de568fc0fff97b9c42222f17486d",
+  "events_sha256": "eecf3ec95f9fd683350cd23d009ac8dd58095a94c11ad04232c9260e430e6303",
+  "inference_calls": 0,
+  "candidate_created": false,
+  "controller_started": false,
+  "restoration_checks": {
+    "8081": {
+      "health": "ok",
+      "model": "gemma-4-e4b",
+      "n_ctx": 32768
+    },
+    "8082": {
+      "health": "ok",
+      "model": "gemma-4-e4b",
+      "n_ctx": 32768
+    },
+    "installed_plist_hash_matches": true
+  },
+  "limitations": [
+    "64K readiness was not confirmed",
+    "Hermes delegation, generated skill tests and reuse remain unverified",
+    "Resource growth was observed during startup; exclusive attribution was not measured"
+  ]
+}

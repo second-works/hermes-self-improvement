@@ -1,0 +1,36 @@
+{
+  "classification": "PUBLIC",
+  "scope": "Issue #7 registered operation implementation",
+  "base_sha": "75d09d8c52215a1060ec342562cef1492aaf62e1",
+  "new_model_experiments": 0,
+  "new_docker_runs": 0,
+  "new_service_changes": 0,
+  "historical_live_evidence": "docs/evidence/skill-delegation-controlled-execution-live.json",
+  "catalog_version": 1,
+  "operations": [
+    "count_context_lines",
+    "count_added_comments"
+  ],
+  "source_boundary": "Pinned PUBLIC baseline plus its four deterministic operation states; checked even for no-op",
+  "offline_cli": {
+    "status": "PREPARED_NOT_EXECUTED",
+    "model_calls": 0,
+    "source_sha256": "091055ee7066c5ea2b8d5d919a7845585793f90b7109ba9a52273ffcfc4239ea",
+    "candidate_sha256": "7d342aa1fc92afaeea8b7aee834650965b885f167975fd2d4f18e5c31ee80b6e"
+  },
+  "independent_review": {
+    "finding": "R1",
+    "severity": "P2",
+    "classification": "BLOCKING",
+    "trigger": "Unregistered repo-local source and empty operations were copied and labelled PUBLIC",
+    "fix": "Pin baseline hash and allow only four derived source hashes before output or execution",
+    "verification": "Reviewer reproduced pre-fix acceptance; regression tests now reject arbitrary/appended source and altered baseline",
+    "result": "RESOLVED; reviewer reran 8 focused tests and found no new blocker"
+  },
+  "limits": [
+    "No new live model/Docker validation of the file adapter",
+    "No sealed independent quality evaluation or production adoption",
+    "New tests are run explicitly locally; existing fixed CI verification entry is unchanged"
+  ],
+  "original_checkout": "Original staged changes and 48 copied source files verified unchanged; logs and runs not copied"
+}

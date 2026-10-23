@@ -1,0 +1,182 @@
+{
+  "classification": "PUBLIC",
+  "acceptance": "BLOCKED",
+  "service_run": "context64-20261017T055838Z",
+  "actor_run": "delegation-20261017T055903Z-48ecfa9b9df7",
+  "service_report": {
+    "baseline_resources": {
+      "memory_free_percent": 20,
+      "swap_mib": 4803.0
+    },
+    "controller_exit": 1,
+    "last_resources": {
+      "memory_free_percent": 25,
+      "swap_mib": 4699.0
+    },
+    "memory_saving": true,
+    "original_context": 32768,
+    "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+    "reason": "DELEGATION_STOPPED",
+    "restoration": "VERIFIED",
+    "status": "STOPPED",
+    "temporary_context": 65536,
+    "temporary_hash": "41f8f669acedbf0a90d861765ed0e178d7a6cf0a79653ccb15ea9171eeb6342e"
+  },
+  "actor_reason": "USAGE_UNVERIFIED",
+  "runtime_context": 65536,
+  "hermes_boot": {
+    "kind": "result",
+    "status": "VERIFIED",
+    "tools": [
+      "delegate_task",
+      "skill_manage",
+      "skill_view",
+      "skills_list"
+    ]
+  },
+  "gate": {
+    "boundaries": {
+      "checks": [
+        "canary_unmounted",
+        "capabilities",
+        "cpu_quota",
+        "deps_readonly",
+        "env",
+        "fixture_readonly",
+        "hidden_unmounted",
+        "lock_readonly",
+        "memory_limit",
+        "network_denied",
+        "no_new_privileges",
+        "no_shared_memory",
+        "non_root",
+        "pids_limit",
+        "root_readonly",
+        "seccomp",
+        "skill_readonly",
+        "socket_unmounted",
+        "source_readonly",
+        "swap_limit",
+        "tmpfs_size",
+        "work_writable"
+      ],
+      "python": "3.12.15",
+      "status": "VERIFIED"
+    },
+    "cpu": {
+      "checks": [
+        "cpu_throttled"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "disk": {
+      "checks": [
+        "disk_denied"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "memory": {
+      "checks": [
+        "memory_denied"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "output": {
+      "probe_started": true,
+      "reason": "OUTPUT_LIMIT",
+      "status": "VERIFIED"
+    },
+    "pids": {
+      "checks": [
+        "pids_denied"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "timeout": {
+      "probe_started": true,
+      "reason": "TIMEOUT",
+      "status": "VERIFIED"
+    }
+  },
+  "model_usage_snapshot": {
+    "calls": 1,
+    "cost_usd": 0,
+    "input_tokens": 2835,
+    "output_tokens": 4096,
+    "records": []
+  },
+  "model_usage_warning": "input_tokens/output_tokens are reserved values on failure, not settled actual usage; failing response usage was not preserved by this source snapshot",
+  "diagnostic_32k": {
+    "classification": "PUBLIC",
+    "scope": "32K transport accounting only; no Hermes acceptance",
+    "inference_calls": 1,
+    "max_inference_calls": 1,
+    "max_output_tokens": 1,
+    "baseline_resources": {
+      "swap_mib": 5674.0,
+      "memory_free_percent": 17
+    },
+    "preflight_token_counts": {
+      "False": 11,
+      "True": 12
+    },
+    "usage": {
+      "completion_tokens": 1,
+      "prompt_tokens": 12,
+      "total_tokens": 13,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    },
+    "finish_reason": "length",
+    "response_model": "gemma-4-e4b",
+    "last_resources": {
+      "swap_mib": 5674.0,
+      "memory_free_percent": 18
+    },
+    "status": "VERIFIED_ACCOUNTING_OBSERVED"
+  },
+  "total_inference_attempts_including_diagnostic": 2,
+  "candidate_created": false,
+  "evaluation": "NOT_RUN",
+  "restoration_checks": {
+    "8081": {
+      "health": "ok",
+      "model": "gemma-4-e4b",
+      "n_ctx": 32768
+    },
+    "8082": {
+      "health": "ok",
+      "model": "gemma-4-e4b",
+      "n_ctx": 32768
+    },
+    "installed_original_hash_matches": true
+  },
+  "source_snapshot": {
+    "fixtures/audit/delegation.json": "838c4747e87b702e964594006b9c976cefb1ee343dcb730b86c536b750bc0f82",
+    "fixtures/delegation/prepare.py": "44e45b3a907012200a16d733c3391cdff691e13140faa07f9fb438085bc94b09",
+    "fixtures/delegation/worker.py": "117155a43147f8dfca6fe90789dc0d0e0d56b2f7f8bffb89272fb5fd30d95f29",
+    "fixtures/self-evolution/hermes-agent/skills/github-code-review/SKILL.md": "7afb0ea3ea8312b1b5eb68770d1e5ef2c921b1f918826a4e8b787bd5e44b6a27",
+    "fixtures/self-evolution/isolation_probe.py": "c3bef46648bc131b8ecf61811685e50be5c15b4d349138557cdc16101ff9a9ab",
+    "scripts/delegate_skill.py": "7773826c48fe2f6c4f1da5343f2bc79c66e1b5cf621377c1f177aa923668628e",
+    "scripts/self_evolution_spike.py": "b507ee9d91784730fcf718e5349108990065d99f42ff969d75680c88cae28686",
+    "src/audit/core.py": "36d53c9b489006bd2dc7d22e12fa959240fcc79587bea32d5b49c691288f82c6",
+    "src/delegation/context.py": "3ed53d1baf0adb481daf9cd5ca948d8eb981e5ebfc66596b128e8ece52623b39",
+    "src/delegation/core.py": "7e552a30393360808614c48ad161630779afcd7303a96fb2f2f91c72769d9954",
+    "src/delegation/relay.py": "9827f7279e74bf917e4d386ff7d838b927732131ec734df045826e02808fd64c",
+    "src/delegation/sandbox.py": "0d0de085075071bc283ce3197607f90c376e3c5f4940ec551fe9e2f00bf043e5",
+    "src/evaluation/core.py": "71f2648fc05790f58a571571c9fafc42c121b4a6f6f1693dd5e5c2f0dcd53fdb",
+    "src/evaluation/sandbox.py": "d136d5d46e6bafa4939560595fe8ccd52958ea7363fd18a36ce29a29735f8cc5",
+    "src/self_evolution/sandbox.py": "ffdb480773bc331f24e425a91a966461ea56e2eac8f7b5f132081a14d28812a3"
+  },
+  "hashes": {
+    "runs/context64-20261017T055838Z/service-report.json": "0f5bfe5ec80f758901bd93fe271d3724e767c0ea62f21114f1238e1bdc562b6b",
+    "runs/delegation-20261017T055903Z-48ecfa9b9df7/report.json": "1a31092e174ee5e1e23516ad57b8bad73817b4bdb1052d51a740eaa6d7859c0c",
+    "runs/token-accounting-probe-20261017/report.json": "56e5b1352b76253439ff12bab822feda18884ddf67a75a81e6ea4d66b3c9c91f"
+  },
+  "followup": "Preflight now includes special tokens and preserves numeric usage diagnostics. Exact equality gate remains. Revised Hermes live inference has not been rerun."
+}

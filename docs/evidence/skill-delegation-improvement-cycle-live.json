@@ -1,0 +1,269 @@
+{
+  "classification": "PUBLIC",
+  "risk_tier": "HIGH",
+  "run": "runs/delegation-20261017T132309Z-69b9d703cc9f",
+  "status": "STOPPED",
+  "reason": "JSON_INVALID",
+  "baseline": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    false
+  ],
+  "rounds": [
+    {
+      "after": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "before": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false
+      ],
+      "before_hashes": {
+        "SKILL.md": {
+          "bytes": 205,
+          "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+        },
+        "scripts/review.py": {
+          "bytes": 2487,
+          "sha256": "1804f0badf98b154e4793d8e3a86ed10733fa2073a609f7a19d7d8247ac20d3c"
+        }
+      },
+      "candidate_hashes": {
+        "SKILL.md": {
+          "bytes": 205,
+          "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+        },
+        "scripts/review.py": {
+          "bytes": 2594,
+          "sha256": "85f3aee699f9821646ae1787ae1fbc20ebd3a687442b66a282a85725c0f95262"
+        }
+      },
+      "decision": "ACCEPTED",
+      "operations": [
+        "count_context_lines",
+        "count_added_comments"
+      ],
+      "round": 1
+    },
+    {
+      "after": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "before": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "before_hashes": {
+        "SKILL.md": {
+          "bytes": 205,
+          "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+        },
+        "scripts/review.py": {
+          "bytes": 2594,
+          "sha256": "85f3aee699f9821646ae1787ae1fbc20ebd3a687442b66a282a85725c0f95262"
+        }
+      },
+      "candidate_hashes": {
+        "SKILL.md": {
+          "bytes": 205,
+          "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+        },
+        "scripts/review.py": {
+          "bytes": 2594,
+          "sha256": "85f3aee699f9821646ae1787ae1fbc20ebd3a687442b66a282a85725c0f95262"
+        }
+      },
+      "decision": "UNCHANGED",
+      "operations": [],
+      "round": 2
+    }
+  ],
+  "final_results": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+  ],
+  "final_hashes": {
+    "SKILL.md": {
+      "bytes": 205,
+      "sha256": "d307721fc3c77f05e78ca537dd605d67ac12fae682f2c8fb4d02590e623e5a06"
+    },
+    "scripts/review.py": {
+      "bytes": 2594,
+      "sha256": "85f3aee699f9821646ae1787ae1fbc20ebd3a687442b66a282a85725c0f95262"
+    }
+  },
+  "reuse_status": "FAILED",
+  "reuse_failures": [
+    "Markdown code fence violates JSON-only output",
+    "rule value is prose rather than dynamic-eval or shell-execution"
+  ],
+  "reuse_final": "```json\n{\n  \"findings\": [\n    {\n      \"path\": \"case_cyclereuse00.py\",\n      \"line\": 23,\n      \"rule\": \"Unsafe added Python line: Use of eval()\"\n    }\n  ],\n  \"cpu_seconds\": 0\n}\n```",
+  "reuse_tool_events": [
+    {
+      "event": "tool_started",
+      "kind": "event",
+      "phase": "reuse",
+      "tool": "skills_list"
+    },
+    {
+      "event": "tool_started",
+      "kind": "event",
+      "phase": "reuse",
+      "tool": "skill_view"
+    }
+  ],
+  "model_usage": {
+    "accounting": "SETTLED",
+    "calls": 98,
+    "cost_usd": 0,
+    "input_tokens": 291476,
+    "output_tokens": 56236,
+    "records": [
+      {
+        "call": 95,
+        "input_tokens": 2478,
+        "output_tokens": 892
+      },
+      {
+        "call": 96,
+        "input_tokens": 2507,
+        "output_tokens": 1041
+      },
+      {
+        "call": 97,
+        "input_tokens": 2088,
+        "output_tokens": 381
+      },
+      {
+        "call": 98,
+        "input_tokens": 2817,
+        "output_tokens": 985
+      }
+    ],
+    "transport_failure": null,
+    "usage_observations": [
+      {
+        "preflight_input_tokens": 2478,
+        "reported_input_tokens": 2478,
+        "reported_output_tokens": 892
+      },
+      {
+        "preflight_input_tokens": 2507,
+        "reported_input_tokens": 2507,
+        "reported_output_tokens": 1041
+      },
+      {
+        "preflight_input_tokens": 2088,
+        "reported_input_tokens": 2088,
+        "reported_output_tokens": 381
+      },
+      {
+        "preflight_input_tokens": 2817,
+        "reported_input_tokens": 2817,
+        "reported_output_tokens": 985
+      }
+    ]
+  },
+  "service": {
+    "baseline_resources": {
+      "memory_free_percent": 71,
+      "swap_mib": 1149.5
+    },
+    "compact_memory": false,
+    "controller_exit": 1,
+    "last_resources": {
+      "memory_free_percent": 36,
+      "swap_mib": 1141.5
+    },
+    "matrix_profile": true,
+    "memory_saving": true,
+    "original_context": 32768,
+    "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+    "reason": "DELEGATION_STOPPED",
+    "restoration": "VERIFIED",
+    "status": "STOPPED",
+    "temporary_context": 65536,
+    "temporary_hash": "36cdadd0f09996a7e6c0e52daf88b7597033881f57a6db1fd9497668ac2bfe87"
+  },
+  "limitations": "Predefined repair selection. Separate transfer cases are not sealed independent evaluation. Skill reuse failed; no production adoption.",
+  "state_note": "Raw progress retained reuse=NOT_RUN because JSON parsing raised before assignment; actual reuse ran and failed, as tool events and raw response demonstrate."
+}

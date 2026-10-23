@@ -1,0 +1,132 @@
+{
+  "classification": "PUBLIC",
+  "risk_tier": "HIGH",
+  "status": "NO_MODEL_PATCH_ACCEPTED",
+  "proposal_limit": 2,
+  "attempts": [
+    {
+      "service_run": "context64-20261017T113758Z",
+      "actor_run": "delegation-20261017T113800Z-ce125c5cc5b5",
+      "reason": "PATCH_REJECTED",
+      "service": {
+        "baseline_resources": {
+          "memory_free_percent": 27,
+          "swap_mib": 1072.0
+        },
+        "compact_memory": false,
+        "controller_exit": 1,
+        "last_resources": {
+          "memory_free_percent": 36,
+          "swap_mib": 1072.0
+        },
+        "memory_saving": true,
+        "original_context": 32768,
+        "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+        "reason": "DELEGATION_STOPPED",
+        "restoration": "VERIFIED",
+        "status": "STOPPED",
+        "temporary_context": 65536,
+        "temporary_hash": "41f8f669acedbf0a90d861765ed0e178d7a6cf0a79653ccb15ea9171eeb6342e"
+      },
+      "cumulative_usage": {
+        "calls": 83,
+        "input_tokens": 251530,
+        "output_tokens": 46504,
+        "accounting": "SETTLED"
+      },
+      "worker_result": {
+        "api_calls": 3,
+        "final": "{\"insertions\": [{\"after_line\": 34, \"text\": \"            # Ignore Python comments\\n            # Added context lines for better diff visualization\\n            \"}]}",
+        "kind": "result",
+        "status": "VERIFIED"
+      }
+    },
+    {
+      "service_run": "context64-20261017T113953Z",
+      "actor_run": "delegation-20261017T113956Z-e41bfca1f5c8",
+      "reason": "HERMES_PROPOSE_PATCH_FAILED",
+      "service": {
+        "baseline_resources": {
+          "memory_free_percent": 30,
+          "swap_mib": 1072.0
+        },
+        "compact_memory": false,
+        "controller_exit": 1,
+        "last_resources": {
+          "memory_free_percent": 38,
+          "swap_mib": 1064.0
+        },
+        "memory_saving": true,
+        "original_context": 32768,
+        "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+        "reason": "DELEGATION_STOPPED",
+        "restoration": "VERIFIED",
+        "status": "STOPPED",
+        "temporary_context": 65536,
+        "temporary_hash": "41f8f669acedbf0a90d861765ed0e178d7a6cf0a79653ccb15ea9171eeb6342e"
+      },
+      "cumulative_usage": {
+        "calls": 84,
+        "input_tokens": 254678,
+        "output_tokens": 46576,
+        "accounting": "SETTLED"
+      },
+      "worker_result": {
+        "error_type": "RuntimeError",
+        "kind": "result",
+        "reason": "PATCH_READ_ONLY_UNVERIFIED",
+        "status": "STOPPED"
+      }
+    }
+  ],
+  "applied_model_patches": 0,
+  "original_best_candidate": "runs/delegation-20261017T112524Z-cdfed6305bab/repair-candidate-1",
+  "best_candidate_original_tests": "5/6",
+  "best_candidate_expanded_tests": "5/9",
+  "scope_control": "Reject full replacement, arbitrary insertions, noncounter code, duplicate anchors. Only2 exact insertion forms preserve all original bytes. Model-facing tools read-only and execution guard rejects writes/delegation.",
+  "control_probe": {
+    "classification": "PUBLIC",
+    "model_calls": 0,
+    "note": "Corrected new public case path to meet existing output contract. Controller-authored allowed insertions; no model success or adoption.",
+    "results": {
+      "baseline": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        false
+      ],
+      "control-candidate": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    "status": "CONTROL_ONLY_NOT_MODEL_SUCCESS"
+  },
+  "control_probe_note": "9/9 pertains only to controller-authored permitted insertions, not a Gemma-generated solution.",
+  "limitations": [
+    "First model proposal inserted comments, rejected before application.",
+    "Second attempt did not issue required skill_view; worker stopped before exporting a proposal. Its patch correctness remains unverified. The prompt also supplied numbered source, so this is a harness evidence condition, not proof of bad generated code.",
+    "Initial extra-case path did not match existing output contract. Corrected path and reran control tests; initial run preserved."
+  ],
+  "reuse": "NOT_RUN",
+  "independent_evaluation": "NOT_RUN",
+  "production_adoption": "NOT_REQUESTED",
+  "latest_verification": {
+    "related_tests": 45,
+    "standard_tests": 30,
+    "security": "SECURITY_PASSED",
+    "dependency_scan": "NOT_APPLICABLE"
+  }
+}

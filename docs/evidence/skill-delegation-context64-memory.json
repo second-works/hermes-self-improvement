@@ -1,0 +1,151 @@
+{
+  "classification": "PUBLIC",
+  "acceptance": "BLOCKED",
+  "service_run": "context64-20261017T055425Z",
+  "actor_run": "delegation-20261017T055431Z-6da6847635cb",
+  "service_report": {
+    "baseline_resources": {
+      "memory_free_percent": 17,
+      "swap_mib": 5316.38
+    },
+    "controller_exit": 1,
+    "last_resources": {
+      "memory_free_percent": 38,
+      "swap_mib": 5055.69
+    },
+    "memory_saving": true,
+    "original_context": 32768,
+    "original_hash": "eb17a4eb952d83f13e3f5fda1f5ed2f8f7441c85126bd4237cecc0dd5346da04",
+    "reason": "DELEGATION_STOPPED",
+    "restoration": "VERIFIED",
+    "status": "STOPPED",
+    "temporary_context": 65536,
+    "temporary_hash": "41f8f669acedbf0a90d861765ed0e178d7a6cf0a79653ccb15ea9171eeb6342e"
+  },
+  "actor_reason": "REQUEST_SCHEMA",
+  "actual_runtime_context": 65536,
+  "hermes_boot": {
+    "kind": "result",
+    "status": "VERIFIED",
+    "tools": [
+      "delegate_task",
+      "skill_manage",
+      "skill_view",
+      "skills_list"
+    ]
+  },
+  "gate": {
+    "boundaries": {
+      "checks": [
+        "canary_unmounted",
+        "capabilities",
+        "cpu_quota",
+        "deps_readonly",
+        "env",
+        "fixture_readonly",
+        "hidden_unmounted",
+        "lock_readonly",
+        "memory_limit",
+        "network_denied",
+        "no_new_privileges",
+        "no_shared_memory",
+        "non_root",
+        "pids_limit",
+        "root_readonly",
+        "seccomp",
+        "skill_readonly",
+        "socket_unmounted",
+        "source_readonly",
+        "swap_limit",
+        "tmpfs_size",
+        "work_writable"
+      ],
+      "python": "3.12.15",
+      "status": "VERIFIED"
+    },
+    "cpu": {
+      "checks": [
+        "cpu_throttled"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "disk": {
+      "checks": [
+        "disk_denied"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "memory": {
+      "checks": [
+        "memory_denied"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "output": {
+      "probe_started": true,
+      "reason": "OUTPUT_LIMIT",
+      "status": "VERIFIED"
+    },
+    "pids": {
+      "checks": [
+        "pids_denied"
+      ],
+      "python": null,
+      "status": "VERIFIED"
+    },
+    "timeout": {
+      "probe_started": true,
+      "reason": "TIMEOUT",
+      "status": "VERIFIED"
+    }
+  },
+  "model_usage": {
+    "calls": 0,
+    "cost_usd": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "records": []
+  },
+  "candidate_created": false,
+  "evaluation": "NOT_RUN",
+  "restoration_checks": {
+    "8081": {
+      "health": "ok",
+      "model": "gemma-4-e4b",
+      "n_ctx": 32768
+    },
+    "8082": {
+      "health": "ok",
+      "model": "gemma-4-e4b",
+      "n_ctx": 32768
+    },
+    "installed_original_hash_matches": true
+  },
+  "source_snapshot": {
+    "fixtures/audit/delegation.json": "838c4747e87b702e964594006b9c976cefb1ee343dcb730b86c536b750bc0f82",
+    "fixtures/delegation/prepare.py": "44e45b3a907012200a16d733c3391cdff691e13140faa07f9fb438085bc94b09",
+    "fixtures/delegation/worker.py": "117155a43147f8dfca6fe90789dc0d0e0d56b2f7f8bffb89272fb5fd30d95f29",
+    "fixtures/self-evolution/hermes-agent/skills/github-code-review/SKILL.md": "7afb0ea3ea8312b1b5eb68770d1e5ef2c921b1f918826a4e8b787bd5e44b6a27",
+    "fixtures/self-evolution/isolation_probe.py": "c3bef46648bc131b8ecf61811685e50be5c15b4d349138557cdc16101ff9a9ab",
+    "scripts/delegate_skill.py": "7773826c48fe2f6c4f1da5343f2bc79c66e1b5cf621377c1f177aa923668628e",
+    "scripts/self_evolution_spike.py": "b507ee9d91784730fcf718e5349108990065d99f42ff969d75680c88cae28686",
+    "src/audit/core.py": "36d53c9b489006bd2dc7d22e12fa959240fcc79587bea32d5b49c691288f82c6",
+    "src/delegation/context.py": "3ed53d1baf0adb481daf9cd5ca948d8eb981e5ebfc66596b128e8ece52623b39",
+    "src/delegation/core.py": "21a032e0fd26f8b1d28e0db3eaa3ecd54b21fa48fe269afea317b12aa25d8004",
+    "src/delegation/relay.py": "9827f7279e74bf917e4d386ff7d838b927732131ec734df045826e02808fd64c",
+    "src/delegation/sandbox.py": "0d0de085075071bc283ce3197607f90c376e3c5f4940ec551fe9e2f00bf043e5",
+    "src/evaluation/core.py": "71f2648fc05790f58a571571c9fafc42c121b4a6f6f1693dd5e5c2f0dcd53fdb",
+    "src/evaluation/sandbox.py": "d136d5d46e6bafa4939560595fe8ccd52958ea7363fd18a36ce29a29735f8cc5",
+    "src/self_evolution/sandbox.py": "ffdb480773bc331f24e425a91a966461ea56e2eac8f7b5f132081a14d28812a3"
+  },
+  "evidence_hashes": {
+    "runs/context64-20261017T055425Z/service-report.json": "f7e6410492b8b482be3acaebaab39af8bdbfe6cbfe03bbe86fe646402c32e0c2",
+    "runs/context64-20261017T055425Z/service-events.jsonl": "3f024927e489c96f569e70126f66ada862ff7bd789aa01814b030dcdc4038672",
+    "runs/delegation-20261017T055431Z-6da6847635cb/report.json": "38e04443aa1ce422ca02f0c89bd2792b8c509290a491a8181a024cb25312f5e7",
+    "runs/delegation-20261017T055431Z-6da6847635cb/boot.json": "167ff94201f20d4d97a24916cc5a34d71fa0b09492d0400ddbf398c73560ad69"
+  },
+  "followup": "Hermes emitted reasoning_effort=medium. Relay normalization fix tested offline; no second live service experiment was performed."
+}

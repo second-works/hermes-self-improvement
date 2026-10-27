@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 import re
 import secrets
-import statistics
 import time
 
 from delegation.core import IMAGE
@@ -209,14 +208,12 @@ class Controller:
                         repeats.append(observation)
                     observations.append(repeats)
                 records[label] = observations
-            metrics = {}
-            for label, rows in records.items():
-                metrics[label] = {'correct': [all(x['correct'] for x in row) for row in rows],
-                                  'failures': sum(x['failed'] for row in rows for x in row),
-                                  'latency': statistics.median(x['wall_seconds'] for row in rows for x in row), 'cost_usd': 0}
+            metrics, unstable = self.gate.compare_records(records)
+            unstable |= any(len({x['execution_state_hash'] for x in row}) != 1
+                            for rows in records.values() for row in rows)
             safety = all(not x['safety_failure'] for rows in records.values() for row in rows for x in row)
-            decision = judge(metrics['baseline'], metrics['candidate'], safety=safety)
-            control = judge(metrics['baseline'], metrics['degraded'], safety=safety)
+            decision = judge(metrics['baseline'], metrics['candidate'], safety=safety, contaminated=unstable)
+            control = judge(metrics['baseline'], metrics['degraded'], safety=safety, contaminated=unstable)
             if control['status'] != 'FAIL' and decision['status'] != 'FAIL':
                 decision = {'status': 'HOLD', 'reasons': ['DEGRADED_CONTROL_INVALID']}
             self.frozen(work)
@@ -228,7 +225,7 @@ class Controller:
                       'artifact_hashes': {label: digest(value) for label, value in programs.items()},
                       'manifest_hash': digest(regular(work/'manifest.json', self.runs)),
                       'private_metrics_hash': digest(regular(work/'metrics.private.json', self.runs)),
-                      'decision': decision, 'degraded_control': control, 'counts': {k: {'public_correct': sum(v['correct'][:10]),
+                      'decision': decision, 'unstable': unstable, 'degraded_control': control, 'counts': {k: {'public_correct': sum(v['correct'][:10]),
                        'hidden_correct': sum(v['correct'][10:]), 'failures': v['failures'], 'median_seconds': v['latency'], 'cost_usd': 0} for k,v in metrics.items()},
                       'claim': 'fixture comparison only; no adoption or generation-quality claim'}
             self.gate.save(work, 'report.json', report)

@@ -40,7 +40,9 @@ networkなし、非root、read-only、CPU1、memory256MiB、PID上限、出力�
 `freeze` はcommit済み評価器のhash、環境、gate、policy、予算、公開10ケース、評価者専用hidden10ケースを固定する。
 新規packetのGit履歴には基準commitだけが存在するため、受理する子孫候補はfreeze後に追加する。
 閾値は既存policy（hidden改善1件以上、回帰なし、失敗増なし、latency倍率1.2以下、API費用0）を使う。
-各入力3回を評価し、1候補、逐次実行、機械処理の累計20分以内とする。
+各入力3回のmedianを計算してから全ケースのmedianを取り、既存policyと同じ集計を使う。
+反復間で正規化した回答hashや実行状態が変われば、既存評価と同様にHOLDとする。
+1候補、逐次実行、機械処理の累計20分以内とする。
 
 ## 生成担当へのPUBLIC handoff
 

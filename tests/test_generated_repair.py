@@ -44,6 +44,13 @@ class ObservationTests(unittest.TestCase):
         self.assertEqual(judge(b,c,safety=True)['status'],'FAIL')
         self.assertEqual(judge(b,{},safety=None)['status'],'HOLD')
 
+    def test_normalized_answers_ignore_json_format_and_cpu_variation(self):
+        case={'exit':0,'expected':[]}
+        first=observe(outcome(stdout=b'{"findings":[],"cpu_seconds":0}'),case)
+        second=observe(outcome(stdout=b'{ "cpu_seconds": 1, "findings": [] }'),case)
+        self.assertEqual(first['answer_hash'],second['answer_hash'])
+        self.assertEqual(first['execution_state_hash'],second['execution_state_hash'])
+
     def test_public_packet_data_contains_no_hidden_or_solution(self):
         public=cases()
         self.assertEqual(len(public),10)
@@ -200,6 +207,50 @@ class FlowTests(unittest.TestCase):
         self.assertTrue((self.root/'runs/generated-repair.lock').exists())
         self.assertFalse((self.work/'report.json').exists())
         with self.assertRaises(EvaluationError): self.c.audit(self.name)
+
+    def test_frozen_latency_uses_median_of_case_medians(self):
+        sha=self.freeze_candidate()
+        original=self.c.gate.Sandbox.run
+        calls=0
+        def varying(box,program,data,**kwargs):
+            nonlocal calls
+            result=original(box,program,data,**kwargs)
+            result['wall_seconds']=1
+            if program.name=='candidate.py':
+                index,repeat=divmod(calls,3); calls+=1
+                result['wall_seconds']=([.5,1.5,1.5] if index<11 else [.5,.5,.5])[repeat]
+            return result
+        with patch.object(self.c.gate.Sandbox,'run',varying):
+            report=self.c.evaluate(self.name,sha)
+        self.assertEqual(report['decision']['status'],'FAIL')
+        self.assertIn('LATENCY_LIMIT',report['decision']['reasons'])
+
+    def unstable_report(self, vary_exit=False):
+        sha=self.freeze_candidate()
+        original=self.c.gate.Sandbox.run
+        calls=0
+        def varying(box,program,data,**kwargs):
+            nonlocal calls
+            result=original(box,program,data,**kwargs)
+            if program.name=='candidate.py':
+                index,repeat=divmod(calls,3); calls+=1
+                if index==15:
+                    result=outcome(0 if vary_exit and repeat==1 else 2,
+                                   canonical({'error':'WRONG' if vary_exit else 'WRONG_'+str(repeat)}))
+            return result
+        with patch.object(self.c.gate.Sandbox,'run',varying):
+            report=self.c.evaluate(self.name,sha)
+        return report
+
+    def test_different_wrong_repeated_answers_cannot_pass(self):
+        report=self.unstable_report()
+        self.assertEqual(report['decision']['status'],'HOLD')
+        self.assertIn('EVALUATION_CONTAMINATED',report['decision']['reasons'])
+
+    def test_different_repeated_exit_states_cannot_pass(self):
+        report=self.unstable_report(vary_exit=True)
+        self.assertEqual(report['decision']['status'],'HOLD')
+        self.assertIn('EVALUATION_CONTAMINATED',report['decision']['reasons'])
 
     def test_changed_dataset_and_source_refuse_execution(self):
         sha=self.freeze_candidate()

@@ -5,10 +5,10 @@ from pathlib import Path
 import re
 import secrets
 import statistics
-import subprocess
 import time
 
 from delegation.core import IMAGE
+from evaluation.sandbox import capture
 from evaluation.core import (canonical, digest, findings, judge, load_json, policy,
                              regular, require, write_new, EvaluationError)
 
@@ -22,12 +22,12 @@ SOURCES = ['src/delegation/core.py', 'src/delegation/generated.py', 'src/evaluat
 
 
 def git(repo, *args):
-    result = subprocess.run(['git', '-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', '-C', str(repo), *args],
+    result = capture(['git', '-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', '-C', str(repo), *args],
                             env={'PATH': '/opt/homebrew/bin:/usr/bin:/bin', 'HOME': '/nonexistent',
                                  'GIT_CONFIG_NOSYSTEM': '1', 'GIT_NO_REPLACE_OBJECTS': '1', 'GIT_CONFIG_GLOBAL': '/dev/null'},
-                            capture_output=True, timeout=10)
-    require(result.returncode == 0, 'GIT_FAILED')
-    return result.stdout
+                            timeout=10, limit=1048576)
+    require(not result['error'] and result['exit'] == 0, 'GIT_FAILED')
+    return result['stdout']
 
 
 def artifact(repo, sha):
@@ -35,6 +35,8 @@ def artifact(repo, sha):
     require(git(repo, 'cat-file', '-t', sha).strip() == b'commit', 'COMMIT_TYPE')
     tree = git(repo, 'ls-tree', sha, '--', ARTIFACT).split()
     require(len(tree) == 4 and tree[:2] == [b'100644', b'blob'], 'ARTIFACT_TYPE')
+    size = git(repo, 'cat-file', '-s', sha + ':' + ARTIFACT).strip()
+    require(size.isdigit() and 0 < int(size) <= 65536, 'ARTIFACT_SIZE')
     value = git(repo, 'show', sha + ':' + ARTIFACT)
     require(0 < len(value) <= 65536, 'ARTIFACT_SIZE')
     return value

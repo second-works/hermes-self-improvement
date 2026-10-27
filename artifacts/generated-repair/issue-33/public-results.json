@@ -1,0 +1,88 @@
+{
+  "cases": [
+    {
+      "case": 0,
+      "passed": true,
+      "exit": 0,
+      "stdout": "{\"findings\": [{\"path\": \"case_public00.py\", \"line\": 7, \"rule\": \"dynamic-eval\"}], \"cpu_seconds\": 0}\n",
+      "stderr": "",
+      "wall_seconds": 0.5056522500017309
+    },
+    {
+      "case": 1,
+      "passed": true,
+      "exit": 0,
+      "stdout": "{\"findings\": [{\"path\": \"case_public00.py\", \"line\": 7, \"rule\": \"shell-execution\"}], \"cpu_seconds\": 0}\n",
+      "stderr": "",
+      "wall_seconds": 0.579335207999975
+    },
+    {
+      "case": 2,
+      "passed": true,
+      "exit": 0,
+      "stdout": "{\"findings\": [], \"cpu_seconds\": 0}\n",
+      "stderr": "",
+      "wall_seconds": 0.45303949999652104
+    },
+    {
+      "case": 3,
+      "passed": true,
+      "exit": 0,
+      "stdout": "{\"findings\": [{\"path\": \"case_public00.py\", \"line\": 8, \"rule\": \"dynamic-eval\"}], \"cpu_seconds\": 0}\n",
+      "stderr": "",
+      "wall_seconds": 0.4190779589989688
+    },
+    {
+      "case": 4,
+      "passed": true,
+      "exit": 0,
+      "stdout": "{\"findings\": [{\"path\": \"case_public00.py\", \"line\": 8, \"rule\": \"dynamic-eval\"}], \"cpu_seconds\": 0}\n",
+      "stderr": "",
+      "wall_seconds": 0.3612711249952554
+    },
+    {
+      "case": 5,
+      "passed": true,
+      "exit": 2,
+      "stdout": "{\"error\":\"INVALID_INPUT\"}\n",
+      "stderr": "",
+      "wall_seconds": 0.34040745799575234
+    },
+    {
+      "case": 6,
+      "passed": true,
+      "exit": 2,
+      "stdout": "{\"error\":\"INVALID_INPUT\"}\n",
+      "stderr": "",
+      "wall_seconds": 0.46851512500143144
+    },
+    {
+      "case": 7,
+      "passed": true,
+      "exit": 2,
+      "stdout": "{\"error\":\"INVALID_INPUT\"}\n",
+      "stderr": "",
+      "wall_seconds": 0.40807425000093644
+    },
+    {
+      "case": 8,
+      "passed": true,
+      "exit": 2,
+      "stdout": "{\"error\":\"INVALID_INPUT\"}\n",
+      "stderr": "",
+      "wall_seconds": 0.30773612500343006
+    },
+    {
+      "case": 9,
+      "passed": true,
+      "exit": 2,
+      "stdout": "{\"error\":\"INVALID_INPUT\"}\n",
+      "stderr": "",
+      "wall_seconds": 0.8693691250009579
+    }
+  ],
+  "passed": 10,
+  "total": 10,
+  "elapsed_seconds": 5.588511708003352,
+  "prior_attempt_seconds_upper_bound": 2
+}

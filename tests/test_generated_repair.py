@@ -54,6 +54,12 @@ class ObservationTests(unittest.TestCase):
         self.assertEqual(digest((ROOT/'fixtures/generated_repair/baseline.py').read_bytes()), BASELINE_HASH)
 
 
+    def test_hidden_values_are_fresh_without_disclosing_them(self):
+        first, second = cases(True), cases(True)
+        self.assertTrue(all(a['stdin'] != b['stdin'] for a,b in zip(first,second)))
+        self.assertTrue(len(first[-1]['stdin'].encode()) > 16384)
+
+
 class IntakeTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)

@@ -61,10 +61,10 @@ def cases(hidden=False):
                canonical({'path': path, 'patch': 7}).decode()]
     if hidden:
         # Different rejection categories from the public examples; values stay internal.
-        invalid = ['[]', canonical({'path': path}).decode(),
+        invalid = [canonical([tag]).decode(), canonical({'path': path}).decode(),
                    canonical({'path': path, 'patch': ''}).decode(),
                    canonical({'path': 'case_A'+tag+'.py', 'patch': 'x'}).decode(),
-                   ' ' * 16385]
+                   canonical({'path': path, 'patch': tag * 1030}).decode()]
     result.extend({'stdin': value, 'expected': None, 'exit': 2} for value in invalid)
     return result
 

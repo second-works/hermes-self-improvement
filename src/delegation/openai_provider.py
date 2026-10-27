@@ -117,9 +117,13 @@ def post(body, key, timeout, limit):
     """One direct TLS POST. No env proxy, redirects, retries, or error-body logging."""
     connection = DeadlineHTTPSConnection('api.openai.com', 443, timeout=timeout,
                                         context=ssl.create_default_context())
+    transport_socket = None
+    response = None
     # A wall timer also bounds slow headers / slow-drip response bodies.
     def expire():
-        sock = connection.sock
+        # HTTPResponse may own the socket after getresponse() handles
+        # Connection: close. Keep the same object reachable for shutdown.
+        sock = transport_socket if transport_socket is not None else connection.sock
         if sock is not None:
             try:
                 sock.shutdown(socket.SHUT_RDWR)
@@ -132,6 +136,7 @@ def post(body, key, timeout, limit):
     started = time.monotonic()
     try:
         connection.connect()
+        transport_socket = connection.sock
         # Prevent http.client from reconnecting after the wall timer closes a
         # connection between this deadline check and request dispatch.
         connection.auto_open = 0
@@ -153,6 +158,8 @@ def post(body, key, timeout, limit):
         return data
     finally:
         timer.cancel()
+        if response is not None:
+            response.close()
         connection.close()
 
 

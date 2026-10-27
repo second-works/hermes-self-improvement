@@ -290,6 +290,28 @@ class ProviderTests(unittest.TestCase):
             connection.connect()
         context.wrap_socket.return_value.do_handshake.assert_called_once()
 
+    def test_response_socket_ownership_does_not_disable_deadline_cancellation(self):
+        with patch('delegation.openai_provider.DeadlineHTTPSConnection') as https, \
+                patch('delegation.openai_provider.threading.Timer') as timer:
+            connection = https.return_value
+            sock = connection.sock
+            reply = Mock()
+            reply.status = 200
+            reply.getheader.side_effect = lambda name, default=None: (
+                'application/json' if name == 'Content-Type' else '2')
+            def getresponse():
+                # http.client does this when the response owns a closing socket.
+                connection.sock = None
+                return reply
+            connection.getresponse.side_effect = getresponse
+            def read(limit):
+                timer.call_args.args[1]()
+                return b'{}'
+            reply.read.side_effect = read
+            post(b'{}', 'synthetic-key', 1, 64)
+            sock.shutdown.assert_called_once()
+            reply.close.assert_called_once()
+
     def test_disabled_example_cannot_read_key_or_call_api(self):
         example = json.loads((ROOT / 'fixtures/delegation/registered-operations/openai-config.example.json').read_text())
         with patch('delegation.openai_provider.os.environ') as env:

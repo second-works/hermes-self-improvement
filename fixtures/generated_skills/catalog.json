@@ -1,0 +1,1 @@
+[{"name":"github-code-review","path":"github-code-review/SKILL.md","capability":"Review a supplied PUBLIC synthetic Python unified diff using the existing bundled scripts/review.py. Its context/comment counters are already repaired. The executable is immutable."}]

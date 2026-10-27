@@ -226,7 +226,7 @@ class ProviderTests(unittest.TestCase):
             self.provider(data).select(STATE)
 
     def test_transport_timeout_bad_content_type_and_no_length_size_cap(self):
-        with patch('delegation.openai_provider.http.client.HTTPSConnection') as https:
+        with patch('delegation.openai_provider.DeadlineHTTPSConnection') as https:
             connection = https.return_value
             reply = connection.getresponse.return_value
             reply.status = 200
@@ -270,6 +270,26 @@ class ProviderTests(unittest.TestCase):
         with self.assertRaisesRegex(EvaluationError, '^API_FAILED$'):
             connect_fixed(('localhost', 8081), 1)
 
+    def test_tls_handshake_is_published_and_receives_only_remaining_deadline(self):
+        # No network or timing sleeps: simulate TCP consuming 75% of the budget.
+        from delegation.openai_provider import DeadlineHTTPSConnection
+        context = Mock()
+        raw = Mock()
+        connection = DeadlineHTTPSConnection('api.openai.com', 443, timeout=0.2, context=context)
+        def wrap(sock, **kwargs):
+            self.assertIs(sock, raw)
+            self.assertFalse(kwargs['do_handshake_on_connect'])
+            return context.wrap_socket.return_value
+        context.wrap_socket.side_effect = wrap
+        def handshake():
+            self.assertIs(connection.sock, context.wrap_socket.return_value)
+            self.assertAlmostEqual(connection.sock.settimeout.call_args.args[0], 0.05)
+        context.wrap_socket.return_value.do_handshake.side_effect = handshake
+        with patch('delegation.openai_provider.connect_fixed', return_value=raw), \
+                patch('delegation.openai_provider.time.monotonic', side_effect=[0, 0.15]):
+            connection.connect()
+        context.wrap_socket.return_value.do_handshake.assert_called_once()
+
     def test_disabled_example_cannot_read_key_or_call_api(self):
         example = json.loads((ROOT / 'fixtures/delegation/registered-operations/openai-config.example.json').read_text())
         with patch('delegation.openai_provider.os.environ') as env:
@@ -278,7 +298,7 @@ class ProviderTests(unittest.TestCase):
             env.get.assert_not_called()
 
     def test_transport_has_fixed_tls_destination_method_no_proxy_redirect_or_retry(self):
-        with patch('delegation.openai_provider.http.client.HTTPSConnection') as https:
+        with patch('delegation.openai_provider.DeadlineHTTPSConnection') as https:
             connection = https.return_value
             reply = connection.getresponse.return_value
             reply.status = 200

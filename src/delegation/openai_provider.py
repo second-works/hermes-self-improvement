@@ -93,11 +93,30 @@ class Config:
         return cls(**parsed)
 
 
+class DeadlineHTTPSConnection(http.client.HTTPSConnection):
+    """Publish the TLS socket before its handshake so cancellation reaches it."""
+    def connect(self):
+        require(self.host == 'api.openai.com' and self.port == 443 and
+                not self._tunnel_host, 'API_FAILED')
+        deadline = time.monotonic() + self.timeout
+        raw = connect_fixed((self.host, self.port), self.timeout)
+        self.sock = raw
+        try:
+            self.sock = self._context.wrap_socket(raw, server_hostname=self.host,
+                                                  do_handshake_on_connect=False)
+            remaining = deadline - time.monotonic()
+            require(remaining > 0, 'API_TIMEOUT')
+            self.sock.settimeout(remaining)
+            self.sock.do_handshake()
+        except Exception:
+            self.close()
+            raise
+
+
 def post(body, key, timeout, limit):
     """One direct TLS POST. No env proxy, redirects, retries, or error-body logging."""
-    connection = http.client.HTTPSConnection('api.openai.com', 443, timeout=timeout,
-                                              context=ssl.create_default_context())
-    connection._create_connection = connect_fixed
+    connection = DeadlineHTTPSConnection('api.openai.com', 443, timeout=timeout,
+                                        context=ssl.create_default_context())
     # A wall timer also bounds slow headers / slow-drip response bodies.
     def expire():
         sock = connection.sock

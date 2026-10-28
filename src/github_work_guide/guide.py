@@ -91,7 +91,7 @@ class Text:
                 self.historical = set(range(previous, len(self.lines)))
                 break
         self.headings = [h for h in self.headings if h[0] not in self.historical]
-        self.inline_code = inline_code_lines(self)
+        self.non_declarations = non_declaration_lines(self)
 
     def prefix(self):
         return self.owner if self.where == 'body' else f'{self.owner}:{self.where}'
@@ -253,20 +253,54 @@ def valid_time(value):
     return value if isinstance(value, str) and TIME.fullmatch(value) else None
 
 
-def inline_code_lines(text):
-    """Shared code-span map; matching backtick lengths can cross source lines."""
-    result, opening = {}, None
+def non_declaration_lines(text):
+    """Shared ranges for code examples and hidden HTML comments.
+
+    Delimiters carry across lines. Comment contents cannot open code, and code
+    contents cannot open comments. Escapes apply only outside actual code.
+    """
+    result, mode, ticks = {}, None, None
+    token = re.compile(r'<!--|`+')
+    code_tick = re.compile(r'`+')
     for i, line in enumerate(text.lines):
         if i in text.fenced or i in text.historical:
             continue
-        spans, start = [], 0 if opening is not None else None
-        for tick in re.finditer(r'`+', line):
-            if opening is None:
-                opening, start = len(tick.group()), tick.start()
-            elif len(tick.group()) == opening:
-                spans.append((start, tick.end()))
-                opening, start = None, None
-        if opening is not None:
+        if mode is None and re.match(r'^(?: {4}| {0,3}\t)', line):
+            result[i] = [(0, len(line))]
+            continue
+        spans, start, pos = [], 0 if mode else None, 0
+        while pos < len(line):
+            if mode == 'comment':
+                finish = line.find('-->', pos)
+                if finish < 0:
+                    break
+                pos = finish + 3
+                spans.append((start, pos))
+                mode, start = None, None
+                continue
+            match = (token if mode is None else code_tick).search(line, pos)
+            if match is None:
+                break
+            begin, finish = match.start(), match.end()
+            value, pos = line[begin:finish], finish
+            if mode == 'code':
+                if len(value) == ticks:
+                    spans.append((start, finish))
+                    mode, ticks, start = None, None, None
+                continue
+            escaped, cursor = 0, begin
+            while cursor and line[cursor - 1] == '\\':
+                escaped ^= 1
+                cursor -= 1
+            if value == '<!--':
+                if not escaped:
+                    mode, start = 'comment', begin
+            else:
+                # An escape consumes the first tick, leaving the rest of a run.
+                begin += escaped
+                if begin < finish:
+                    mode, ticks, start = 'code', finish - begin, begin
+        if mode:
             spans.append((start, len(line)))
         result[i] = spans
     return result
@@ -310,7 +344,7 @@ def dependency_hints(text, start, end):
         line = text.lines[i]
         # Inline-code spans use matching backtick lengths; an unclosed span
         # suppresses the remainder rather than manufacturing a declaration.
-        spans = list(text.inline_code.get(i, []))
+        spans = list(text.non_declarations.get(i, []))
         spans += condition_spans(line, condition_stack, spans)
         for match in label.finditer(line):
             if any(a < match.end() and match.start() < b for a, b in spans):
@@ -338,7 +372,7 @@ def body_refs(text, reference):
     if not reference['evidence']['id'].startswith(f'{text.owner}:L'):
         return False
     line, column = text.lines[reference['line']], reference['column']
-    if any(a <= column < b for a, b in text.inline_code.get(reference['line'], [])):
+    if any(a <= column < b for a, b in text.non_declarations.get(reference['line'], [])):
         return False
     label = re.match(r'\s*(?:[-*]\s+)?refs?\s*[:：]?\s*', line, re.I)
     if not label:

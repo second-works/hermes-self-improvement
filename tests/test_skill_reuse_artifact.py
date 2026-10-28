@@ -26,9 +26,11 @@ class PublicProofTests(unittest.TestCase):
         self.assertEqual(report['candidate_sha'], provenance['candidate_sha'])
         self.assertEqual(report['candidate_hash'], digest((ART / 'candidate.SKILL.md').read_bytes()))
         self.assertEqual(digest((ART / 'candidate.bundle').read_bytes()), provenance['bundle_hash'])
-        # This is the old observer's status, not final output-contract acceptance.
         self.assertEqual(report['status'], 'PASS')
-        self.assertEqual(provenance['acceptance_status'], 'HOLD')
+        self.assertEqual(provenance['final_response_status'], 'PASS')
+        self.assertEqual(len([p for p in report['trace_hashes'] if p.endswith('.response.json')]), 6)
+        previous_observer = json.loads((ART / 'superseded-output-unchecked/provenance.json').read_text())
+        self.assertEqual(previous_observer['acceptance_status'], 'HOLD')
         self.assertEqual(report['counts'], {name: 3 for name in ['primary', 'sufficient', 'denied', 'missing', 'baseline']})
         self.assertEqual(len(set(report['session_ids'])), 3)
         with tempfile.TemporaryDirectory() as directory:

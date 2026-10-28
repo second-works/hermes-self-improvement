@@ -54,21 +54,13 @@ class Text:
         for line in self.lines:
             self.offsets.append(pos)
             pos += len(line) + 1
-        self.headings, self.fenced = [], set()
-        fence = None  # opening marker; a block closes only with the same character, at least as long, and nothing after
+        self.fenced, self.non_declarations = source_ranges(self.lines)
+        self.headings = []
         for i, line in enumerate(self.lines):
-            m = FENCE.match(line.rstrip('\r'))
-            if fence is None and m and not (m.group(1)[0] == '`' and '`' in m.group(2)):
-                fence = m.group(1)
-                self.fenced.add(i)
-                continue
-            if fence is not None:
-                self.fenced.add(i)
-                if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and not m.group(2).strip():
-                    fence = None
+            if i in self.fenced:
                 continue
             m = HEADING.match(line.rstrip('\r'))
-            if m:
+            if m and not any(a <= m.start(1) < b for a, b in self.non_declarations.get(i, [])):
                 self.headings.append((i, len(m.group(1)), m.group(2)))
         # Only a separated, explicitly labelled trailing archive after a current Goal.
         # A later higher-level section makes the boundary ambiguous: keep all text active.
@@ -166,7 +158,7 @@ def references(text, repo):
 
 def ref(text, line, match, kind, number, source):
     keyword = KEYWORD.search(source[:match.start()][-40:]) is not None
-    return {'kind': kind, 'number': number, 'line': line, 'relation': 'refs' if keyword else 'mention',
+    return {'kind': kind, 'number': number, 'line': line, 'column': match.start(), 'relation': 'refs' if keyword else 'mention',
             'evidence': text.window(line, match.start(), match.end())}
 
 
@@ -250,3 +242,158 @@ def done_counts(text, section):
 
 def valid_time(value):
     return value if isinstance(value, str) and TIME.fullmatch(value) else None
+
+
+def source_ranges(lines):
+    """Shared ranges for code examples and hidden HTML comments.
+
+    Delimiters carry across lines. Comment contents cannot open code, and code
+    contents cannot open comments. Escapes apply only outside actual code.
+    """
+    result, fenced, mode, ticks, fence = {}, set(), None, None, None
+    token = re.compile(r'<!--|`+')
+    code_tick = re.compile(r'`+')
+    for i, line in enumerate(lines):
+        marker = FENCE.match(line.rstrip('\r'))
+        if mode == 'fence':
+            fenced.add(i)
+            if (marker and marker.group(1)[0] == fence[0] and len(marker.group(1)) >= len(fence)
+                    and not marker.group(2).strip()):
+                mode, fence = None, None
+            continue
+        if mode is None and marker and not (marker.group(1)[0] == '`' and '`' in marker.group(2)):
+            mode, fence = 'fence', marker.group(1)
+            fenced.add(i)
+            continue
+        if mode is None and re.match(r'^(?: {4}| {0,3}\t)', line):
+            result[i] = [(0, len(line))]
+            continue
+        spans, start, pos = [], 0 if mode else None, 0
+        while pos < len(line):
+            if mode == 'comment':
+                finish = line.find('-->', pos)
+                if finish < 0:
+                    break
+                pos = finish + 3
+                spans.append((start, pos))
+                mode, start = None, None
+                continue
+            match = (token if mode is None else code_tick).search(line, pos)
+            if match is None:
+                break
+            begin, finish = match.start(), match.end()
+            value, pos = line[begin:finish], finish
+            if mode == 'code':
+                if len(value) == ticks:
+                    spans.append((start, finish))
+                    mode, ticks, start = None, None, None
+                continue
+            escaped, cursor = 0, begin
+            while cursor and line[cursor - 1] == '\\':
+                escaped ^= 1
+                cursor -= 1
+            if value == '<!--':
+                if not escaped:
+                    mode, start = 'comment', begin
+            else:
+                # An escape consumes the first tick, leaving the rest of a run.
+                begin += escaped
+                if begin < finish:
+                    mode, ticks, start = 'code', finish - begin, begin
+        if mode:
+            spans.append((start, len(line)))
+        result[i] = spans
+    return fenced, result
+
+
+def condition_spans(line, stack, ignored):
+    """Keep parenthesized context out of declarations, including across lines."""
+    spans, start = [], 0 if stack else None
+    closes = {'(': ')', '（': '）'}
+    for pos, char in enumerate(line):
+        if any(a <= pos < b for a, b in ignored):
+            continue
+        if char in closes:
+            if not stack:
+                start = pos
+            stack.append(closes[char])
+        elif stack and char == stack[-1]:
+            stack.pop()
+            if not stack:
+                spans.append((start, pos + 1))
+                start = None
+    if stack:
+        spans.append((start, len(line)))
+    return spans
+
+
+def dependency_hints(text, start, end):
+    """Literal labelled references to inspect; never used as graph edges.
+
+    Only a statement-start label and its immediately following reference list
+    qualify. Numbers inside conditions, Parent, prose, fences and inline code
+    never become additional targets. The whole source line remains evidence.
+    """
+    label = re.compile(r'(?:^|[。;；]\s*|\.\s+)\s*(?:[-*]\s+)?(?:depends[ -]on|依存)\s*[:：]\s*', re.I)
+    reference = re.compile(r'(?:(issue|pr)\s+)?#([1-9][0-9]*)(?![0-9A-Za-z_])', re.I)
+    separator = re.compile(r'\s*(?:[,、/／]|\band\b|と)\s*', re.I)
+    result, condition_stack = [], []
+    for i in range(start, end):
+        if i in text.fenced or i in text.historical:
+            continue
+        line = text.lines[i]
+        # Inline-code spans use matching backtick lengths; an unclosed span
+        # suppresses the remainder rather than manufacturing a declaration.
+        spans = list(text.non_declarations.get(i, []))
+        spans += condition_spans(line, condition_stack, spans)
+        for match in label.finditer(line):
+            if any(a < match.end() and match.start() < b for a, b in spans):
+                continue
+            pos = match.end()
+            while True:
+                ref = reference.match(line, pos)
+                if not ref or any(a <= ref.start() < b for a, b in spans):
+                    break
+                n = int(ref.group(2))
+                if n >= 1_000_000_000:
+                    break
+                kind = ref.group(1).lower() if ref.group(1) else None
+                result.append({'kind': kind, 'number': n, 'line': i,
+                               'evidence': text.excerpt(i, i + 1)})
+                sep = separator.match(line, ref.end())
+                if not sep:
+                    break
+                pos = sep.end()
+    return result
+
+
+def body_refs(text, reference):
+    """Explicit Refs declaration in the current PR body, excluding examples."""
+    if not reference['evidence']['id'].startswith(f'{text.owner}:L'):
+        return False
+    line, column = text.lines[reference['line']], reference['column']
+    if any(a <= column < b for a, b in text.non_declarations.get(reference['line'], [])):
+        return False
+    label = re.match(r'\s*(?:[-*]\s+)?refs?\s*[:：]?\s*', line, re.I)
+    if not label:
+        return False
+    pos = label.end()
+    separator = re.compile(r'\s*(?:[,、/／]|\band\b|と)\s*', re.I)
+    while pos <= column:
+        typed = re.match(r'(?:issue|pr)\s+', line[pos:], re.I)
+        if typed:
+            pos += typed.end()
+        match = URL.match(line, pos) or QUALIFIED.match(line, pos) or SHORT.match(line, pos)
+        if not match:
+            return False
+        if pos == column:
+            return True
+        # URL tokens may include a trailing comma; retain it as a list delimiter.
+        finish = match.end()
+        if line[pos:finish].startswith('https://'):
+            finish = pos + len(line[pos:finish].rstrip(','))
+        sep = separator.match(line, finish)
+        if not sep:
+            return False
+        pos = sep.end()
+    return False

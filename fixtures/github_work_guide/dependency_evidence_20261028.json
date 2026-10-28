@@ -1,0 +1,50 @@
+{
+  "classification": "PUBLIC",
+  "source_snapshot_hash": "3a1016a1e9250246df08c4369878822dd816c066f53c1e8837568ef99d89309b",
+  "scope": "Issue #35 and PR #40 public text/state/head for deterministic guidance tests; not a live acquisition",
+  "omitted": [
+    "comments",
+    "checks",
+    "statuses",
+    "reviews",
+    "review_comments",
+    "threads"
+  ],
+  "items": [
+    {
+      "detail": {
+        "number": 35,
+        "title": "[Task] 不足するスキルの新規生成と別セッションでの利用を実証する",
+        "body": "# Goal\n合成の完全なスキル一覧に必要機能がない場合、Codexが不足を根拠付きで判断し、SKILL.mdと実行スクリプトを新規作成し、別セッションで利用できることを示す。着手順③の後半、1 Issue = 1 PR。\n\n# Context\nParent: #31。Depends on: #34。2026-10-28承認済み再計画P2。Plan Review: PASS。\n既存機能がある対照では再利用を優先し、常に新規スキルを生成する動作を合格にしない。実Hermesのスキル一覧や本番へ接続しない。\n\n# Scope / Boundaries\n- Risk Tier: HIGH。新しいAI生成コードとスキルを別セッションで使い、隔離実行・独立評価する。\n- 対象はPUBLIC合成課題「イベントJSONをcategory別のok/failed件数JSONへ集計する」1件。入力はevents配列、各要素はcategory（英小文字または数字1〜16文字）とstatus（ok/failed）だけ。出力はcounts objectでcategoryごとにok/failedの非負整数を持つ。空配列はcounts空object。不正入力はexit 2と厳密JSON error=INVALID_INPUT。stdinは16KiB以下。\n- 合成の完全な既存スキル一覧、入出力契約、公開例、許可ツールだけを生成側へ渡す。候補はSKILL.mdとscripts/aggregate.pyの2ファイル、合計64KiB以内、Python標準ライブラリだけ。完成コードや登録済み修正を渡さない。\n- 変更範囲はfixtures/generated_skills/、生成候補の専用adapterと関連test/docs。評価集合、閾値、原本、既存スキル、依存、CI/workflowを候補から変更できない。\n- #34までの公開packet、評価の事前固定、原本/候補SHAとhash、別セッション、auditを再利用。hiddenと個別traceを作成側へ出さず、同じhiddenによる修正はしない。\n- 生成依頼は初回と公開修正1回まで、最終候補1件。別セッションの固定3試行を途中フィードバックなしで一括判定。機械実行20分以内、同時実行1。\n- Codexアプリの利用枠を使用し、有料API/Gemma呼出・キー参照0。コードは既存固定imageのnetworkなし/非root/read-only/資源制限Dockerだけで実行し、ホスト実行禁止。\n- 本番/~/.hermes/実ログ/認証/モデルサービスの読取変更、インストール、権限・課金変更はしない。PUBLIC差分と集計だけ本repo専用PRへ提出し正式レビュー。人間がMergeと採用を判断。\n\n# Non-goals\nグローバルなスキル登録、実Hermes統合、既存機能の重複作成、自由な依存導入、一般精度保証、モデル学習、本番適用、Cron、自動採用。\n\n# Done\n- [x] 新規作成が必要な根拠と、生成した2ファイル、候補SHA/hash、入出力契約の対応を追跡できる。\n- [x] 別セッションの固定3試行で新スキルを読み、別入力の実stdoutが正しい集計JSONとなる。\n- [x] 空、複数category、重複event、誤型、不正status、過大入力を固定評価し、失敗を正常な空結果として隠さない。\n- [x] 既存一覧に同等機能がある、根拠不足、権限不足の対照では再利用または保留を選び、不要な新規作成をしない。\n- [x] 原本保持、禁止変更の拒否、実隔離と回収、標準verify/Security/self-reviewと最終headのCI/CodeQL/正式レビューを記録する。\n\n# Verification\n評価集合と期待結果を生成前に固定し、公開例だけを渡す。別セッションの実利用をtraceと実stdoutで確認。テストダブルの結果を実モデル/実Dockerの成功としない。\n生成パス逸脱、hidden参照、評価器/依存/権限変更、任意外部取得、期限超過、出力不正を拒否する。\n./scripts/verify.sh、Bash 5 Security Preflight、関連の生成候補/スキル/既存評価回帰。同じ最終headのCI、Security Preflight、Analyze (python)、Codex Review。未実行や取得不能は成功扱いにしない。\n\n# Dependencies\nParent: #31。Depends on: #34（人間Merge後）。新しい別セッション/隔離/評価の受渡しを再利用する。\n\n\n## 完了確認（2026-10-28）\n\n[PR #40](https://github.com/second-works/hermes-self-improvement/pull/40)のMergeと、PR最終headの検証・正式レビューを確認。ユーザーの「終了issueはcloseして」の指示に基づき、本Issueの範囲を完了としてCloseします。\n本番採用と後続工程の完了を意味しません。\n",
+        "state": "closed",
+        "html_url": "https://github.com/second-works/hermes-self-improvement/issues/35",
+        "updated_at": "2026-10-28T07:21:40Z",
+        "comments": 0
+      },
+      "comments": []
+    },
+    {
+      "detail": {
+        "number": 40,
+        "title": "feat: 不足する集計スキルの生成と別セッション利用を実証 (#35)",
+        "body": "Refs #35。\n\n合成の既存一覧に集計機能がないことを確認し、イベントをcategory別のok/failed件数へ集計するSKILL.mdとスクリプトを新規生成しました。専用adapter、合成fixture、tests/docs、PUBLIC成果物を追加します。\n\nRisk Tier: HIGH。生成コードと独立受渡しを扱うためです。変更は本repo内の合成課題に限定します。\n\n検証: head `11a8f2a0b511339e98b8ec1d125be908dedab59e` で標準verify、新規関連13件、Bash 5 Securityが成功。関連ローカル回帰は計116件成功。CI、Security Preflight、CodeQLも成功し、正式Codex Reviewは指摘0件で完了しました。最終head gateはREADYです。依存manifestなしのため依存監査は対象外です。\n\n固定した合成課題の実証であり、一般的な生成品質や本番動作を保証しません。最終Mergeは人間が判断します。",
+        "state": "closed",
+        "html_url": "https://github.com/second-works/hermes-self-improvement/pull/40",
+        "updated_at": "2026-10-28T06:56:23Z",
+        "merged": true,
+        "merged_at": "2026-10-28T06:56:22Z",
+        "head": {
+          "sha": "11a8f2a0b511339e98b8ec1d125be908dedab59e"
+        },
+        "comments": 0
+      },
+      "comments": [],
+      "checks": [],
+      "statuses": [],
+      "reviews": [],
+      "review_comments": [],
+      "threads": [],
+      "closing": []
+    }
+  ]
+}

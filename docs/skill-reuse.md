@@ -46,7 +46,7 @@ python3 -B scripts/skill_reuse.py accept --run <run> --candidate-sha <full-sha>
 受理は完全SHA、cleanなpacket、通常blob、差分1ファイル、上限、元script hashを照合し、candidate.mdをread-onlyに保持する。
 受理は1回のみ。評価結果による候補調整は行わない。
 
-利用担当は履歴を継がない3つのCodexセッションとし、各セッションにはtrial番号、read/use入口、候補スキル・タスク・許可ツールだけを渡す。
+利用担当はfork_turns=noneで履歴を継がない3つの実Codex subagentセッションとし、各セッションにはtrial番号、read/use入口、候補スキル・タスク・許可ツールだけを渡す。
 各trialにprimary、手順が十分なsufficient、実行権限なしdenied、patch不足missing、修正前baselineの5条件を固定する。
 readはその条件のスキル・タスク・ツールを返し、読取hashを残す。生成会話と正解は渡さない。
 useはoperationだけを持つJSON objectを受ける。run_review以外は固定の停止報告だけを許す。
@@ -60,7 +60,7 @@ python3 -B scripts/skill_reuse.py use --run <run> --trial 0 --scenario primary -
 
 利用traceには読取hash、入力hash、候補hash、script hash、実exit/stdout/stderrとそのhashを記録し、正解は含めない。
 これらの個別値はローカル保持し、PUBLIC報告は集計とhashだけとする。
-監督側は実際の3セッションIDをsessions.jsonへwrite_newで保存する。自己申告の成功文は採点に使わない。
+監督側はspawn_agentが返した実際の3セッション識別子（canonical task name）をsessions.jsonへwrite_newで保存する。識別子の登録だけで独立性を証明したとはせず、実際のfork_turns=noneの起動記録と照合する。自己申告の成功文は採点に使わない。
 mock試験はadapter回帰に限定し、実Codexセッションを代替しない。
 
 ## 一括評価と監査

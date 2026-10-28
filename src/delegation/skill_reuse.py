@@ -127,7 +127,7 @@ class Controller:
                     'api_calls': 0, 'simultaneous_runs': 1}
         self.save(work, 'manifest.json', manifest)
         self.save(work, 'freeze.checkpoint.json', {'manifest_hash': digest(regular(work / 'manifest.json', self.runs))})
-        self.legacy().event(work, 'SKILL_FROZEN', digest(regular(work / 'manifest.json', self.runs)))
+        self.legacy().event(work, 'EVALUATION_FROZEN', digest(regular(work / 'manifest.json', self.runs)))
         return {'run_id': name, 'manifest_hash': digest(regular(work / 'manifest.json', self.runs)),
                 'baseline_sha': manifest['baseline_sha'], 'status': 'FROZEN'}
 
@@ -136,7 +136,7 @@ class Controller:
         require(self.read_json(self.runs, 'skill-reuse.lock') == {'run_id': work.name}, 'GLOBAL_LOCK')
         gate = self.legacy()
         gate.verify_gate(work)
-        anchors = [r for r in gate.verify_events(work) if r['state'] == 'SKILL_FROZEN']
+        anchors = [r for r in gate.verify_events(work) if r['state'] == 'EVALUATION_FROZEN']
         require(len(anchors) == 1 and anchors[0]['payload_hash'] == digest(regular(work / 'manifest.json', self.runs)), 'FREEZE_EVENT')
         require(self.read_json(work, 'freeze.checkpoint.json')['manifest_hash'] == digest(regular(work / 'manifest.json', self.runs)), 'FREEZE_ANCHOR')
         require(m['sources'] == self.sources(), 'SOURCE_CHANGED')
@@ -173,15 +173,17 @@ class Controller:
                     'manifest_hash': digest(regular(work / 'manifest.json', self.runs)),
                     'accepted_at': time.time()}
         self.save(work, 'accepted.json', accepted)
-        self.legacy().event(work, 'SKILL_ACCEPTED', digest(regular(work / 'accepted.json', self.runs)))
+        self.save(work, 'evaluation-lock.json', accepted)
+        self.legacy().event(work, 'EVALUATING', digest(regular(work / 'accepted.json', self.runs)))
         return accepted
 
     def accepted(self, work):
         a = self.read_json(work, 'accepted.json')
         m, candidate = self.intake(work, a['candidate_sha'])
+        require(regular(work / 'accepted.json', self.runs) == regular(work / 'evaluation-lock.json', self.runs), 'ACCEPTED_LOCK')
         require(a['baseline_sha'] == m['baseline_sha'] and a['script_hash'] == SCRIPT_HASH and
                 a['manifest_hash'] == digest(regular(work / 'manifest.json', self.runs)), 'ACCEPTED_IDENTITY')
-        anchors = [r for r in self.legacy().verify_events(work) if r['state'] == 'SKILL_ACCEPTED']
+        anchors = [r for r in self.legacy().verify_events(work) if r['state'] == 'EVALUATING']
         require(len(anchors) == 1 and anchors[0]['payload_hash'] == digest(regular(work / 'accepted.json', self.runs)), 'ACCEPTED_EVENT')
         require(digest(candidate) == a['candidate_hash'] == digest(regular(work / 'candidate.md', self.runs)), 'CANDIDATE_CHANGED')
         return a
@@ -258,7 +260,7 @@ class Controller:
         require(time.time() - budget['started_at'] < 1200, 'RUN_DEADLINE')
         sessions = self.read_json(work, 'sessions.json')
         require(type(sessions) is list and len(sessions) == 3 and
-                all(type(v) is str and re.fullmatch('[a-f0-9-]{36}', v) for v in sessions) and
+                all(type(v) is str and re.fullmatch(r'[/A-Za-z0-9_-]{1,200}', v) for v in sessions) and
                 len(set(sessions)) == 3, 'FRESH_SESSIONS_MISSING')
         correct = {scenario: 0 for scenario in SCENARIOS}; hashes = {}
         seconds = self.read_json(work, 'budget.json')['seconds']
@@ -293,7 +295,7 @@ class Controller:
                   'session_ids': sessions, 'api_calls': 0,
                   'claim': 'Three fresh Codex sessions and finite synthetic tasks only; no adoption.'}
         self.save(work, 'report.json', report)
-        self.legacy().event(work, 'SKILL_EVALUATED', digest(regular(work / 'report.json', self.runs)))
+        self.legacy().event(work, 'EVALUATION_COMPLETED', digest(regular(work / 'report.json', self.runs)))
         self.save(work, 'checkpoint.json', {'last_event_hash': self.legacy().verify_events(work)[-1]['hash'], ** {'report_hash': digest(regular(work / 'report.json', self.runs)),
                                            'accepted_hash': digest(regular(work / 'accepted.json', self.runs))}})
         return report
@@ -301,7 +303,7 @@ class Controller:
     def audit(self, name):
         work = self.work(name); a = self.accepted(work)
         events = self.legacy().verify_events(work)
-        require([r['state'] for r in events] == ['ENVIRONMENT_PINNED', 'ISOLATION_VERIFIED', 'SKILL_FROZEN', 'SKILL_ACCEPTED', 'SKILL_EVALUATED'], 'AUDIT_STATES')
+        require([r['state'] for r in events] == ['ENVIRONMENT_PINNED', 'ISOLATION_VERIFIED', 'EVALUATION_FROZEN', 'EVALUATING', 'EVALUATION_COMPLETED'], 'AUDIT_STATES')
         report = self.read_json(work, 'report.json'); checkpoint = self.read_json(work, 'checkpoint.json')
         require(not (work / 'active.lock').exists(), 'ACTIVE_OR_FAILED')
         require(checkpoint['last_event_hash'] == events[-1]['hash'] and events[-1]['payload_hash'] == checkpoint['report_hash'], 'AUDIT_EVENTS')

@@ -130,7 +130,7 @@ class IntakeTests(unittest.TestCase):
         self.c.save(self.work, 'trials.private.json', cases)
         self.c.save(self.work, 'sessions.json', ['00000000-0000-0000-0000-' + str(i).zfill(12) for i in range(3)])
         events = [{'state': state, 'hash': str(i)} for i, state in enumerate(
-            ['ENVIRONMENT_PINNED', 'ISOLATION_VERIFIED', 'SKILL_FROZEN', 'SKILL_ACCEPTED'])]
+            ['ENVIRONMENT_PINNED', 'ISOLATION_VERIFIED', 'EVALUATION_FROZEN', 'EVALUATING'])]
         class Gate:
             def event(_, work, state, payload_hash):
                 events.append({'state': state, 'hash': 'last', 'payload_hash': payload_hash})
@@ -161,6 +161,64 @@ class IntakeTests(unittest.TestCase):
             self.c.save(self.work, 'sessions.json', [])
             with self.assertRaisesRegex(EvaluationError, 'FRESH_SESSIONS_MISSING'):
                 self.c.evaluate(self.work.name)
+
+
+
+class LegacyBindingTests(unittest.TestCase):
+    def test_real_freeze_accept_and_audit_bindings_without_docker(self):
+        """Real legacy verifier and event bindings; only container observations are mocked."""
+        import shutil
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            original = Controller(ROOT)
+            for name in original.sources():
+                target = root / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / name, target)
+            (root / '.gitignore').write_text('runs/\n')
+            git(root, 'init', '--template=', '--initial-branch=test')
+            git(root, 'add', '.')
+            git(root, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'test source')
+            c = Controller(root)
+            c.runs.mkdir()
+            work = c.runs / ('skill-' + 'b'*24); work.mkdir()
+            c.save(c.runs, 'skill-reuse.lock', {'run_id': work.name})
+            c.save(work, 'environment.json', {'synthetic': True})
+            gate = c.legacy()
+            c.save(work, 'gate.json', {'status': 'VERIFIED', 'sources': gate.source_hashes(),
+                'environment_hash': digest((work / 'environment.json').read_bytes()),
+                'probes': {name: 'VERIFIED' for name in (*gate.PROBE_FIELDS, 'timeout', 'output')}})
+            c.save(work, 'budget.json', {'seconds': 1, 'started_at': time.time()})
+            gate.event(work, 'ENVIRONMENT_PINNED', digest((work / 'environment.json').read_bytes()))
+            gate.event(work, 'ISOLATION_VERIFIED', digest((work / 'gate.json').read_bytes()))
+            c.freeze(work.name)
+            packet = work / 'packet'
+            with (packet / SKILL).open('ab') as stream: stream.write(b'\nInert mock candidate.\n')
+            git(packet, 'add', SKILL)
+            git(packet, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'mock candidate')
+            candidate = git(packet, 'rev-parse', 'HEAD').decode().strip()
+            c.accept(work.name, candidate)
+            self.assertEqual(len(c.legacy().verify_events(work)), 4)
+            cases = c.read_json(work, 'trials.private.json')
+            c.save(work, 'sessions.json', ['00000000-0000-0000-0000-' + str(i).zfill(12) for i in range(3)])
+            answers = {digest(canonical(case['task'])): case['expected']
+                       for row in cases for case in row.values()}
+            def observed(program, data, **kwargs):
+                rows = answers[digest(data)]
+                return {'exit': 0, 'container_exit': 0, 'error': None, 'oom': False,
+                        'stdout': canonical({'findings': [dict(zip(['path','line','rule'], row)) for row in rows],
+                                             'cpu_seconds': 0}), 'stderr': b'', 'wall_seconds': .1}
+            with patch('delegation.skill_reuse.Sandbox') as sandbox:
+                sandbox.return_value.run.side_effect = observed
+                for i, row in enumerate(cases):
+                    for scenario, case in row.items():
+                        c.handoff(work.name, i, scenario)
+                        c.use(work.name, i, scenario, {'operation': case['expected_operation']})
+            self.assertEqual(c.evaluate(work.name)['status'], 'PASS')
+            self.assertEqual(c.audit(work.name)['audit'], 'VERIFIED')
+            (work / 'candidate.md').chmod(0o600)  # disposable tamper fixture
+            (work / 'candidate.md').write_bytes(b'changed')
+            with self.assertRaises(EvaluationError): c.audit(work.name)
 
 
 if __name__ == '__main__': unittest.main()

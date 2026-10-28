@@ -166,7 +166,7 @@ def references(text, repo):
 
 def ref(text, line, match, kind, number, source):
     keyword = KEYWORD.search(source[:match.start()][-40:]) is not None
-    return {'kind': kind, 'number': number, 'line': line, 'relation': 'refs' if keyword else 'mention',
+    return {'kind': kind, 'number': number, 'line': line, 'column': match.start(), 'relation': 'refs' if keyword else 'mention',
             'evidence': text.window(line, match.start(), match.end())}
 
 
@@ -250,3 +250,65 @@ def done_counts(text, section):
 
 def valid_time(value):
     return value if isinstance(value, str) and TIME.fullmatch(value) else None
+
+
+def inline_code_spans(line):
+    spans, opening = [], None
+    for tick in re.finditer(r'`+', line):
+        if opening is None:
+            opening = (tick.start(), len(tick.group()))
+        elif len(tick.group()) == opening[1]:
+            spans.append((opening[0], tick.end()))
+            opening = None
+    if opening:
+        spans.append((opening[0], len(line)))
+    return spans
+
+
+def dependency_hints(text, start, end):
+    """Literal labelled references to inspect; never used as graph edges.
+
+    Only a statement-start label and its immediately following reference list
+    qualify. Numbers inside conditions, Parent, prose, fences and inline code
+    never become additional targets. The whole source line remains evidence.
+    """
+    label = re.compile(r'(?:^|[。;；]\s*|\.\s+)\s*(?:[-*]\s+)?(?:depends[ -]on|依存)\s*[:：]\s*', re.I)
+    reference = re.compile(r'(?:(issue|pr)\s+)?#([1-9][0-9]*)(?![0-9A-Za-z_])', re.I)
+    separator = re.compile(r'\s*(?:[,、/／]|\band\b|と)\s*', re.I)
+    result = []
+    for i in range(start, end):
+        if i in text.fenced or i in text.historical:
+            continue
+        line = text.lines[i]
+        # Inline-code spans use matching backtick lengths; an unclosed span
+        # suppresses the remainder rather than manufacturing a declaration.
+        spans = inline_code_spans(line)
+        for match in label.finditer(line):
+            if any(a <= match.start() < b or a < match.end() <= b for a, b in spans):
+                continue
+            pos = match.end()
+            while True:
+                ref = reference.match(line, pos)
+                if not ref or any(a <= ref.start() < b for a, b in spans):
+                    break
+                n = int(ref.group(2))
+                if n >= 1_000_000_000:
+                    break
+                kind = ref.group(1).lower() if ref.group(1) else None
+                result.append({'kind': kind, 'number': n, 'line': i,
+                               'evidence': text.excerpt(i, i + 1)})
+                sep = separator.match(line, ref.end())
+                if not sep:
+                    break
+                pos = sep.end()
+    return result
+
+
+def body_refs(text, reference):
+    """Explicit Refs declaration in the current PR body, excluding examples."""
+    if not reference['evidence']['id'].startswith(f'{text.owner}:L'):
+        return False
+    line, column = text.lines[reference['line']], reference['column']
+    if any(a <= column < b for a, b in inline_code_spans(line)):
+        return False
+    return re.fullmatch(r'\s*(?:[-*]\s+)?refs?\s*[:：]?\s*', line[:column], re.I) is not None

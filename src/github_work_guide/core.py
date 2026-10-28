@@ -9,7 +9,7 @@ from . import guide
 
 REPO = 'second-works/hermes-self-improvement'
 VERSION = 1
-PLAN_VERSION = 3  # v3: current/archive distinction and child-list evidence
+PLAN_VERSION = 4  # v4: unconfirmed dependency inspection hints
 REQUIRED = ('ci', 'Security Preflight', 'Analyze (python)')
 KINDS = {
     'completion': ('完了範囲確認', 'IssueのDoneと関連PRの実装範囲を人が照合する。'),
@@ -252,6 +252,7 @@ def analyze(key, item, a):
     evidence, holds, notes = {}, [], []
     child_sections = [s for s in named if s['name'] == 'children']
     children = []
+    dependency_hints = []
 
     def cite(entry):
         owner = items[':'.join(entry['id'].split(':')[:2])]
@@ -332,10 +333,58 @@ def analyze(key, item, a):
                 target = r['target']
                 if target not in [m['target'] for m in mentioned]:
                     mentioned.append({'target': target, 'state': items[target]['state'] if target in items else 'UNFETCHED'})
-        holds.append(hold('dependency_prose', 'semantic', '依存が自然文で書かれ、Issue/PR番号が確定していない', [cite(quote)],
-                          f'{key} L{line + 1} の依存の各項目と、名称が近いIssue（未確定の候補）',
-                          '各項目はどのIssue/PRか。先に完了している必要があるか。',
-                          '依存を番号（- depends-on: #N）か「なし」で確定する、または人が判断して記録する。',
+        for declaration in guide.dependency_hints(body, line, end):
+            target = guide.resolve(items, declaration['kind'], declaration['number'])
+            evidence_id = cite(declaration['evidence'])
+            if any(h['target'] == target and h['evidence'] == evidence_id for h in dependency_hints):
+                continue
+            dep = items.get(target)
+            hint = {'target': target, 'state': dep['state'] if dep else 'UNFETCHED',
+                    'confirmed': False, 'evidence': evidence_id, 'done': [], 'related_prs': []}
+            if dep:
+                hint['state_evidence'] = cite(state_evidence(dep))
+                dep_body = a.texts[target][0]
+                for section in guide.sections(dep_body):
+                    if section['name'] == 'done':
+                        checked, total = guide.done_counts(dep_body, section)
+                        hint['done'].append({'checked': checked, 'total': total,
+                                             'evidence': cite(dep_body.excerpt(section['line'],
+                                                                               min(section['end'], section['line'] + 6)))})
+                if dep['kind'] == 'pr':
+                    hint['head'] = dep['raw']['detail']['head']['sha']
+                    hint['head_evidence'] = cite(guide.evidence_entry(f'{target}:head', hint['head'], False))
+                else:
+                    for pr_key, pr in sorted(items.items()):
+                        if pr['kind'] != 'pr':
+                            continue
+                        closing = next((c for c in pr['raw']['closing'] if c['number'] == dep['number'] and
+                                        c['repository']['nameWithOwner'] == REPO), None)
+                        # Only the PR body can declare its relationship. A comment
+                        # mentioning a label or number is not a binding relation.
+                        refs = [r for r in a.refs[pr_key] if r['target'] == target and
+                                guide.body_refs(a.texts[pr_key][0], r)]
+                        if not closing and not refs:
+                            continue
+                        head = pr['raw']['detail']['head']['sha']
+                        head_id = cite(guide.evidence_entry(f'{pr_key}:head', head, False))
+                        relation_id = (cite(guide.evidence_entry(f'{pr_key}:closing:{target}',
+                                                               json.dumps(closing, sort_keys=True), False))
+                                       if closing else cite(refs[0]['evidence']))
+                        hint['related_prs'].append({'target': pr_key, 'state': pr['state'], 'head': head,
+                                                   'relation': 'closing' if closing else 'refs',
+                                                   'state_evidence': cite(state_evidence(pr)), 'evidence': relation_id, 'head_evidence': head_id})
+            dependency_hints.append(hint)
+        numbered = bool(mentioned)
+        reason = ('依存欄に番号の記載はあるが、条件・関係が混在する形式は機械確定できない' if numbered else
+                  '依存が自然文で書かれ、Issue/PR番号が確定していない')
+        check = (f'{key} L{line + 1} の明示された依存番号と原文条件' if numbered else
+                 f'{key} L{line + 1} の依存の各項目と、名称が近いIssue（未確定の候補）')
+        question = ('記載された依存先のどの完了条件と証拠を確認する必要があるか。' if numbered else
+                    '各項目はどのIssue/PRか。先に完了している必要があるか。')
+        release = ('記載された依存先のDone・関連PR・原文条件を人が照合して記録する。必要なら指定形式へ揃える。' if numbered else
+                   '依存を番号（- depends-on: #N）か「なし」で確定する、または人が判断して記録する。')
+        holds.append(hold('dependency_prose', 'format' if numbered else 'semantic', reason, [cite(quote)],
+                          check, question, release,
                           terms=[{'term': t, 'candidates': [] if guide.SHORT.search(t) else guide.name_candidates(t, items, key)}
                                  for t in terms], mentioned=mentioned))
     numbers = sorted(set(numbers)) if not any(h['code'] == 'dependency_prose' for h in holds) else []
@@ -415,7 +464,8 @@ def analyze(key, item, a):
     other = [{'line': s['line'] + 1, 'heading': s['heading']} for s in found if not s['name']]
     return {'sections': [{'name': s['name'], 'line': s['line'] + 1} for s in named], 'gaps': gaps, 'done': done,
             'related': related, 'external': external, 'holds': holds, 'notes': notes, 'other_headings': other,
-            'numbers': numbers, 'merged': merged_targets, 'evidence': evidence, 'children': children}
+            'numbers': numbers, 'merged': merged_targets, 'evidence': evidence, 'children': children,
+            'dependency_hints': dependency_hints}
 
 
 def steps_for(key, kind, item, info, deps, items):
@@ -430,6 +480,19 @@ def steps_for(key, kind, item, info, deps, items):
     for h in info['holds']:
         if h['code'] == 'active_pr':
             steps.append(f'{h["check"]} のcheck・レビュー・検収を確認する。重複する新規実装を開始しない。')
+    for hint in info.get('dependency_hints', []):
+        head = f'、head {hint["head"]}' if hint.get('head') else ''
+        steps.append(f'明示の依存確認先 {hint["target"]}（{hint["state"]}{head}）と原文条件（{hint["evidence"]}）を確認する。'
+                     '未確定の確認先であり、CLOSED/MERGEDから成功・採用を推定しない。')
+        if hint['done']:
+            marks = '、'.join(f'{d["checked"]}/{d["total"]}チェック（{d["evidence"]}）' for d in hint['done'])
+            steps.append(f'{hint["target"]} のDone {marks} を実装範囲・評価根拠と照合する。本文チェックだけで完了認定しない。')
+        else:
+            steps.append(f'{hint["target"]} のDoneは取得済み範囲で確認できない。原文の完了条件と取得範囲を確認する。')
+        for pr in hint['related_prs']:
+            how = 'closing' if pr['relation'] == 'closing' else 'Refs（closingではない）'
+            steps.append(f'依存確認先 {hint["target"]} の関連 {pr["target"]}（{pr["state"]}、head {pr["head"]}、'
+                         f'関係: {how}、根拠 {pr["evidence"]}）の変更・検証を原文条件と照合する。Mergeだけで成功・採用としない。')
     if info.get('children'):
         steps.append('親計画を直接実装せず、子一覧の未完了項目と各子の依存・対象範囲を照合する。')
     if kind == 'completion':
@@ -485,7 +548,7 @@ def build_plan(snapshot, priority=()):
     candidates, deps = {}, {}
     for key, item in sorted(items.items()):
         info = {'sections': [], 'gaps': [], 'done': [], 'related': [], 'external': [], 'holds': [], 'notes': [],
-                'other_headings': [], 'numbers': [], 'merged': [], 'evidence': {}, 'children': []}
+                'other_headings': [], 'numbers': [], 'merged': [], 'evidence': {}, 'children': [], 'dependency_hints': []}
         if item['state'] != 'OPEN':
             kind = 'none'
         elif item['kind'] == 'pr':
@@ -529,7 +592,7 @@ def build_plan(snapshot, priority=()):
             'sections': info['sections'], 'gaps': info['gaps'], 'done': info['done'], 'related': info['related'],
             'external': info['external'], 'holds': info['holds'], 'notes': info['notes'],
             'other_headings': info['other_headings'], 'evidence': evidence, 'dependencies': deps[key],
-            'children': info['children'],
+            'children': info['children'], 'dependency_hints': info['dependency_hints'],
             'start_condition': '取得完了、状態不変、保留なしを再取得で確認する。',
             'next_step': action, 'steps': steps_for(key, kind, item, info, deps[key], items),
             'success_condition': '人が原文と受入条件を照合する（実行・承認・検収の完了ではない）。',
@@ -631,6 +694,8 @@ def markdown(snapshot, changes, plan=None, result=None):
                 lines.append('- 完了条件: ' + '、'.join(
                     f'L{d["line"]} ' + (f'{d["checked"]}/{d["total"]}チェック' if d['total'] else 'チェック項目なし')
                     for d in c['done']))
+            for hint in c['dependency_hints']:
+                lines.append(f'- 未確定の依存確認先: {hint["target"]}（{hint["state"]}） / {quote(hint["evidence"])}')
             for child in c.get('children', []):
                 targets = '、'.join(f'{t}({child["states"][t]})' for t in child['targets']) or '番号未確定'
                 lines.append(f'- 子一覧の参照: {targets} / 本文チェック {"済" if child["checked"] else "未"} / '

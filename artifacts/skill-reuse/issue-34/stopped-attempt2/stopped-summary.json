@@ -1,0 +1,33 @@
+{
+  "status": "STOPPED",
+  "reason": "ISOLATION_CLEANUP_FAILED",
+  "quality_evaluation": "NOT_RUN",
+  "candidate_sha": "6a31dfe7c38fe3ed08760b0a82b933984372b813",
+  "baseline_sha": "15096012cd1653b0ff42f992edc0b8d9ee104356",
+  "candidate_hash": "d391dc90267e2126af399a83664da2120904bfcd8df83d51e008cfa4e5c2b1da",
+  "script_hash": "7d342aa1fc92afaeea8b7aee834650965b885f167975fd2d4f18e5c31ee80b6e",
+  "manifest_hash": "1fbd36af9d82b391dbdbc5c058a6ab2e918003a4a3adfee5ae4e31af118f8485",
+  "controller_sha": "5b3ec010e855ac7a30fb1c959252e4cc24bbd717",
+  "run_id": "skill-5dc04f84780e323fb11ef7da",
+  "generation_attempts": 1,
+  "public_revision_attempts": 0,
+  "candidate_count": 1,
+  "usage_trials_started": 1,
+  "usage_trials_completed": 0,
+  "final_three_trial_evaluation": "NOT_RUN",
+  "stopped_operation": "0-primary",
+  "pending_container_recorded": "hermes-eval-cf0be34e707a4394a42596c2219a736c",
+  "post_stop_docker_ps_remaining_containers": 0,
+  "first_run": {
+    "run_id": "skill-9d1f21ebd7be74c083184838",
+    "reason": "AUDIT_BINDING",
+    "candidate_accepted": false,
+    "controller_sha": "e2e55577b36f42e55e91b7ee4659370396fc0acd"
+  },
+  "first_candidate_sha": "0539237b7d41b6545bdbf16534d624e94aefabbf",
+  "candidate_content_changed_between_runs": false,
+  "api_calls": 0,
+  "gemma_calls": 0,
+  "bundle_hash": "80b060c697457c0a1e8792c3f389bdfa9a6863e22f4a3f34d33d08334b2cbee4",
+  "recovery": "Preserve both runs and locks; use a new isolated controller root after human decision. Require sandbox_permissions=require_escalated for every consumer exec_command. No quality result exists."
+}

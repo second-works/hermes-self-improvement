@@ -1,0 +1,42 @@
+{
+  "classification": "PUBLIC",
+  "status": "PASS",
+  "run_id": "skill-20f39038ce3782f579d101ba",
+  "controller_sha": "5b3ec010e855ac7a30fb1c959252e4cc24bbd717",
+  "candidate_sha": "4959610ae8efa8d954f0194d7393b6b5e54ae249",
+  "baseline_sha": "dd923f2ef1026447f1a89d8f57b3d87a0c3ea93a",
+  "candidate_hash": "d391dc90267e2126af399a83664da2120904bfcd8df83d51e008cfa4e5c2b1da",
+  "script_hash": "7d342aa1fc92afaeea8b7aee834650965b885f167975fd2d4f18e5c31ee80b6e",
+  "manifest_hash": "836fb6683ebdd1b52592a83ec4b39d26444a0aab928bb36de304f4856421a67a",
+  "bundle_hash": "88a83a62c610be359c97153ec45022d912b394c4f028a84d8f3f510752b472c3",
+  "generation_attempts": 1,
+  "public_revision_attempts": 0,
+  "candidate_count": 1,
+  "original_candidate_sha": "0539237b7d41b6545bdbf16534d624e94aefabbf",
+  "content_changed_after_generation": false,
+  "fresh_session_mechanism": "collaboration.spawn_agent fork_turns=none; sequential; canonical task names recorded from tool responses",
+  "session_ids": [
+    "/root/skill_retry3_trial_0",
+    "/root/skill_retry3_trial_1",
+    "/root/skill_retry3_trial_2"
+  ],
+  "supervised_wall_seconds_upper_bound_all_three_runs": 573.9156723022461,
+  "per_run_upper_bounds": [
+    111.468186378479,
+    70.65849375724792,
+    391.78899216651917
+  ],
+  "budget_seconds": 1200,
+  "api_calls": 0,
+  "gemma_calls": 0,
+  "candidate_host_execution": false,
+  "retry_authorization": "2026-10-28 human: 再開して下さい; then 了承します for third run",
+  "prior_stops": [
+    "AUDIT_BINDING",
+    "ISOLATION_CLEANUP_FAILED"
+  ],
+  "originals_locks_and_private_traces_retained": true,
+  "acceptance_status": "HOLD",
+  "acceptance_reason": "Final session result was not captured by the archived evaluator; PR39 P2 BLOCKING. Original report and run preserved.",
+  "corrected_protocol_real_trials": "NOT_RUN"
+}

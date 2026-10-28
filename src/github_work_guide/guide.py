@@ -311,4 +311,26 @@ def body_refs(text, reference):
     line, column = text.lines[reference['line']], reference['column']
     if any(a <= column < b for a, b in inline_code_spans(line)):
         return False
-    return re.fullmatch(r'\s*(?:[-*]\s+)?refs?\s*[:：]?\s*', line[:column], re.I) is not None
+    label = re.match(r'\s*(?:[-*]\s+)?refs?\s*[:：]?\s*', line, re.I)
+    if not label:
+        return False
+    pos = label.end()
+    separator = re.compile(r'\s*(?:[,、/／]|\band\b|と)\s*', re.I)
+    while pos <= column:
+        typed = re.match(r'(?:issue|pr)\s+', line[pos:], re.I)
+        if typed:
+            pos += typed.end()
+        match = URL.match(line, pos) or QUALIFIED.match(line, pos) or SHORT.match(line, pos)
+        if not match:
+            return False
+        if pos == column:
+            return True
+        # URL tokens may include a trailing comma; retain it as a list delimiter.
+        finish = match.end()
+        if line[pos:finish].startswith('https://'):
+            finish = pos + len(line[pos:finish].rstrip(','))
+        sep = separator.match(line, finish)
+        if not sep:
+            return False
+        pos = sep.end()
+    return False

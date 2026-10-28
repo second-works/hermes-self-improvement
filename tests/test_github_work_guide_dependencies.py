@@ -128,6 +128,27 @@ class DependencyGuidanceTests(unittest.TestCase):
         self.assertTrue(any(h['code']=='dependency_multiple' for h in c['holds']))
         self.assertEqual(recheck(s,p,'issue:8',s)['status'],'BLOCKED')
 
+    def test_refs_list_routes_later_explicit_target(self):
+        for body in ('Refs #8, #35', 'Refs: #8 and #35', '- Refs #8、#35',
+                     'Refs https://github.com/second-works/hermes-self-improvement/issues/8, #35'):
+            with self.subTest(body=body):
+                s=dependency_snapshot();items=copy.deepcopy(s['items']);pr=items['pr:40']
+                pr['body']=body;pr['raw']['detail']['body']=body;pr['hash']=digest(pr['raw'])
+                c=build_plan(seal(items,s['coverage']))['candidates']['issue:8']
+                self.assertTrue(any(r['target']=='pr:40' and r['relation']=='refs'
+                                    for r in c['dependency_hints'][0]['related_prs']))
+        s=dependency_snapshot();items=copy.deepcopy(s['items']);pr=items['pr:40']
+        pr['body']='Refs #8, example #35';pr['raw']['detail']['body']=pr['body'];pr['hash']=digest(pr['raw'])
+        self.assertEqual(build_plan(seal(items,s['coverage']))['candidates']['issue:8']['dependency_hints'][0]['related_prs'],[])
+
+    def test_unfetched_explicit_kind_survives_in_hint_and_steps(self):
+        for kind in ('PR','Issue'):
+            s=body_snapshot('# Goal\nx\n# Dependencies\nDepends on: '+kind+' #999（条件）')
+            p=build_plan(s);c=p['candidates']['issue:8'];h=c['dependency_hints'][0]
+            self.assertEqual(h['target'],kind.lower()+':999')
+            self.assertEqual(h['state'],'UNFETCHED');self.assertIn(kind.lower()+':999','\n'.join(c['steps']))
+            self.assertEqual(c['dependencies'],[]);self.assertEqual(recheck(s,p,'issue:8',s)['status'],'BLOCKED')
+
     def test_new_hints_do_not_clear_holds_or_hide_changes_or_reuse_old_plan(self):
         s=dependency_snapshot();p=build_plan(s)
         self.assertEqual(recheck(s,p,'issue:8',s)['status'],'BLOCKED')

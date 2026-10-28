@@ -334,7 +334,8 @@ def analyze(key, item, a):
                 if target not in [m['target'] for m in mentioned]:
                     mentioned.append({'target': target, 'state': items[target]['state'] if target in items else 'UNFETCHED'})
         for declaration in guide.dependency_hints(body, line, end):
-            target = guide.resolve(items, declaration['kind'], declaration['number'])
+            target = (f"{declaration['kind']}:{declaration['number']}" if declaration['kind'] else
+                      guide.resolve(items, None, declaration['number']))
             evidence_id = cite(declaration['evidence'])
             if any(h['target'] == target and h['evidence'] == evidence_id for h in dependency_hints):
                 continue

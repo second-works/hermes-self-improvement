@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "classification": "PUBLIC",
+  "source_kind": "synthetic-fixture",
+  "evaluation_kind": "development-visible",
+  "files": [
+    {
+      "id": "approval",
+      "path": "sources/approval.md",
+      "sha256": "eba06b076121cbc5742bb5f237c14d295b2f165c3a976d4073c87c1eb506d104",
+      "characters": 15169,
+      "bytes": 42265,
+      "reused_source": "fixtures/worklog_candidates/logs/04-approval-basic-0.md",
+      "reused_sha256": "9abaf11d6fe1e60bc26e8947ac4408c4c34dd533e6ce02a58d16ec2036501993"
+    },
+    {
+      "id": "investigation",
+      "path": "sources/investigation.md",
+      "sha256": "288e1f06b722f13e9c0bdc2a77f9b2f48ff8630ad0c1d7040a3b161bae8508aa",
+      "characters": 15496,
+      "bytes": 42596,
+      "reused_source": "fixtures/worklog_candidates/logs/06-investigation-basic-0.md",
+      "reused_sha256": "c3456c5e7add1020175d9c420b25a01a5e7a49036ac042957d81f233db060298"
+    },
+    {
+      "id": "recovery",
+      "path": "sources/recovery.md",
+      "sha256": "0732aec69cc8da27fccaba1bc4a2cfaa0a4f150d95d0111dae6366dab939091e",
+      "characters": 15184,
+      "bytes": 42300,
+      "reused_source": "fixtures/worklog_candidates/logs/08-resolved-same-log-0.md",
+      "reused_sha256": "4a9f63398899b868db3e3e6994ad423c3139131740c5cff2d1a8cd1d609f7999"
+    }
+  ]
+}

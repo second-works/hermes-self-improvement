@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "approval",
+      "final_state": "awaiting_approval",
+      "required": [
+        {
+          "kind": "state",
+          "line": 21,
+          "quote": "公開操作は承認待ち。"
+        },
+        {
+          "kind": "number",
+          "line": 202,
+          "quote": "比較予算は116秒であり、実行した時間を示さない。"
+        },
+        {
+          "kind": "negative-and-uncertain",
+          "line": 395,
+          "quote": "本番への適用は許可されていない。原因の確定は未実施である。"
+        }
+      ],
+      "review": "全主張を原文照合し、未掲載の重大事実と否定の反転、因果の創作も人が確認する。"
+    },
+    {
+      "id": "investigation",
+      "final_state": "investigating",
+      "required": [
+        {
+          "kind": "state",
+          "line": 21,
+          "quote": "通信エラーを継続調査。"
+        },
+        {
+          "kind": "number",
+          "line": 202,
+          "quote": "比較予算は216秒であり、実行した時間を示さない。"
+        },
+        {
+          "kind": "negative-and-uncertain",
+          "line": 395,
+          "quote": "本番への適用は許可されていない。原因の確定は未実施である。"
+        }
+      ],
+      "review": "全主張を原文照合し、未掲載の重大事実と否定の反転、因果の創作も人が確認する。"
+    },
+    {
+      "id": "recovery",
+      "final_state": "resolved_in_log",
+      "required": [
+        {
+          "kind": "state",
+          "line": 23,
+          "quote": "修正後の再テスト成功。"
+        },
+        {
+          "kind": "number",
+          "line": 204,
+          "quote": "比較予算は316秒であり、実行した時間を示さない。"
+        },
+        {
+          "kind": "negative-and-uncertain",
+          "line": 397,
+          "quote": "本番への適用は許可されていない。原因の確定は未実施である。"
+        }
+      ],
+      "review": "全主張を原文照合し、未掲載の重大事実と否定の反転、因果の創作も人が確認する。"
+    }
+  ]
+}

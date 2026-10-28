@@ -1,0 +1,29 @@
+{
+  "classification": "PUBLIC",
+  "task": "review-input-contract-v1",
+  "run_id": "generated-a9879c182fccecc0ce488323",
+  "controller_sha": "ac91393276781758f9f8273fa58ead8ccc1ac394",
+  "baseline_sha": "65c53babda8f31405d54941e900c2d3987efa4b1",
+  "candidate_sha": "e3153fec973051b28178df0656db05d2a3ffae84",
+  "candidate_sha256": "ffd1fbd0087c86edea77ca0f1eac2c4c2a4cc516fba8a011331e0fe5a36d876d",
+  "bundle_sha256": "4d373fca8040eea381c6266eb3d469e04699fee4413a02bbb3b5bc79448bc048",
+  "manifest_hash": "339f7d4e9c63ff8041df9f8d7bbe66deb13ede7bd36048e442e64654d614278d",
+  "generation_attempts": 1,
+  "public_revision_attempts": 0,
+  "candidate_count": 1,
+  "api_calls": 0,
+  "api_cost_usd": 0,
+  "machine_seconds_upper_bound": 132,
+  "machine_seconds_limit": 1200,
+  "input_packet_files": [
+    "scripts/review.py",
+    "contract.json",
+    "public.json"
+  ],
+  "public_execution_incidents": [
+    "Initial restricted-host Sandbox invocation failed ISOLATION_CLEANUP_FAILED; docker ps -a confirmed no remaining containers. Same unchanged candidate tested with Docker access."
+  ],
+  "candidate_host_execution": false,
+  "hidden_read_by_generator": false,
+  "post_hidden_candidate_changes": false
+}

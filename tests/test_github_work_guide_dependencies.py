@@ -218,6 +218,15 @@ class DependencyGuidanceTests(unittest.TestCase):
                 related=build_plan(seal(items,s['coverage']))['candidates']['issue:8']['dependency_hints'][0]['related_prs']
                 self.assertTrue(any(r['target']=='pr:40' for r in related))
 
+    def test_hidden_headings_do_not_cut_the_live_dependency_section(self):
+        for prefix in ('<!--\n# Scope\n-->', '`example\n# Scope\n`',
+                       '``example\n# Goal\n# Done\n``'):
+            with self.subTest(prefix=prefix):
+                c=build_plan(body_snapshot('# Goal\nx\n# Dependencies\n'+prefix+'\nParent: #31。Depends on: #35（条件）'))['candidates']['issue:8']
+                self.assertEqual([h['target'] for h in c['dependency_hints']],['issue:35'])
+                self.assertEqual(len([x for x in c['sections'] if x['name']=='goal']),1)
+                self.assertFalse(any(h['code']=='goal_multiple' for h in c['holds']))
+
     def test_new_hints_do_not_clear_holds_or_hide_changes_or_reuse_old_plan(self):
         s=dependency_snapshot();p=build_plan(s)
         self.assertEqual(recheck(s,p,'issue:8',s)['status'],'BLOCKED')

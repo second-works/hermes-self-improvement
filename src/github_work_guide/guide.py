@@ -60,7 +60,7 @@ class Text:
             if i in self.fenced:
                 continue
             m = HEADING.match(line.rstrip('\r'))
-            if m:
+            if m and not any(a <= m.start(1) < b for a, b in self.non_declarations.get(i, [])):
                 self.headings.append((i, len(m.group(1)), m.group(2)))
         # Only a separated, explicitly labelled trailing archive after a current Goal.
         # A later higher-level section makes the boundary ambiguous: keep all text active.

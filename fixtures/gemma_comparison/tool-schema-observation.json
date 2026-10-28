@@ -1,0 +1,18 @@
+{
+  "observed_on": "2026-10-28",
+  "source": "Callable tool metadata exposed to Codex; functions not invoked",
+  "tools": [
+    {
+      "name": "mcp__llama_advisor__ask_llama",
+      "description": "Use compression as read-only, loss-aware orientation. A single compression tool call may internally map and reduce multiple chunks. Trust coverage_complete only when input_truncated and output_truncated are both false. Verify cited original lines for security, permissions, destructive actions, numerical conclusions, and code changes.\n\nAsk the local LLAMA model for a read-only second opinion, preliminary research, brainstorming, or loss-aware compression. Compression uses internal map-reduce rather than truncating the source.\n\nexec tool declaration:\n```ts\ndeclare const tools: { mcp__llama_advisor__ask_llama(args: {\n  // Optional supporting context.\n  context?: string;\n  // How LLAMA should approach the request.\n  purpose?: \"compress\" | \"review\" | \"research\" | \"brainstorm\";\n  // The specific question or task for LLAMA.\n  task: string;\n}): Promise<CallToolResult>; };\n```"
+    },
+    {
+      "name": "mcp__llama_advisor__compress_files",
+      "description": "Use compression as read-only, loss-aware orientation. A single compression tool call may internally map and reduce multiple chunks. Trust coverage_complete only when input_truncated and output_truncated are both false. Verify cited original lines for security, permissions, destructive actions, numerical conclusions, and code changes.\n\nRead project text files and produce a complete, cited digest. Long inputs are split by file and line, summarized, and hierarchically reduced. The call fails instead of returning a silently truncated digest when coverage cannot be proven.\n\nexec tool declaration:\n```ts\ndeclare const tools: { mcp__llama_advisor__compress_files(args: {\n  // Optional topic the digest should emphasize without dropping coverage.\n  focus?: string;\n  // Digest language: source language, Japanese, or English.\n  output_language?: \"source\" | \"ja\" | \"en\";\n  // Project-relative text file paths to compress.\n  paths: Array<string>;\n  // Absolute project root. Files outside its canonical path are rejected.\n  project_root: string;\n}): Promise<CallToolResult>; };\n```"
+    },
+    {
+      "name": "mcp__llama_advisor__llama_status",
+      "description": "Use compression as read-only, loss-aware orientation. A single compression tool call may internally map and reduce multiple chunks. Trust coverage_complete only when input_truncated and output_truncated are both false. Verify cited original lines for security, permissions, destructive actions, numerical conclusions, and code changes.\n\nCheck whether the local llama-server is reachable and report its model and effective context size.\n\nexec tool declaration:\n```ts\ndeclare const tools: { mcp__llama_advisor__llama_status(args: {}): Promise<CallToolResult>; };\n```"
+    }
+  ]
+}

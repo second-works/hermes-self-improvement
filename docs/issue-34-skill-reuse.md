@@ -3,21 +3,16 @@
 Risk Tier: HIGH。PUBLIC合成スキルの手順生成、履歴なし利用担当、隔離実行と独立評価を扱う。
 Issue #33 / PR #38の人間Merge後、2026-10-28の「マージしました。進めて下さい」で着手した。
 
-一括評価はPASS、auditはVERIFIED。実行が必要なprimary/sufficient、停止すべきdenied/missing/baselineはそれぞれ3/3で期待と一致した。
-これは実Codex利用セッションから得た実スクリプト出力と機械照合による結果であり、mockによる代替ではない。
+**受入状態はHOLD / NOT_ACCEPTED。PR #39の正式レビュー指摘を修正中で、Merge可能ではない。**
+旧評価器は操作とスクリプトstdoutだけを照合し、利用担当の最終返却を検査していなかった。
+以下の旧reportのPASS/audit VERIFIEDは、その限定した検査結果として原bytesのまま保持する。
+SKILL.md手順4の「実stdoutを変更せず返す」の実証には不足していた。
+[レビュー指摘と分類](https://github.com/second-works/hermes-self-improvement/pull/39#discussion_r4396515148)はP2 BLOCKING。
 
-| 条件 | 結果 | 観測した操作 |
-| --- | --- | --- |
-| 手順修正後primary | 3/3 | run_review、実stdoutを正解と照合 |
-| 手順が既に十分sufficient | 3/3 | 変更せずrun_review |
-| 実行権限不足denied | 3/3 | stop_permission、実行なし |
-| 入力根拠不足missing | 3/3 | stop_evidence、実行なし |
-| 修正前baseline | 3/3 | stop_no_procedure、実結果取得なし |
-
-primary/sufficient計6回を実Docker内で実行した。採点は3セッション完了後の一括処理1回のみ。
-adapterのprepareと利用Tool処理の計測は11.93秒。先行停止2 runも含め、各run開始から停止/監査までの壁時計を加算した保守的上限は約574秒で、1200秒以内だった。
-この上限にはモデル待機や監督側の作業時間も含む。各runの実測値と監督上限はprovenance.jsonへ記録した。
-有料API/Gemma呼出し・追加クレジット・キー参照は0。全runの原本とlockを保持している。
+旧runでは各条件の操作と実スクリプト出力は3/3一致した。adapter計測11.93秒、先行停止runを含む監督上限約574秒。
+これらを最終返却契約の合格やIssue完了とは扱わない。
+修正は候補SKILL.mdの変更ではなく、受渡しadapterによる最終返却の取得と実stdoutとのbytes/hash照合である。
+新runの入力・評価器を事前freezeして、同じ候補内容で新しい3セッションを実測する必要がある。
 
 ## 原因と変更
 
@@ -51,14 +46,14 @@ freeze後に同一候補bytesを新packetの基準の子孫commitとして受理
 SHA、cleanなpacket、SKILL.mdだけの差分、上限、元スクリプトhashを確認した。評価中に候補を変更していない。
 
 利用担当は `fork_turns=none` の実Codex subagentを3つ逐次起動した。別のユーザー向けchatタブではなく、履歴なしの独立した推論セッションである。
-各担当に渡したのは専用read/use入口、trial番号と、その入口が返すスキル・タスク・許可Toolだけ。
+旧試行で各担当に渡したのは専用read/use入口、trial番号と、その入口が返すスキル・タスク・許可Toolだけ。
 作成会話、評価器、正解、他担当の結果は渡していない。
 全Tool呼出しでホスト側の必要権限を明示し、Docker内の制限は維持した。
 
 各試行のprimaryとsufficientでは、候補を読み、スクリプトを変更せず再利用して別入力の実stdoutを得る。
 deniedでは実行権限不足、missingではpatch不足で停止し、修正前baselineでは実行手順がないため停止する。
 3試行を終えるまで途中採点せず、機械のexit/stdout、厳密schema、原本・候補・入力hashを一括照合する。
-採点にモデルの成功宣言は使用しない。
+採点にモデルの成功宣言は使用しない。ただし旧試行では管理用の概要だけを親へ返すよう指示してしまい、実stdoutを保持した最終返却の検査が欠けた。この点は未検証として訂正する。
 
 ## 先行2 runの停止と承認
 
@@ -96,8 +91,16 @@ Merge、Issue Close、採用は人間判断とし、#35へ進まない。復旧�
 
 ## ローカル検証
 
-標準verifyのlint・setup 30件、専用adapter回帰8件、PUBLIC証拠同一性1件に成功。
+標準verifyのlint・setup 30件、旧版の専用adapter回帰8件、PUBLIC証拠同一性1件に成功。
 既存generated-repair 19件、登録操作8件、evaluation 34件にも成功した（合計100件）。
 Bash 5 Security PreflightはSECURITY_PASSED。依存manifestなしのため依存監査は理由付きSECURITY_NOT_APPLICABLE。
 typecheck/buildは設定がないため理由付き対象外。warning/deprecationは観測していない。
 最終PR headのCI・Security・CodeQL・正式Codex Reviewと残存リスクはPRへ記録する。
+
+## レビュー修正の再実証条件
+
+修正版は成功した各taskの最終結果をrespondへ届け、実stdoutのbytes/hashと一致した場合だけ成功に数える。
+JSONリスト・再構成した値・返却なしをそれぞれ回帰で拒否する。respondは受領だけを返し、3試行終了前の採点はしない。
+一括評価の開始時にassessment.lockを作り、欠損で停止した後の追加返却・再採点を拒否する。
+旧runとlock、候補内容は維持する。修正版での実3試行はまだ実施していない。
+親 #31の「新runの再試行は人間判断」に従い、修正・標準検証が完了した具体案について人間の承認を得てから新runへ進む。

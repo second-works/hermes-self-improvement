@@ -196,18 +196,20 @@ class Controller:
     def handoff(self, name, trial, scenario):
         work, label = self.location(name, trial, scenario)
         a = self.accepted(work)
+        require(not (work / 'assessment.lock').exists(), 'ASSESSMENT_STARTED')
         case = self.read_json(work, 'trials.private.json')[trial][scenario]
         skill = (git(work / 'packet', 'show', a['baseline_sha'] + ':' + SKILL)
                  if scenario == 'baseline' else regular(work / 'candidate.md', self.runs))
         self.save(work, label + '.read.json', {'skill_hash': digest(skill), 'task_hash': digest(canonical(case['task']))})
         return {'skill': skill.decode(), 'task': case['task'],
                 'allowed_tools': ['run_review'] if scenario != 'denied' else [],
-                'transport': 'use the same adapter with use and a JSON request containing only operation; stop_permission, stop_evidence, stop_no_procedure are allowed stop reports',
+                'transport': 'Use this adapter use with an operation-only JSON request. Stop reports: stop_permission, stop_evidence, stop_no_procedure. After successful run_review, deliver the final task result through respond --response with the exact stdout string including its final newline. Do not summarize or reconstruct it. The session closing message is an administrative receipt only.',
                 'instruction': 'Follow this skill for this task only. If sufficient, reuse unchanged. If permission or evidence is missing, stop. Never invent findings, edit files, request external retrieval or arbitrary commands.'}
 
     def use(self, name, trial, scenario, value):
         work, label = self.location(name, trial, scenario)
         a = self.accepted(work)
+        require(not (work / 'assessment.lock').exists(), 'ASSESSMENT_STARTED')
         require((work / (label + '.read.json')).is_file(), 'SKILL_NOT_READ')
         require(not (work / (label + '.trace.json')).exists(), 'TRIAL_ALREADY_USED')
         case = self.read_json(work, 'trials.private.json')[trial][scenario]
@@ -251,10 +253,26 @@ class Controller:
                 'pending_container': getattr(error, 'pending_container', None)})
             raise
 
+    def respond(self, name, trial, scenario, response):
+        """Receive the session's final task result; no correctness feedback before batch."""
+        work, label = self.location(name, trial, scenario)
+        a = self.accepted(work)
+        require(not (work / 'active.lock').exists(), 'ACTIVE_OR_FAILED')
+        require(not (work / 'assessment.lock').exists(), 'ASSESSMENT_STARTED')
+        require(time.time() - self.read_json(work, 'budget.json')['started_at'] < 1200, 'RUN_DEADLINE')
+        require(type(response) is str and len(response.encode('utf-8')) <= 65536, 'RESPONSE_BOUNDARY')
+        trace = self.read_json(work, label + '.trace.json')
+        require(trace['operation'] == 'run_review', 'RESPONSE_NOT_APPLICABLE')
+        self.save(work, label + '.response.json', {'response': response,
+            'response_hash': digest(response.encode('utf-8')), 'task_hash': trace['task_hash'],
+            'candidate_hash': a['candidate_hash']})
+        return {'status': 'RECEIVED'}
+
     def evaluate(self, name):
         work = self.work(name); a = self.accepted(work)
         require(not (work / 'active.lock').exists(), 'ACTIVE_OR_FAILED')
         require(not (work / 'report.json').exists(), 'EVALUATION_USED')
+        write_new(work / 'assessment.lock', canonical({'candidate_sha': a['candidate_sha']}))
         cases = self.read_json(work, 'trials.private.json')
         budget = self.read_json(work, 'budget.json')
         require(time.time() - budget['started_at'] < 1200, 'RUN_DEADLINE')
@@ -277,6 +295,13 @@ class Controller:
                 require(read['skill_hash'] == digest(expected_skill), 'READ_IDENTITY')
                 good = trace['operation'] == case['expected_operation']
                 if trace['operation'] == 'run_review':
+                    require((work / (label + '.response.json')).is_file(), 'FINAL_RESPONSE_MISSING')
+                    response = self.read_json(work, label + '.response.json')
+                    require(response['candidate_hash'] == a['candidate_hash'] and
+                            response['task_hash'] == trace['task_hash'], 'RESPONSE_IDENTITY')
+                    require(digest(response['response'].encode('utf-8')) == response['response_hash'], 'RESPONSE_HASH')
+                    good &= response['response'].encode('utf-8') == trace['stdout'].encode('utf-8')
+                    hashes[label + '.response.json'] = digest(regular(work / (label + '.response.json'), self.runs))
                     parsed = observe(dict(trace['outcome'], stdout=trace['stdout'].encode(), stderr=trace['stderr'].encode()))
                     good &= [list(row) for row in parsed] == case['expected']
                     require(digest(trace['stdout'].encode()) == trace['stdout_hash'] and
@@ -296,7 +321,7 @@ class Controller:
                   'claim': 'Three fresh Codex sessions and finite synthetic tasks only; no adoption.'}
         self.save(work, 'report.json', report)
         self.legacy().event(work, 'EVALUATION_COMPLETED', digest(regular(work / 'report.json', self.runs)))
-        self.save(work, 'checkpoint.json', {'last_event_hash': self.legacy().verify_events(work)[-1]['hash'], ** {'report_hash': digest(regular(work / 'report.json', self.runs)),
+        self.save(work, 'checkpoint.json', {'assessment_hash': digest(regular(work / 'assessment.lock', self.runs)), 'last_event_hash': self.legacy().verify_events(work)[-1]['hash'], ** {'report_hash': digest(regular(work / 'report.json', self.runs)),
                                            'accepted_hash': digest(regular(work / 'accepted.json', self.runs))}})
         return report
 
@@ -306,6 +331,7 @@ class Controller:
         require([r['state'] for r in events] == ['ENVIRONMENT_PINNED', 'ISOLATION_VERIFIED', 'EVALUATION_FROZEN', 'EVALUATING', 'EVALUATION_COMPLETED'], 'AUDIT_STATES')
         report = self.read_json(work, 'report.json'); checkpoint = self.read_json(work, 'checkpoint.json')
         require(not (work / 'active.lock').exists(), 'ACTIVE_OR_FAILED')
+        require(checkpoint['assessment_hash'] == digest(regular(work / 'assessment.lock', self.runs)), 'AUDIT_ASSESSMENT')
         require(checkpoint['last_event_hash'] == events[-1]['hash'] and events[-1]['payload_hash'] == checkpoint['report_hash'], 'AUDIT_EVENTS')
         require(checkpoint['report_hash'] == digest(regular(work / 'report.json', self.runs)) and
                 checkpoint['accepted_hash'] == digest(regular(work / 'accepted.json', self.runs)), 'AUDIT_CHECKPOINT')

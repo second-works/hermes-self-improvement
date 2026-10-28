@@ -46,18 +46,19 @@ python3 -B scripts/skill_reuse.py accept --run <run> --candidate-sha <full-sha>
 受理は完全SHA、cleanなpacket、通常blob、差分1ファイル、上限、元script hashを照合し、candidate.mdをread-onlyに保持する。
 受理は1回のみ。評価結果による候補調整は行わない。
 
-利用担当はfork_turns=noneで履歴を継がない3つの実Codex subagentセッションとし、各セッションにはtrial番号、read/use入口、候補スキル・タスク・許可ツールだけを渡す。
+利用担当はfork_turns=noneで履歴を継がない3つの実Codex subagentセッションとし、各セッションにはtrial番号、read/use/respond入口、候補スキル・タスク・許可ツールだけを渡す。
 各trialにprimary、手順が十分なsufficient、実行権限なしdenied、patch不足missing、修正前baselineの5条件を固定する。
 readはその条件のスキル・タスク・ツールを返し、読取hashを残す。生成会話と正解は渡さない。
 useはoperationだけを持つJSON objectを受ける。run_review以外は固定の停止報告だけを許す。
 任意コマンド、外部取得、追加キーを拒否する。権限・入力が不足する実行も拒否する。
-モデルは実stdoutを受け取り、結果を作り直さない。1条件につきread/use各1回、逐次実行する。
+モデルは実stdoutを受け取り、結果を作り直さない。1条件につきread/use各1回、成功したrun_reviewにはrespondで最終結果を1回返却し、逐次実行する。
 
 ```sh
 python3 -B scripts/skill_reuse.py read --run <run> --trial 0 --scenario primary
 python3 -B scripts/skill_reuse.py use --run <run> --trial 0 --scenario primary --request '{"operation":"run_review"}'
 ```
 
+成功した各taskの最終返却先はrespondであり、セッション終了メッセージは管理用の受領報告だけにする。respondには実stdout文字列を末尾改行も含めてそのまま渡す。評価前に正誤フィードバックは返さない。
 利用traceには読取hash、入力hash、候補hash、script hash、実exit/stdout/stderrとそのhashを記録し、正解は含めない。
 これらの個別値はローカル保持し、PUBLIC報告は集計とhashだけとする。
 監督側はspawn_agentが返した実際の3セッション識別子（canonical task name）をsessions.jsonへwrite_newで保存する。識別子の登録だけで独立性を証明したとはせず、実際のfork_turns=noneの起動記録と照合する。自己申告の成功文は採点に使わない。
@@ -71,7 +72,7 @@ python3 -B scripts/skill_reuse.py audit --run <run>
 ```
 
 全3試行・全条件を終えてから一括評価する。途中結果で候補を変更しない。
-実stdoutの厳密JSON、exit、状態、正解、両SHA、原本・候補・入力hashを照合する。
+実stdoutの厳密JSON、exit、状態、正解、両SHA、原本・候補・入力hashを照合する。primary/sufficientには利用担当がrespondへ返した最終結果を必須とし、そのbytes/hashが実stdoutと一致することも確認する。JSONリスト化や再構成はFAIL、返却欠損はSTOP。一括評価の開始lockを保持し、開始後の返却や再採点は拒否する。
 primary/sufficientの実行成功と、denied/missing/baselineでの適切な停止が各3件すべて成立した場合だけPASSとする。
 欠損、timeout、故障、改変、回収不能、予算超過を成功にしない。
 失敗ではactive.lockとrunを保持して停止する。既存run/lockの削除や再試行は人間判断とする。

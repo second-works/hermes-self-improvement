@@ -106,7 +106,7 @@ class IntakeTests(unittest.TestCase):
                 (self.work / 'stopped.json').unlink()
             sandbox.assert_not_called()
 
-    def test_mock_batch_audits_actual_stdout_and_rejects_trace_tampering(self):
+    def batch_fixture(self, return_mode='correct'):
         from delegation.skill_reuse import SCENARIOS
         candidate_sha = self.candidate()
         candidate = (self.packet / SKILL).read_bytes()
@@ -145,17 +145,41 @@ class IntakeTests(unittest.TestCase):
                 for scenario in SCENARIOS:
                     self.c.handoff(self.work.name, i, scenario)
                     self.c.use(self.work.name, i, scenario, {'operation': row[scenario]['expected_operation']})
+                    if row[scenario]['expected_operation'] == 'run_review' and return_mode != 'missing':
+                        response = outcome['stdout'].decode() if return_mode == 'correct' else (
+                            '[]' if return_mode == 'list' else '{"findings":[],"cpu_seconds":1}')
+                        self.c.respond(self.work.name, i, scenario, response)
+            if return_mode == 'missing':
+                with self.assertRaisesRegex(EvaluationError, 'FINAL_RESPONSE_MISSING'):
+                    self.c.evaluate(self.work.name)
+                with self.assertRaisesRegex(EvaluationError, 'ASSESSMENT_STARTED'):
+                    self.c.respond(self.work.name, 0, 'primary', outcome['stdout'].decode())
+                return
             report = self.c.evaluate(self.work.name)
-            self.assertEqual(report['status'], 'PASS')
+            self.assertEqual(report['status'], 'PASS' if return_mode == 'correct' else 'FAIL')
             self.assertEqual(sandbox.return_value.run.call_count, 6)
             self.assertEqual(self.c.audit(self.work.name)['audit'], 'VERIFIED')
+            with self.assertRaisesRegex(EvaluationError, 'ASSESSMENT_STARTED'):
+                self.c.respond(self.work.name, 0, 'primary', outcome['stdout'].decode())
             trace = self.work / '0-primary.trace.json'
             trace.write_bytes(b'{}')
             with self.assertRaisesRegex(EvaluationError, 'AUDIT_TRACE'):
                 self.c.audit(self.work.name)
 
+    def test_mock_batch_audits_actual_stdout_and_rejects_trace_tampering(self):
+        self.batch_fixture()
+
+    def test_missing_final_response_cannot_pass(self):
+        self.batch_fixture('missing')
+
+    def test_list_response_cannot_pass(self):
+        self.batch_fixture('list')
+
+    def test_reconstructed_response_cannot_pass(self):
+        self.batch_fixture('changed')
+
     def test_evaluation_requires_all_three_real_session_receipts(self):
-        with patch.object(self.c, 'accepted', return_value={}):
+        with patch.object(self.c, 'accepted', return_value={'candidate_sha': 'mock'}):
             self.c.save(self.work, 'budget.json', {'seconds': 1, 'started_at': time.time()})
             self.c.save(self.work, 'trials.private.json', [{}, {}, {}])
             self.c.save(self.work, 'sessions.json', [])
@@ -213,7 +237,9 @@ class LegacyBindingTests(unittest.TestCase):
                 for i, row in enumerate(cases):
                     for scenario, case in row.items():
                         c.handoff(work.name, i, scenario)
-                        c.use(work.name, i, scenario, {'operation': case['expected_operation']})
+                        result = c.use(work.name, i, scenario, {'operation': case['expected_operation']})
+                        if case['expected_operation'] == 'run_review':
+                            c.respond(work.name, i, scenario, result['stdout'])
             self.assertEqual(c.evaluate(work.name)['status'], 'PASS')
             self.assertEqual(c.audit(work.name)['audit'], 'VERIFIED')
             (work / 'candidate.md').chmod(0o600)  # disposable tamper fixture

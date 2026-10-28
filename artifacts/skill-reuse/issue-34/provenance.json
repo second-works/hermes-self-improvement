@@ -35,5 +35,8 @@
     "AUDIT_BINDING",
     "ISOLATION_CLEANUP_FAILED"
   ],
-  "originals_locks_and_private_traces_retained": true
+  "originals_locks_and_private_traces_retained": true,
+  "acceptance_status": "HOLD",
+  "acceptance_reason": "Final session result was not captured by the archived evaluator; PR39 P2 BLOCKING. Original report and run preserved.",
+  "corrected_protocol_real_trials": "NOT_RUN"
 }

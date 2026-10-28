@@ -1,4 +1,4 @@
-"""PUBLIC proof identities; never execute or import generated skill resources."""
+"""Archived PUBLIC observation identities; never execute or import generated skill resources."""
 import hashlib
 import json
 from pathlib import Path
@@ -26,7 +26,9 @@ class PublicProofTests(unittest.TestCase):
         self.assertEqual(report['candidate_sha'], provenance['candidate_sha'])
         self.assertEqual(report['candidate_hash'], digest((ART / 'candidate.SKILL.md').read_bytes()))
         self.assertEqual(digest((ART / 'candidate.bundle').read_bytes()), provenance['bundle_hash'])
+        # This is the old observer's status, not final output-contract acceptance.
         self.assertEqual(report['status'], 'PASS')
+        self.assertEqual(provenance['acceptance_status'], 'HOLD')
         self.assertEqual(report['counts'], {name: 3 for name in ['primary', 'sufficient', 'denied', 'missing', 'baseline']})
         self.assertEqual(len(set(report['session_ids'])), 3)
         with tempfile.TemporaryDirectory() as directory:

@@ -74,6 +74,7 @@ class Text:
         # A later higher-level section makes the boundary ambiguous: keep all text active.
         self.historical = set()
         self.archive_heading = None
+        self.archive_start = None
         if where == 'body':
             for line, level, heading in self.headings:
                 if not re.fullmatch(r'(?:[0-9]{4}-[0-9]{2}-[0-9]{2}の)?履歴', heading.strip()):
@@ -86,7 +87,8 @@ class Text:
                 if any(i > line and lv < level for i, lv, _ in self.headings):
                     continue
                 self.archive_heading = line
-                self.historical = set(range(line, len(self.lines)))
+                self.archive_start = previous
+                self.historical = set(range(previous, len(self.lines)))
                 break
         self.headings = [h for h in self.headings if h[0] not in self.historical]
 
@@ -117,7 +119,7 @@ def evidence_entry(label, quote, truncated):
 def sections(text):
     result = []
     for index, (line, level, heading) in enumerate(text.headings):
-        end = text.headings[index + 1][0] if index + 1 < len(text.headings) else (text.archive_heading if text.archive_heading is not None else len(text.lines))
+        end = text.headings[index + 1][0] if index + 1 < len(text.headings) else (text.archive_start if text.archive_start is not None else len(text.lines))
         parent = next((h for h in reversed(text.headings[:index]) if h[1] < level), None)
         result.append({'name': canonical(heading), 'line': line, 'end': end, 'heading': heading,
                        'parent': parent[0] if parent else None,
@@ -231,7 +233,7 @@ def subtree_end(text, section):
     for line, lv, heading in text.headings:
         if line > section['line'] and (lv <= level or canonical(heading) is not None):
             return line
-    return text.archive_heading if text.archive_heading is not None else len(text.lines)
+    return text.archive_start if text.archive_start is not None else len(text.lines)
 
 
 def subtree_content(text, section):

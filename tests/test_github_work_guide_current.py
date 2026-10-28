@@ -104,6 +104,24 @@ class CurrentContracts(unittest.TestCase):
         self.assertTrue(plan['candidates']['issue:131']['children'])
         self.assertNotIn('dependency_prose', codes(plan['candidates']['issue:128']))
 
+    def test_archive_separator_is_not_dependency_content(self):
+        for value in ('none', 'なし', 'なし（#26 / PR #27はマージ済み）'):
+            with self.subTest(value=value):
+                snapshot0 = current_snapshot()
+                items = copy.deepcopy(snapshot0['items'])
+                item = items['issue:28']
+                item['body'] = '# Goal\ncurrent\n# Dependencies\n' + value + '\n\n---\n## 履歴\n## 目的\nold'
+                item['raw']['detail']['body'] = item['body']
+                item['hash'] = digest(item['raw'])
+                snap = seal(items, snapshot0['coverage'])
+                text = guide.Text('issue:28', 'body', item['body'])
+                section = next(s for s in guide.sections(text) if s['name'] == 'dependencies')
+                self.assertEqual(section['content'], value)
+                self.assertEqual(guide.subtree_content(text, section), value)
+                plan = build_plan(snap)
+                self.assertNotIn('dependency_prose', codes(plan['candidates']['issue:28']))
+                self.assertEqual(recheck(snap, plan, 'issue:28', snap)['status'], 'CONFIRMED')
+
     def test_old_plan_version_is_not_reused(self):
         s = current_snapshot()
         plan = build_plan(s)

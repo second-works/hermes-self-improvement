@@ -1,0 +1,1 @@
+{"complete":true,"skills":[{"name":"github-code-review","capability":"python-diff-review","input":"path/patch","output":"findings/cpu_seconds"}]}

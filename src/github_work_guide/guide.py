@@ -54,18 +54,10 @@ class Text:
         for line in self.lines:
             self.offsets.append(pos)
             pos += len(line) + 1
-        self.headings, self.fenced = [], set()
-        fence = None  # opening marker; a block closes only with the same character, at least as long, and nothing after
+        self.fenced, self.non_declarations = source_ranges(self.lines)
+        self.headings = []
         for i, line in enumerate(self.lines):
-            m = FENCE.match(line.rstrip('\r'))
-            if fence is None and m and not (m.group(1)[0] == '`' and '`' in m.group(2)):
-                fence = m.group(1)
-                self.fenced.add(i)
-                continue
-            if fence is not None:
-                self.fenced.add(i)
-                if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and not m.group(2).strip():
-                    fence = None
+            if i in self.fenced:
                 continue
             m = HEADING.match(line.rstrip('\r'))
             if m:
@@ -91,7 +83,6 @@ class Text:
                 self.historical = set(range(previous, len(self.lines)))
                 break
         self.headings = [h for h in self.headings if h[0] not in self.historical]
-        self.non_declarations = non_declaration_lines(self)
 
     def prefix(self):
         return self.owner if self.where == 'body' else f'{self.owner}:{self.where}'
@@ -253,17 +244,26 @@ def valid_time(value):
     return value if isinstance(value, str) and TIME.fullmatch(value) else None
 
 
-def non_declaration_lines(text):
+def source_ranges(lines):
     """Shared ranges for code examples and hidden HTML comments.
 
     Delimiters carry across lines. Comment contents cannot open code, and code
     contents cannot open comments. Escapes apply only outside actual code.
     """
-    result, mode, ticks = {}, None, None
+    result, fenced, mode, ticks, fence = {}, set(), None, None, None
     token = re.compile(r'<!--|`+')
     code_tick = re.compile(r'`+')
-    for i, line in enumerate(text.lines):
-        if i in text.fenced or i in text.historical:
+    for i, line in enumerate(lines):
+        marker = FENCE.match(line.rstrip('\r'))
+        if mode == 'fence':
+            fenced.add(i)
+            if (marker and marker.group(1)[0] == fence[0] and len(marker.group(1)) >= len(fence)
+                    and not marker.group(2).strip()):
+                mode, fence = None, None
+            continue
+        if mode is None and marker and not (marker.group(1)[0] == '`' and '`' in marker.group(2)):
+            mode, fence = 'fence', marker.group(1)
+            fenced.add(i)
             continue
         if mode is None and re.match(r'^(?: {4}| {0,3}\t)', line):
             result[i] = [(0, len(line))]
@@ -303,7 +303,7 @@ def non_declaration_lines(text):
         if mode:
             spans.append((start, len(line)))
         result[i] = spans
-    return result
+    return fenced, result
 
 
 def condition_spans(line, stack, ignored):

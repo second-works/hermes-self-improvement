@@ -208,6 +208,16 @@ class DependencyGuidanceTests(unittest.TestCase):
         c=build_plan(body_snapshot('# Goal\nx\n# Dependencies\nliteral '+chr(92)*2+'`\nDepends on: #9\n`\nDepends on: #35（条件）'))['candidates']['issue:8']
         self.assertEqual([h['target'] for h in c['dependency_hints']],['issue:35'])
 
+    def test_fence_markers_in_comment_or_inline_code_do_not_hide_live_declarations(self):
+        for prefix in ('<!--\n```\n-->', '`example\n```\n`', '``example\n~~~\n``'):
+            with self.subTest(prefix=prefix):
+                c=build_plan(body_snapshot('# Goal\nx\n# Dependencies\n'+prefix+'\nDepends on: #35（条件）'))['candidates']['issue:8']
+                self.assertEqual([h['target'] for h in c['dependency_hints']],['issue:35'])
+                s=dependency_snapshot();items=copy.deepcopy(s['items']);pr=items['pr:40']
+                pr['body']=prefix+'\nRefs #35';pr['raw']['detail']['body']=pr['body'];pr['hash']=digest(pr['raw'])
+                related=build_plan(seal(items,s['coverage']))['candidates']['issue:8']['dependency_hints'][0]['related_prs']
+                self.assertTrue(any(r['target']=='pr:40' for r in related))
+
     def test_new_hints_do_not_clear_holds_or_hide_changes_or_reuse_old_plan(self):
         s=dependency_snapshot();p=build_plan(s)
         self.assertEqual(recheck(s,p,'issue:8',s)['status'],'BLOCKED')

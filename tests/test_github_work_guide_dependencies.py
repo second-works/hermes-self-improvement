@@ -164,6 +164,21 @@ class DependencyGuidanceTests(unittest.TestCase):
         c=build_plan(body_snapshot('# Goal\nx\n# Dependencies\n`（例`。Depends on: #35（条件）'))['candidates']['issue:8']
         self.assertEqual([h['target'] for h in c['dependency_hints']],['issue:35'])
 
+    def test_multiline_inline_code_cannot_declare_dependency_or_refs(self):
+        for ticks in ('`','``'):
+            for body in (ticks+'example\nDepends on: #35\n'+ticks,
+                         ticks+'example\ntext。依存: #35（条件）\n'+ticks):
+                with self.subTest(body=body):
+                    c=build_plan(body_snapshot('# Goal\nx\n# Dependencies\n'+body))['candidates']['issue:8']
+                    self.assertEqual(c['dependency_hints'],[])
+            s=dependency_snapshot();items=copy.deepcopy(s['items']);pr=items['pr:40']
+            pr['body']=ticks+'Example:\nRefs #35\n'+ticks
+            pr['raw']['detail']['body']=pr['body'];pr['hash']=digest(pr['raw'])
+            c=build_plan(seal(items,s['coverage']))['candidates']['issue:8']
+            self.assertEqual(c['dependency_hints'][0]['related_prs'],[])
+        c=build_plan(body_snapshot('# Goal\nx\n# Dependencies\n``example\n` text。依存: #9\n``\nDepends on: #35（条件）'))['candidates']['issue:8']
+        self.assertEqual([h['target'] for h in c['dependency_hints']],['issue:35'])
+
     def test_new_hints_do_not_clear_holds_or_hide_changes_or_reuse_old_plan(self):
         s=dependency_snapshot();p=build_plan(s)
         self.assertEqual(recheck(s,p,'issue:8',s)['status'],'BLOCKED')

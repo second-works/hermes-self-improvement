@@ -91,6 +91,7 @@ class Text:
                 self.historical = set(range(previous, len(self.lines)))
                 break
         self.headings = [h for h in self.headings if h[0] not in self.historical]
+        self.inline_code = inline_code_lines(self)
 
     def prefix(self):
         return self.owner if self.where == 'body' else f'{self.owner}:{self.where}'
@@ -252,17 +253,23 @@ def valid_time(value):
     return value if isinstance(value, str) and TIME.fullmatch(value) else None
 
 
-def inline_code_spans(line):
-    spans, opening = [], None
-    for tick in re.finditer(r'`+', line):
-        if opening is None:
-            opening = (tick.start(), len(tick.group()))
-        elif len(tick.group()) == opening[1]:
-            spans.append((opening[0], tick.end()))
-            opening = None
-    if opening:
-        spans.append((opening[0], len(line)))
-    return spans
+def inline_code_lines(text):
+    """Shared code-span map; matching backtick lengths can cross source lines."""
+    result, opening = {}, None
+    for i, line in enumerate(text.lines):
+        if i in text.fenced or i in text.historical:
+            continue
+        spans, start = [], 0 if opening is not None else None
+        for tick in re.finditer(r'`+', line):
+            if opening is None:
+                opening, start = len(tick.group()), tick.start()
+            elif len(tick.group()) == opening:
+                spans.append((start, tick.end()))
+                opening, start = None, None
+        if opening is not None:
+            spans.append((start, len(line)))
+        result[i] = spans
+    return result
 
 
 def condition_spans(line, stack, ignored):
@@ -303,7 +310,7 @@ def dependency_hints(text, start, end):
         line = text.lines[i]
         # Inline-code spans use matching backtick lengths; an unclosed span
         # suppresses the remainder rather than manufacturing a declaration.
-        spans = inline_code_spans(line)
+        spans = list(text.inline_code.get(i, []))
         spans += condition_spans(line, condition_stack, spans)
         for match in label.finditer(line):
             if any(a < match.end() and match.start() < b for a, b in spans):
@@ -331,7 +338,7 @@ def body_refs(text, reference):
     if not reference['evidence']['id'].startswith(f'{text.owner}:L'):
         return False
     line, column = text.lines[reference['line']], reference['column']
-    if any(a <= column < b for a, b in inline_code_spans(line)):
+    if any(a <= column < b for a, b in text.inline_code.get(reference['line'], [])):
         return False
     label = re.match(r'\s*(?:[-*]\s+)?refs?\s*[:：]?\s*', line, re.I)
     if not label:

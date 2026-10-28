@@ -9,7 +9,7 @@ from . import guide
 
 REPO = 'second-works/hermes-self-improvement'
 VERSION = 1
-PLAN_VERSION = 2  # v2: per-item guidance, excerpt evidence, work fingerprint
+PLAN_VERSION = 3  # v3: current/archive distinction and child-list evidence
 REQUIRED = ('ci', 'Security Preflight', 'Analyze (python)')
 KINDS = {
     'completion': ('完了範囲確認', 'IssueのDoneと関連PRの実装範囲を人が照合する。'),
@@ -250,6 +250,8 @@ def analyze(key, item, a):
     found = guide.sections(body)
     named = [s for s in found if s['name']]
     evidence, holds, notes = {}, [], []
+    child_sections = [s for s in named if s['name'] == 'children']
+    children = []
 
     def cite(entry):
         owner = items[':'.join(entry['id'].split(':')[:2])]
@@ -258,6 +260,29 @@ def analyze(key, item, a):
 
     def section_excerpt(s, lines=4):
         return cite(body.excerpt(s['line'], min(s['end'], s['line'] + lines)))
+
+    if body.archive_heading is not None:
+        marker = cite(body.excerpt(body.archive_heading, body.archive_heading + 1))
+        notes.append(f'明示された末尾の履歴は現行契約の判定に使わない（{marker}）。原本と変更検知は保持する。')
+    for section in child_sections:
+        for i in range(section['line'] + 1, guide.subtree_end(body, section)):
+            if i in body.fenced or i in body.historical:
+                continue
+            mark = guide.CHECKBOX.match(body.lines[i])
+            if not mark:
+                continue
+            targets = sorted({r['target'] for r in a.refs[key] if r['line'] == i and r['kind'] != 'pr'
+                              and r['evidence']['id'].startswith(f'{key}:L')})
+            children.append({'checked': mark.group(1).lower() == 'x', 'targets': targets,
+                             'states': {t: items[t]['state'] if t in items else 'UNFETCHED' for t in targets},
+                             'evidence': cite(body.excerpt(i, i + 1))})
+        cite(body.excerpt(section['line'], section['line'] + 1))
+    if child_sections:
+        holds.append(hold('parent_plan', 'semantic', '親計画の子一覧は、親自身の開始依存ではない',
+                          [cite(body.excerpt(s['line'], s['line'] + 1)) for s in child_sections],
+                          f'{key} の子一覧と各子のGoal/Dependencies',
+                          '次に進める子はどれか。主経路と任意経路、各子の依存を確認できたか。',
+                          '子一覧の未完了項目と各子の依存・範囲を照合し、着手する子を人が選ぶ。'))
 
     recognised = ', '.join(guide.LABELS[s['name']] for s in named) or 'なし'
     goals = [s for s in named if s['name'] == 'goal']
@@ -286,7 +311,7 @@ def analyze(key, item, a):
     sources += [(x['line'], x['value'], body.excerpt(x['line'], x['line'] + 1)) for x in guide.labels(body, found)]
     sources.sort(key=lambda x: x[0])
     numbers = []
-    if not sources:
+    if not sources and not child_sections:
         holds.append(hold('format_missing', 'format', '依存欄がない', [],
                           f'{key} 本文（認識した欄: {recognised}）', '先に終わっている必要があるIssue/PRはあるか。',
                           '依存/Dependencies欄に番号（- depends-on: #N）か「なし」を書く、または人が判断して記録する。',
@@ -362,6 +387,14 @@ def analyze(key, item, a):
             checked, total = guide.done_counts(body, s)
             done.append({'line': s['line'] + 1, 'checked': checked, 'total': total, 'evidence': section_excerpt(s, 6)})
 
+    for r in related:
+        if r['relation'] == 'closing' and r['direction'] == 'in' and r['state'] == 'OPEN':
+            head_ev = cite(guide.evidence_entry(f'{r["target"]}:head', r['head'], False))
+            holds.append(hold('active_pr', 'state', f'{r["target"]} がこのIssueをclosingするOPEN PR', [head_ev],
+                              f'{r["target"]} 現head {r["head"]}',
+                              '既存PRの未完了点は何か。新規実装と重複しないか。',
+                              '既存PRの現headのcheck・レビュー・検収を確認し、そのPRで作業を続ける。'))
+
     merged = [r for r in related if r['state'] == 'MERGED' and (r['relation'] == 'closing' or
               (r['relation'] == 'refs' and r['direction'] == 'in'))]
     merged_targets = sorted({r['target'] for r in merged})
@@ -378,11 +411,11 @@ def analyze(key, item, a):
                          '本文の状態の記述はMerge前の時点として読む。')
     notes = sorted(set(notes))
     gaps = [n for n in guide.EXPECTED if n not in {s['name'] for s in named}
-            and not (n == 'dependencies' and sources)]
+            and not (n == 'dependencies' and (sources or child_sections))]
     other = [{'line': s['line'] + 1, 'heading': s['heading']} for s in found if not s['name']]
     return {'sections': [{'name': s['name'], 'line': s['line'] + 1} for s in named], 'gaps': gaps, 'done': done,
             'related': related, 'external': external, 'holds': holds, 'notes': notes, 'other_headings': other,
-            'numbers': numbers, 'merged': merged_targets, 'evidence': evidence}
+            'numbers': numbers, 'merged': merged_targets, 'evidence': evidence, 'children': children}
 
 
 def steps_for(key, kind, item, info, deps, items):
@@ -394,6 +427,11 @@ def steps_for(key, kind, item, info, deps, items):
         return steps + [f'保留 gate: {h["reason"]}' for h in info['holds']] + [
             f'scripts/check-pr-head.sh {item["number"]} が PR_GATE_STATUS=READY を返すまでマージを依頼しない。']
     steps = []
+    for h in info['holds']:
+        if h['code'] == 'active_pr':
+            steps.append(f'{h["check"]} のcheck・レビュー・検収を確認する。重複する新規実装を開始しない。')
+    if info.get('children'):
+        steps.append('親計画を直接実装せず、子一覧の未完了項目と各子の依存・対象範囲を照合する。')
     if kind == 'completion':
         for r in info['related']:
             if r['target'] in info['merged'] and r['relation'] in ('closing', 'refs') and r['direction'] == 'in':
@@ -447,7 +485,7 @@ def build_plan(snapshot, priority=()):
     candidates, deps = {}, {}
     for key, item in sorted(items.items()):
         info = {'sections': [], 'gaps': [], 'done': [], 'related': [], 'external': [], 'holds': [], 'notes': [],
-                'other_headings': [], 'numbers': [], 'merged': [], 'evidence': {}}
+                'other_headings': [], 'numbers': [], 'merged': [], 'evidence': {}, 'children': []}
         if item['state'] != 'OPEN':
             kind = 'none'
         elif item['kind'] == 'pr':
@@ -491,6 +529,7 @@ def build_plan(snapshot, priority=()):
             'sections': info['sections'], 'gaps': info['gaps'], 'done': info['done'], 'related': info['related'],
             'external': info['external'], 'holds': info['holds'], 'notes': info['notes'],
             'other_headings': info['other_headings'], 'evidence': evidence, 'dependencies': deps[key],
+            'children': info['children'],
             'start_condition': '取得完了、状態不変、保留なしを再取得で確認する。',
             'next_step': action, 'steps': steps_for(key, kind, item, info, deps[key], items),
             'success_condition': '人が原文と受入条件を照合する（実行・承認・検収の完了ではない）。',
@@ -592,6 +631,10 @@ def markdown(snapshot, changes, plan=None, result=None):
                 lines.append('- 完了条件: ' + '、'.join(
                     f'L{d["line"]} ' + (f'{d["checked"]}/{d["total"]}チェック' if d['total'] else 'チェック項目なし')
                     for d in c['done']))
+            for child in c.get('children', []):
+                targets = '、'.join(f'{t}({child["states"][t]})' for t in child['targets']) or '番号未確定'
+                lines.append(f'- 子一覧の参照: {targets} / 本文チェック {"済" if child["checked"] else "未"} / '
+                             f'{quote(child["evidence"])}（チェックは成功・採用の証明ではない）')
             if c['other_headings']:
                 lines.append('- 判断に使っていない見出し: ' + '、'.join(f'L{x["line"]}' for x in c['other_headings']))
             grouped = {}

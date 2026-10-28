@@ -6,6 +6,7 @@ It never turns prose into a confirmed dependency, a completion or an approval.
 import re
 
 SECTIONS = (
+    ('children', ('children / dependencies', 'children', '子issue', '子 issue', '子一覧')),
     ('goal', ('goal', '目的', '目標')),
     ('scope', ('scope', '作業', '範囲', '対象範囲')),
     ('done', ('done', '完了条件', 'acceptance criteria', '受入条件')),
@@ -17,7 +18,7 @@ SECTIONS = (
 )
 LABELS = {'goal': '目的/Goal', 'scope': '作業/Scope', 'done': '完了条件/Done', 'verification': '検証/Verification',
           'dependencies': '依存/Dependencies', 'non_goals': '対象外/Non-goals', 'boundaries': '境界/Boundaries',
-          'context': '背景/Context'}
+          'context': '背景/Context', 'children': '子一覧/Children'}
 EXPECTED = ('goal', 'scope', 'done', 'verification', 'dependencies', 'non_goals')
 NONE_WORDS = {'none', 'なし', '依存なし', 'n/a'}
 QUOTE_LIMIT = 300
@@ -69,6 +70,25 @@ class Text:
             m = HEADING.match(line.rstrip('\r'))
             if m:
                 self.headings.append((i, len(m.group(1)), m.group(2)))
+        # Only a separated, explicitly labelled trailing archive after a current Goal.
+        # A later higher-level section makes the boundary ambiguous: keep all text active.
+        self.historical = set()
+        self.archive_heading = None
+        if where == 'body':
+            for line, level, heading in self.headings:
+                if not re.fullmatch(r'(?:[0-9]{4}-[0-9]{2}-[0-9]{2}の)?履歴', heading.strip()):
+                    continue
+                previous = next((i for i in range(line - 1, -1, -1) if self.lines[i].strip()), None)
+                if previous is None or self.lines[previous].strip() != '---' or previous in self.fenced:
+                    continue
+                if not any(i < line and canonical(h) == 'goal' for i, _, h in self.headings):
+                    continue
+                if any(i > line and lv < level for i, lv, _ in self.headings):
+                    continue
+                self.archive_heading = line
+                self.historical = set(range(line, len(self.lines)))
+                break
+        self.headings = [h for h in self.headings if h[0] not in self.historical]
 
     def prefix(self):
         return self.owner if self.where == 'body' else f'{self.owner}:{self.where}'
@@ -97,7 +117,7 @@ def evidence_entry(label, quote, truncated):
 def sections(text):
     result = []
     for index, (line, level, heading) in enumerate(text.headings):
-        end = text.headings[index + 1][0] if index + 1 < len(text.headings) else len(text.lines)
+        end = text.headings[index + 1][0] if index + 1 < len(text.headings) else (text.archive_heading if text.archive_heading is not None else len(text.lines))
         parent = next((h for h in reversed(text.headings[:index]) if h[1] < level), None)
         result.append({'name': canonical(heading), 'line': line, 'end': end, 'heading': heading,
                        'parent': parent[0] if parent else None,
@@ -109,7 +129,7 @@ def labels(text, found):
     inside = {i for s in found if s['name'] == 'dependencies' for i in range(s['line'], s['end'])}
     result = []
     for i, line in enumerate(text.lines):
-        if i in text.fenced or i in inside:
+        if i in text.fenced or i in text.historical or i in inside:
             continue
         m = LABEL.match(line.rstrip('\r'))
         if m:
@@ -121,7 +141,7 @@ def references(text, repo):
     """Same-repo references and other-repo URLs, each with the exact line they come from."""
     internal, external = [], []
     for i, line in enumerate(text.lines):
-        if i in text.fenced:
+        if i in text.fenced or i in text.historical:
             continue
         masked = line
         for m in URL.finditer(line):
@@ -188,6 +208,13 @@ def dependency_value(value):
     text = re.sub(r'(?im)^\s*[-*]\s*depends-on:\s*', '', value).strip()
     if text.strip(' 。.').lower() in NONE_WORDS:
         return [], None
+    # Only a reference-only annotation asserting merged state, never arbitrary prose.
+    annotated = re.fullmatch(r'(none|なし|依存なし|n/a)\s*[（(]([^）)\n]+)[）)]\s*[。.]*', text, re.I)
+    if annotated:
+        reference = r'(?:(?:Issue|PR)\s*)?#[1-9][0-9]*'
+        annotation = reference + r'(?:\s*[/／、,]\s*' + reference + r')*\s*(?:は)?\s*(?:マージ済み|Merge済み|MERGED|CLOSED)'
+        if re.fullmatch(annotation, annotated.group(2).strip(), re.I):
+            return [], None
     numbers = [int(x) for x in SHORT.findall(text)]
     rest = SHORT.sub(' ', text)
     # A PR named as a dependency ("PR #25") stays prose: confirmed numbers are resolved as issues only.
@@ -204,7 +231,7 @@ def subtree_end(text, section):
     for line, lv, heading in text.headings:
         if line > section['line'] and (lv <= level or canonical(heading) is not None):
             return line
-    return len(text.lines)
+    return text.archive_heading if text.archive_heading is not None else len(text.lines)
 
 
 def subtree_content(text, section):

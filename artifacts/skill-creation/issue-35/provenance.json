@@ -1,0 +1,46 @@
+{
+  "classification": "PUBLIC",
+  "task": "event-status-counts-v1",
+  "controller_sha": "0ee8a76549376926a53b5296e30452e885a94e02",
+  "run_id": "skill-2ee186c219dab2e1b3a8af15",
+  "candidate_sha": "a5ed84835670818aa63b0345ad60e111fd10fb75",
+  "baseline_sha": "6294fb8a69d2a31eed2af045bf51a83b99a69601",
+  "initial_candidate_sha": "f84cbf78eb117219d53e5a34a80fca0c077bebe8",
+  "artifact_hashes": {
+    "event-status-counts/SKILL.md": "3c72df2e34093a0c9e101805b265001356c3c8cfc795b3bbf5d17cbe655e827a",
+    "event-status-counts/scripts/aggregate.py": "71d21965955799bdbe865fc529dd61da0051d854b2c3027a84c94e7b1e57af14"
+  },
+  "manifest_hash": "1e6eb829f9a7e3c19aa9890d8ff9e669017983142b09b0d76c460fcbd29e77e4",
+  "bundle_hash": "176572c01b84a64dd144275ad90e144186ac831d8206bd623fd38e5701a4e942",
+  "generation_attempts": 1,
+  "public_revision_attempts": 1,
+  "final_candidate_count": 1,
+  "public_revision_scope": "SKILL.md transport instructions only; aggregate.py bytes unchanged",
+  "generation_inputs": [
+    "catalog.json",
+    "contract.json",
+    "public.json",
+    "Git identifiers"
+  ],
+  "creation_reason": "Complete synthetic catalog contains only python-diff-review, not event-status-counts.",
+  "fresh_session_mechanism": "collaboration.spawn_agent fork_turns=none; sequential",
+  "session_ids": [
+    "/root/skill35_trial_0",
+    "/root/skill35_trial_1",
+    "/root/skill35_trial_2"
+  ],
+  "task_final_result_receiver": "respond; chat closing messages are administrative only",
+  "contract_identifier_semantics": "Capability IDs refer to the exact I/O contract described by the skill.",
+  "final_response_comparison": "exact stdout bytes including trailing newline",
+  "matched_final_responses": 27,
+  "candidate_execution": "fixed Docker only; no host import or execution",
+  "supervised_wall_seconds_upper_bound": 596.1685502529144,
+  "budget_seconds": 1200,
+  "api_calls": 0,
+  "gemma_calls": 0,
+  "key_reads": 0,
+  "post_hidden_candidate_changes": false,
+  "review_status": "PENDING",
+  "merge_and_adoption": "NOT_PERFORMED",
+  "bundle_packaging": "Standalone full history re-exported from checked packet; received incremental bundles retained locally."
+}

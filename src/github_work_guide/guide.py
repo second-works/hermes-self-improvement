@@ -265,6 +265,27 @@ def inline_code_spans(line):
     return spans
 
 
+def condition_spans(line, stack, ignored):
+    """Keep parenthesized context out of declarations, including across lines."""
+    spans, start = [], 0 if stack else None
+    closes = {'(': ')', '（': '）'}
+    for pos, char in enumerate(line):
+        if any(a <= pos < b for a, b in ignored):
+            continue
+        if char in closes:
+            if not stack:
+                start = pos
+            stack.append(closes[char])
+        elif stack and char == stack[-1]:
+            stack.pop()
+            if not stack:
+                spans.append((start, pos + 1))
+                start = None
+    if stack:
+        spans.append((start, len(line)))
+    return spans
+
+
 def dependency_hints(text, start, end):
     """Literal labelled references to inspect; never used as graph edges.
 
@@ -275,7 +296,7 @@ def dependency_hints(text, start, end):
     label = re.compile(r'(?:^|[。;；]\s*|\.\s+)\s*(?:[-*]\s+)?(?:depends[ -]on|依存)\s*[:：]\s*', re.I)
     reference = re.compile(r'(?:(issue|pr)\s+)?#([1-9][0-9]*)(?![0-9A-Za-z_])', re.I)
     separator = re.compile(r'\s*(?:[,、/／]|\band\b|と)\s*', re.I)
-    result = []
+    result, condition_stack = [], []
     for i in range(start, end):
         if i in text.fenced or i in text.historical:
             continue
@@ -283,8 +304,9 @@ def dependency_hints(text, start, end):
         # Inline-code spans use matching backtick lengths; an unclosed span
         # suppresses the remainder rather than manufacturing a declaration.
         spans = inline_code_spans(line)
+        spans += condition_spans(line, condition_stack, spans)
         for match in label.finditer(line):
-            if any(a <= match.start() < b or a < match.end() <= b for a, b in spans):
+            if any(a < match.end() and match.start() < b for a, b in spans):
                 continue
             pos = match.end()
             while True:

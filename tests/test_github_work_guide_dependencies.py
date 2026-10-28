@@ -149,6 +149,21 @@ class DependencyGuidanceTests(unittest.TestCase):
             self.assertEqual(h['state'],'UNFETCHED');self.assertIn(kind.lower()+':999','\n'.join(c['steps']))
             self.assertEqual(c['dependencies'],[]);self.assertEqual(recheck(s,p,'issue:8',s)['status'],'BLOCKED')
 
+    def test_condition_labels_are_context_even_after_punctuation(self):
+        for body in ('Depends on: #35（説明。依存: #9 はこの条件には不要）',
+                     'Depends on: #35 (note; Depends on: #9 is not required)',
+                     'Depends on: #35（説明（追加）。依存: #9 は不要）',
+                     'Depends on: #35（説明\n依存: #9 は不要）',
+                     'Depends on: #35（未閉鎖。依存: #9 は不要'):
+            with self.subTest(body=body):
+                c=build_plan(body_snapshot('# Goal\nx\n# Dependencies\n'+body))['candidates']['issue:8']
+                self.assertEqual([h['target'] for h in c['dependency_hints']],['issue:35'])
+                self.assertEqual(c['dependencies'],[])
+        c=build_plan(body_snapshot('# Goal\nx\n# Dependencies\nDepends on: #35（条件）。依存: #8（別条件）'))['candidates']['issue:8']
+        self.assertEqual([h['target'] for h in c['dependency_hints']],['issue:35','issue:8'])
+        c=build_plan(body_snapshot('# Goal\nx\n# Dependencies\n`（例`。Depends on: #35（条件）'))['candidates']['issue:8']
+        self.assertEqual([h['target'] for h in c['dependency_hints']],['issue:35'])
+
     def test_new_hints_do_not_clear_holds_or_hide_changes_or_reuse_old_plan(self):
         s=dependency_snapshot();p=build_plan(s)
         self.assertEqual(recheck(s,p,'issue:8',s)['status'],'BLOCKED')

@@ -35,7 +35,9 @@ macOSの `/tmp` / `/var` などsymlinkを含む絶対pathは実体path（`/priva
 
 ## 取得範囲と限界
 
-1回につき全状態のIssue/PR一覧、各本文と現在状態、Issue/PR会話コメント、PR head、headのcheck runsとcommit statuses、正式レビュー、inline review comments、review threadの解決状態、GitHubのclosing issue関係を取得する。
+1回につき全状態のIssue/PR一覧、各本文と現在状態、Issue/PR会話コメント、PR head、GitHubのclosing issue関係を取得する。OPENのPRだけは、さらにheadのcheck runsとcommit statuses、正式レビュー、inline review comments、review threadの解決状態を取得する。
+
+CLOSED/MERGEDのPRは「今回対応不要」としか案内に使わないため、check runs・commit status・レビュー・inline review comments・threadを取得しない（#49）。report冒頭の「取得対象外」に明記する。閉じたPRのこれらの変化は差分・再確認で比較せず、「変化なし」とは扱わない。依存先や関連候補として出る閉じたPRも、状態とheadだけで扱い、checkやレビューの成否を表示しない。#49より前のrunはこれらを含むが、比較では同じく除外するため、閉じたPRが一斉に `CHANGED` にはならない。2026-10-30の実データでは48件で237呼出・138秒かかり、上限180秒に近づいていた。
 GraphQLは固定の `query` 2種のconnectionだけで、mutationも任意query入力もない。
 RESTは固定repo・固定routeのGETだけ。shellは使わず、`gh api` の固定引数を呼ぶ。
 書込API・操作実行・通知・予定変更・モデル・本番・Dockerの入口はない。
@@ -45,7 +47,7 @@ RESTは固定repo・固定routeのGETだけ。shellは使わず、`gh api` の�
 - API応答は1呼出10MB、保存JSONの読出しは1ファイル32MBまで。
 - 再試行0。空の短い最終ページ/GraphQL pageInfoまで追い、check total_countも照合する。
 - 認証不足、rate limit、欠落、不正schema、上限、時間切れ、途中失敗は `INCOMPLETE`。手順を生成しない。
-- 一覧を最後に再取得し、件数・updated_at・stateの不一致を停止する。GitHub APIは複数要求の原子的snapshotを提供しない。収集直後/確認直後の変化を防止するロックではない。
+- 一覧を最後に再取得し、件数・updated_at・stateの不一致を停止する。取得の途中でPRが開閉した場合もここで `INCOMPLETE` になり、閉じたPRとして省略した範囲を混在させない。GitHub APIは複数要求の原子的snapshotを提供しない。収集直後/確認直後の変化を防止するロックではない。
 - PR file diff、添付、外部URLの内容、本番採用、実検収、任意の関連Issueまでの横断探索は取得しない。
 
 coverageは取得完了の判定であり、必須checkやレビュー成功の判定とは別。
@@ -127,7 +129,7 @@ MERGEDからIssue Close、本番適用、検収済みを推定しない。本文
 `FIRST` / `ADDED` / `UNCHANGED` / `CHANGED` / `UNAVAILABLE` を区別する。
 取得できなくなった項目は削除・解決と呼ばない。変更フィールドにstate、body、headを含むdetail、comments、checks、statuses、reviews、threads等を表示する。
 
-差分と再確認は、原本hashとは別の作業fingerprintで比べる。fingerprintは原本から、PRの `head.repo` / `base.repo` のrepo全体のメタデータ（`open_issues_count`、`pushed_at`、`updated_at` など）を `full_name` だけに縮めたもののhash。
+差分と再確認は、原本hashとは別の作業fingerprintで比べる。fingerprintは原本から、PRの `head.repo` / `base.repo` のrepo全体のメタデータ（`open_issues_count`、`pushed_at`、`updated_at` など）を `full_name` だけに縮め、CLOSED/MERGEDのPRから取得対象外の5系列（check runs・statuses・reviews・review comments・threads）を除いたもののhash。
 これらだけが変わったitemは `UNCHANGED`（`metadata_only: true`）で、reportに件数を出す。state、title、本文、head SHA/ref、コメント、check、status、レビュー、thread、closing関係の変化は引き続き `CHANGED` / `STALE` になる。
 原本と原本hashはそのまま保存し、読出し時に検証する。
 

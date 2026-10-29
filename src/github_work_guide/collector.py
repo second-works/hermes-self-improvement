@@ -4,7 +4,8 @@ import subprocess
 import time
 from dataclasses import asdict, dataclass
 
-from .core import Invalid, REPO, digest, number, now, require, seal, source_url, strict_json, validate
+from .core import (CLOSED_PR_OMITTED, Invalid, REPO, digest, number, now, require, seal, source_url,
+                   strict_json, validate)
 
 PREFIX = f'repos/{REPO}'
 REST = re.compile(re.escape(PREFIX) + r'(?:|/issues|/issues/[1-9][0-9]*(?:/comments)?|/pulls/[1-9][0-9]*(?:/reviews|/comments)?|/commits/[0-9a-f]{40}/(?:check-runs|statuses))\Z')
@@ -164,11 +165,15 @@ class Collector:
                 if kind == 'pr':
                     sha = detail['head']['sha']
                     require(isinstance(sha, str) and re.fullmatch(r'[0-9a-f]{40}', sha), 'invalid head')
-                    raw.update(checks=self.pages(f'{PREFIX}/commits/{sha}/check-runs', 'check_runs'),
-                               statuses=self.pages(f'{PREFIX}/commits/{sha}/statuses'),
-                               reviews=self.pages(f'{PREFIX}/pulls/{n}/reviews'),
-                               review_comments=self.pages(f'{PREFIX}/pulls/{n}/comments'),
-                               threads=self.connection('threads', n), closing=self.connection('closing', n))
+                    require(detail['state'] in ('open', 'closed'), 'invalid PR state')
+                    # Closed/merged PRs are only shown as "no action"; their review gate is not read (#49).
+                    if detail['state'] == 'open':
+                        raw.update(checks=self.pages(f'{PREFIX}/commits/{sha}/check-runs', 'check_runs'),
+                                   statuses=self.pages(f'{PREFIX}/commits/{sha}/statuses'),
+                                   reviews=self.pages(f'{PREFIX}/pulls/{n}/reviews'),
+                                   review_comments=self.pages(f'{PREFIX}/pulls/{n}/comments'),
+                                   threads=self.connection('threads', n))
+                    raw['closing'] = self.connection('closing', n)
                 item = {'kind': kind, 'number': n, 'state': 'MERGED' if kind == 'pr' and detail['merged'] else detail['state'].upper(),
                         'title': detail['title'], 'body': detail['body'] or '', 'url': source_url(kind, n),
                         'raw': raw, 'hash': digest(raw)}
@@ -184,7 +189,9 @@ class Collector:
         coverage = {'status': 'INCOMPLETE' if errors else 'COMPLETE', 'errors': errors,
                     'calls': self.calls, 'limits': asdict(self.limits), 'connections': self.connections,
                     'returned_nodes': self.nodes, 'finished_at': now(),
-                    'scope': 'all issue/PR states; bodies, comments, heads, checks, statuses, reviews, review comments, threads, closing links'}
+                    'scope': 'all issue/PR states; bodies, comments, heads, closing links; '
+                             'checks, statuses, reviews, review comments, threads for OPEN PRs only',
+                    'omitted': CLOSED_PR_OMITTED}
         snapshot = seal(items, coverage)
         # Invalid partial items are not silently emitted as complete.
         try:

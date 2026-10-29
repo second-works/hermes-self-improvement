@@ -146,6 +146,42 @@ class OutsideAcquisitionTests(StaysParentPlanTests):
         self.assertEqual(c['kind'], 'acceptance')
 
 
+class LooseLineTests(StaysParentPlanTests):
+    """Codex review on PR #53: references outside checkbox rows in the child section."""
+
+    def with_lines(self, lines, *extra):
+        text = PARENT + lines
+        values = [issue(1, text), issue(2, state='closed'), issue(3, state='closed')] + list(extra)
+        return snapshot(*values)
+
+    def test_plain_list_row_with_open_child(self):
+        self.assert_parent_plan(self.with_lines('- 子 #4 の実装\n', issue(4)))
+
+    def test_continuation_line_of_unchecked_row(self):
+        url = 'https://github.com/second-works/hermes-self-improvement/issues/4'
+        text = PARENT.replace('- [ ] 親のDone', f'- [ ] 子の実装\n  {url}\n- [ ] 親のDone')
+        self.assert_parent_plan(snapshot(issue(1, text), issue(2, state='closed'), issue(3, state='closed'),
+                                         issue(4, state='closed')))
+
+    def test_continuation_line_with_external_reference(self):
+        text = PARENT.replace('- [x] 子 #3 の作業', '- [x] 子 #3 の作業\n  参考: example/other#9')
+        self.assert_parent_plan(snapshot(issue(1, text), issue(2, state='closed'), issue(3, state='closed')))
+
+    def test_note_naming_a_closed_issue_that_is_not_a_checked_child(self):
+        self.assert_parent_plan(self.with_lines('主経路: #2 → #4\n', issue(4, state='closed')))
+
+    def test_note_naming_only_checked_children_keeps_acceptance(self):
+        c = candidate(self.with_lines('主経路の依存: #2 → #3。\n'))
+        self.assertEqual(c['kind'], 'acceptance')
+
+    def test_appended_note_under_subheading_is_not_a_child_row(self):
+        c = candidate(self.with_lines('\n## 完了反映\n#5 は別の親で扱う。\n', issue(5)))
+        self.assertEqual(c['kind'], 'acceptance')
+
+    def test_checkbox_under_subheading_still_counts(self):
+        self.assert_parent_plan(self.with_lines('\n## 追加の子\n- [ ] 子 #5 の実装\n', issue(5)))
+
+
 class NotParentTests(unittest.TestCase):
     def test_issue_without_children_is_unchanged(self):
         text = '# Goal\n合成課題\n# Dependencies\nnone'

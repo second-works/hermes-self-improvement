@@ -252,7 +252,7 @@ def analyze(key, item, a):
     named = [s for s in found if s['name']]
     evidence, holds, notes = {}, [], []
     child_sections = [s for s in named if s['name'] == 'children']
-    children, unverifiable = [], []
+    children, unverifiable, loose = [], [], []
     dependency_hints = []
 
     def cite(entry):
@@ -271,10 +271,15 @@ def analyze(key, item, a):
             if i in body.fenced or i in body.historical:
                 continue
             mark = guide.CHECKBOX.match(body.lines[i])
-            if not mark:
-                continue
             line_refs = [r for r in a.refs[key] if r['line'] == i and r['kind'] != 'pr'
                          and r['evidence']['id'].startswith(f'{key}:L')]
+            if not mark:
+                # Plain/continuation lines in the section's own text (before any subheading) are checked after all
+                # rows are known. Appended notes under subheadings are not child rows; their checkboxes still count.
+                total = guide.reference_count(body.lines[i], REPO) if i < section['end'] else 0
+                if total:
+                    loose.append((i, total, line_refs))
+                continue
             targets = sorted({r['target'] for r in line_refs})
             # A row is "unnumbered" only when it has no reference at all. Rows whose references are not all
             # fetched same-repo Issues (other repo, PR, self, unresolved) cannot be confirmed by acquisition.
@@ -288,6 +293,13 @@ def analyze(key, item, a):
     # #50: every numbered child is checked with all targets CLOSED, no row refers to anything outside the
     # acquisition, and only rows without any reference (human acceptance/reconciliation) remain unchecked.
     # This routes to acceptance; it is not acceptance itself.
+    # References outside checkbox rows (plain list rows, continuation lines, notes) are accepted only when
+    # every one of them is a fetched same-repo Issue that already appears on a checked child row.
+    checked_targets = {t for c in children if c['checked'] for t in c['targets']}
+    for i, total, line_refs in loose:
+        if len(line_refs) != total or any(r['target'] not in checked_targets or r['target'] not in items
+                                          or items[r['target']]['kind'] != 'issue' for r in line_refs):
+            unverifiable.append(i)
     numbered = [c for c in children if c['targets']]
     acceptance = bool(numbered) and not unverifiable and all(
         c['checked'] and all(s == 'CLOSED' for s in c['states'].values()) for c in numbered) and all(

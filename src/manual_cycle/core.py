@@ -161,18 +161,38 @@ class Cycle:
 
     def interrupted(self):
         rows = self.rows()
-        if rows[-1]['state'] != 'BUSY':
+        starts = [r for r in rows if r['state'] == 'BUSY' and 'started_monotonic' in r['details']]
+        if not starts:
+            require(rows[-1]['state'] != 'BUSY', 'CYCLE_START_MISSING')
+            return rows[-1]['state']
+        started = starts[-1]
+        details = started['details']
+        # Domain events such as ADOPTED are intermediate until the command's
+        # completion (or explicit failure/interruption) receipt is durable.
+        closed = any(r['details'].get('operation_completed') == details['operation'] or
+            r['details'].get('interrupted_operation_hash') == started['hash'] or
+            (r['state'] in ('STOPPED', 'RECOVERY_REQUIRED') and 'reason' in r['details'] and
+             r['details'].get('operation') == details['operation'])
+            for r in rows[started['sequence'] + 1:])
+        if closed:
             return rows[-1]['state']
         a = self.active_adoption()
-        state = a.state('target') if (a.area / 'targets/target.json').exists() else None
+        state = None
+        if (a.area / 'targets/target.json').exists():
+            with a.guard():
+                state = a.state('target')
+                if state in ('RECOVERY_REQUIRED','ADOPTED','ROLLED_BACK'):
+                    # Reconcile the target journal too: rollback requests consult
+                    # it, and must bind to this new observation event.
+                    a.event('target', 'RECOVERY_REQUIRED', {'reason': 'CYCLE_OPERATION_INTERRUPTED',
+                            'cycle_operation_hash': started['hash']})
         result = 'RECOVERY_REQUIRED' if state in ('RECOVERY_REQUIRED','ADOPTED','ROLLED_BACK') else 'STOPPED'
-        started = [r for r in rows if r['state'] == 'BUSY' and 'started_monotonic' in r['details']][-1]
-        details = started['details']
         # Across a process restart on the same boot, elapsed wall time is a
         # conservative upper bound. Across an OS reboot, reserve the full budget.
         same_boot = abs((time.time() - time.monotonic()) - details['boot_epoch']) < 5
         charged = min(1200, started['machine_seconds'] + max(0, time.monotonic() - details['started_monotonic'])) if same_boot else 1200
-        self.event(result, {'reason': 'INTERRUPTED', 'operation': details['operation']}, charged)
+        self.event(result, {'reason': 'INTERRUPTED', 'operation': details['operation'],
+                           'interrupted_operation_hash': started['hash']}, charged)
         return result
 
     def status(self):

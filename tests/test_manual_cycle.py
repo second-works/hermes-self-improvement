@@ -238,6 +238,50 @@ class CycleTests(unittest.TestCase):
             self.assertEqual(a.actual(a.binding('target'),ARTIFACT)[0],a.packet()['before_hash'])
             self.assertEqual(self.c.adoption().state('target'),'ADOPTED')
 
+    def test_degradation_process_death_after_adopted_event_requires_recovery(self):
+        self.evaluated()
+        with patch.object(Cycle,'regression',return_value=lambda *_:True):
+            request,key=self.request(); self.c.execute(request,key); self.c.reobserve()
+            normal=self.c.adoption()
+            normal_before=normal.actual(normal.binding('target'),ARTIFACT)
+            self.c.prepare_trial('degradation')
+            request,key=self.request()
+            confirmation=digest(canonical(self.c.fault_plan(request)))
+            pid=os.fork()
+            if pid == 0:
+                # execute() has already recorded ADOPTED and injected drift.
+                # Kill before observe() can record RECOVERY_REQUIRED.
+                with patch.object(EvaluatedAdoption,'observe',side_effect=lambda *_:os._exit(72)):
+                    self.c.execute(request,key,confirmation)
+                os._exit(99)
+            _,status=os.waitpid(pid,0)
+            self.assertEqual(os.waitstatus_to_exitcode(status),72)
+            self.assertEqual(self.c.rows()[-1]['state'],'ADOPTED')
+            self.assertEqual(self.c.active_adoption().state('target'),'ADOPTED')
+            result=self.c.status()
+            self.assertEqual(result['state'],'RECOVERY_REQUIRED')
+            self.assertEqual(self.c.active_adoption().state('target'),'RECOVERY_REQUIRED')
+            self.assertEqual(self.c.status(),result)  # reconciliation is persisted once
+            request,key=self.request('ROLLBACK'); self.c.execute(request,key)
+            a=self.c.active_adoption()
+            self.assertEqual(self.c.status()['state'],'ROLLED_BACK')
+            self.assertEqual(a.actual(a.binding('target'),ARTIFACT)[0],a.packet()['before_hash'])
+            self.assertEqual(normal.actual(normal.binding('target'),ARTIFACT),normal_before)
+
+    def test_prewrite_intermediate_event_is_not_operation_completion(self):
+        pid=os.fork()
+        if pid == 0:
+            with self.c.operation('diagnose',{'OBSERVED'}):
+                self.c.event('PROPOSED',{'unverified_intermediate':True})
+                os._exit(73)
+        _,status=os.waitpid(pid,0)
+        self.assertEqual(os.waitstatus_to_exitcode(status),73)
+        self.assertEqual(self.c.rows()[-1]['state'],'PROPOSED')
+        result=self.c.status()
+        self.assertEqual(result['state'],'STOPPED')
+        self.assertEqual(self.c.status(),result)
+        with self.assertRaises(EvaluationError): self.c.handoff()
+
     def test_fault_injection_needs_its_own_confirmation(self):
         self.evaluated()
         with patch.object(Cycle,'regression',return_value=lambda *_:True):

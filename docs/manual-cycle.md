@@ -70,7 +70,9 @@ run_idと基準/候補SHA、observation/proposal/manifest/evaluation/packet/appr
 OS排他lockはcommand間競合を防ぎ、永続lockは別runの自動開始を禁止する。lock/intentを自動消去しない。
 
 commandの前にBUSYと時間予約をfsyncする。
-未完BUSYの再起動では書込前はSTOPPED、採用/復旧intentが未完または書込有無不明ならRECOVERY_REQUIRED。
+途中にADOPTED等の状態があっても、operation_completedまたは明示的な失敗・中断記録まで未完了として扱う。
+再起動では書込前はSTOPPED、採用/復旧intentが未完または書込有無不明ならRECOVERY_REQUIRED。
+書込後は対象側journalにもRECOVERY_REQUIREDを記録し、その最新eventへ結合した別の復旧票を要求する。
 同一bootの中断時間は経過時間を保守的にchargeし、OS再起動や時計同一性不明では残り全額を予約済みとして扱う。
 予算/期限不足では復旧も実行せず、人間に新しい範囲の判断を求める。制限を自動延長しない。
 再開とは人間待ちから次の明示commandへ進むこと。FAIL/HOLD/STOPPEDから自動再開しない。
@@ -115,6 +117,10 @@ Harness判定はSTRENGTHEN。既存評価と採用は各工程を守るが、工
 
 ## Issue #9の検証記録（2026-10-29）
 
+以下の生成・独立評価・Docker40件は修正前head `a6d2fa6f6c8206e819d8b2ce80a4ee49ab47970c` の履歴である。
+PR #45のレビュー修正で制御側source hashが変わったため、現headのサイクル実証には流用しない。
+同じ候補bytesと閾値による新runは人間判断待ち。旧run・評価・lock・backup・未承認票は保全し、旧票を実行しない。
+
 [PUBLIC証拠](../artifacts/manual-cycle/issue-9/summary.json)を、候補・評価・packet・bundleのhashで固定した。
 新runは `cycle-issue9-approved-20261029`、候補SHAは `8a32cf60008e28fd0175074018b13eceaa35e7ec`。
 候補内容hashは `3e5354f0a2043112e5e38c46ee8793471bad1bc74621a5af29c8dfa4c6782a57`、評価hashは `dc5a67348ade4e646c6d8e44410026346b0aa165208dfdd05394d93006f989d1`。
@@ -140,3 +146,8 @@ Harness判定はSTRENGTHEN。既存評価と採用は各工程を守るが、工
 固定CIは既存setup30件とlintで、上記追加試験を実行したと扱わない。
 人間targetはAWAITING_APPROVAL、試験container残存0。人間の採用・故障注入・復旧・検収、最終Mergeは未実施。
 Product Accepted/Issue #9完了/親#31完了を宣言しない。
+
+レビュー指摘 PR45-R1（P2/BLOCKING）: 劣化bytes注入後、再観測前にprocessを終了すると、中間ADOPTEDを完了扱いして復旧票を要求できなかった。
+実process exit72の再現と、書込前PROPOSED後のexit73の対称例は修正前2件失敗、修正後成功。
+完了記録のない操作を検出し、対象側とcycle側を停止状態へ揃える。復旧は新票で元hashへ戻り、正常対象不変、再statusで再記録・二重chargeなしを確認した。
+追加suiteは22件成功。評価と回帰callbackは合成であり、今回の22件を独立評価・実Docker・人間検収の代わりにしない。

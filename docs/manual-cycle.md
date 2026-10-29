@@ -112,3 +112,31 @@ Harness判定はSTRENGTHEN。既存評価と採用は各工程を守るが、工
 入力はPUBLIC観測/診断/候補SHAと人間票、出力はhash連鎖状態と限定fixture。
 判定は状態/hash/予算で決定可能。コストは既存独立評価の逐次Docker180件、PUBLIC確認10件、採用/再観測各10件、復旧5件と人間確認。
 同等の工程間同一性と停止/復旧保証を持つ代替が実証された場合に統合を再評価する。既存gateや試験を削除しない。
+
+## Issue #9の検証記録（2026-10-29）
+
+[PUBLIC証拠](../artifacts/manual-cycle/issue-9/summary.json)を、候補・評価・packet・bundleのhashで固定した。
+新runは `cycle-issue9-approved-20261029`、候補SHAは `8a32cf60008e28fd0175074018b13eceaa35e7ec`。
+候補内容hashは `3e5354f0a2043112e5e38c46ee8793471bad1bc74621a5af29c8dfa4c6782a57`、評価hashは `dc5a67348ade4e646c6d8e44410026346b0aa165208dfdd05394d93006f989d1`。
+基準はPUBLIC5/10・hidden5/10、候補は両方10/10で独立評価PASS、劣化対照はFAIL、監査VERIFIED。
+今回の独立生成コンテキストはPUBLIC packetだけを読み、ホストで候補を実行しなかった。
+初回生成SHA `498865c0b81e418a48254ef5487b651f0050049a` から、新runへ同一bytesを再登録した。hidden結果で修正していない。
+
+初期runは評価器の自己点検で期限切れ回収の不具合を見つけたためSTOPPEDとして保全した。
+新規実行のdeadlineが安全回収も拒否する修正前失敗を再現し、基底Sandboxの個別5秒回収を維持するよう修正した。
+修正後20件と、固定probeの実Docker deadline2秒→TIMEOUT→停止/回収成功を確認した。
+ユーザーが別runを明示承認した後だけ、新しい評価集合をfreezeした。旧評価のPASSは新headへ流用していない。
+
+| Requirement | Risk | Verification | Result |
+| --- | --- | --- | --- |
+| PUBLIC観測→独立生成→独立評価 | 完成解/hidden混入、自己申告PASS | 独立PUBLICコンテキスト、事前freeze、基準/候補/劣化対照のDocker180件、audit | VERIFIED（有限fixture） |
+| 不要生成/旧票/上限/排他/停止 | 権限不足、根拠不足、予算、二重run、出力不正 | tests/test_manual_cycle.py 20件、既存生成19/評価34/採用28件 | VERIFIED（合成観測/票を含む） |
+| 採用/再観測/故障/復旧の接続 | 実体取り違え、部分書込、正常対象巻込み | tests/run_manual_cycle_docker.py、別controller/root、実process exit71、Docker40件 | VERIFIED（合成票、人間検収ではない） |
+| 人間の模擬採用/復旧と全体検収 | 実装/提出許可の採用承認への流用 | 未採用の別人間target、具体的票・故障計画、故障後の別復旧票 | NOT_RUN |
+| 最新repo headの外部gate | 旧headのCI/Review流用 | 標準verify/Bash5 Security、PR後にCI/Security/CodeQL/正式レビュー | PRで最新結果を記録 |
+
+新runの観測・評価・合成Docker試験のmachine timeは約156秒。人間待ちは除外し、今後の実操作も同じ予算へchargeする。
+有料API/キー確認は0、cycle内GemmaはOFF。資料読解時のローカルLLM圧縮はcycle外であり、この実証のモデル効果に含めない。
+固定CIは既存setup30件とlintで、上記追加試験を実行したと扱わない。
+人間targetはAWAITING_APPROVAL、試験container残存0。人間の採用・故障注入・復旧・検収、最終Mergeは未実施。
+Product Accepted/Issue #9完了/親#31完了を宣言しない。

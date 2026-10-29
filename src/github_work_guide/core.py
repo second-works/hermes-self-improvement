@@ -252,7 +252,7 @@ def analyze(key, item, a):
     named = [s for s in found if s['name']]
     evidence, holds, notes = {}, [], []
     child_sections = [s for s in named if s['name'] == 'children']
-    children = []
+    children, unverifiable = [], []
     dependency_hints = []
 
     def cite(entry):
@@ -273,16 +273,23 @@ def analyze(key, item, a):
             mark = guide.CHECKBOX.match(body.lines[i])
             if not mark:
                 continue
-            targets = sorted({r['target'] for r in a.refs[key] if r['line'] == i and r['kind'] != 'pr'
-                              and r['evidence']['id'].startswith(f'{key}:L')})
+            line_refs = [r for r in a.refs[key] if r['line'] == i and r['kind'] != 'pr'
+                         and r['evidence']['id'].startswith(f'{key}:L')]
+            targets = sorted({r['target'] for r in line_refs})
+            # A row is "unnumbered" only when it has no reference at all. Rows whose references are not all
+            # fetched same-repo Issues (other repo, PR, self, unresolved) cannot be confirmed by acquisition.
+            total = guide.reference_count(body.lines[i], REPO)
+            if total and (len(line_refs) != total or any(t not in items or items[t]['kind'] != 'issue' for t in targets)):
+                unverifiable.append(i)
             children.append({'checked': mark.group(1).lower() == 'x', 'targets': targets,
                              'states': {t: items[t]['state'] if t in items else 'UNFETCHED' for t in targets},
                              'evidence': cite(body.excerpt(i, i + 1))})
         cite(body.excerpt(section['line'], section['line'] + 1))
-    # #50: every numbered child is checked with all targets CLOSED, and only unnumbered rows
-    # (human acceptance/reconciliation) remain unchecked. This routes to acceptance; it is not acceptance itself.
+    # #50: every numbered child is checked with all targets CLOSED, no row refers to anything outside the
+    # acquisition, and only rows without any reference (human acceptance/reconciliation) remain unchecked.
+    # This routes to acceptance; it is not acceptance itself.
     numbered = [c for c in children if c['targets']]
-    acceptance = bool(numbered) and all(
+    acceptance = bool(numbered) and not unverifiable and all(
         c['checked'] and all(s == 'CLOSED' for s in c['states'].values()) for c in numbered) and all(
         c['checked'] or not c['targets'] for c in children)
     if child_sections and not acceptance:

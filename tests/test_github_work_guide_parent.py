@@ -111,6 +111,41 @@ class StaysParentPlanTests(unittest.TestCase):
         self.assert_parent_plan(parent_snapshot(text))
 
 
+class OutsideAcquisitionTests(StaysParentPlanTests):
+    """Codex review on PR #53: rows referring outside the acquisition are not "unnumbered"."""
+
+    def with_row(self, row, *extra):
+        text = PARENT.replace('- [ ] 親のDone', row + '\n- [ ] 親のDone')
+        values = [issue(1, text), issue(2, state='closed'), issue(3, state='closed')] + list(extra)
+        return snapshot(*values)
+
+    def test_unchecked_external_url_child(self):
+        self.assert_parent_plan(self.with_row('- [ ] 子 https://github.com/example/other/issues/99 の実装'))
+
+    def test_checked_qualified_external_child(self):
+        self.assert_parent_plan(self.with_row('- [x] 子 example/other#99 の実装'))
+
+    def test_child_pointing_to_a_pr(self):
+        pr = item(25, True, 'closed')
+        pr['state'] = 'MERGED'
+        pr['raw']['detail']['merged'] = True
+        pr['hash'] = digest(pr['raw'])
+        self.assert_parent_plan(self.with_row('- [x] 子 #25 の実装', pr))
+        url = 'https://github.com/second-works/hermes-self-improvement/pull/25'
+        self.assert_parent_plan(self.with_row(f'- [x] 子 {url} の実装', pr))
+
+    def test_child_pointing_to_itself(self):
+        self.assert_parent_plan(self.with_row('- [x] 親 #1 の整理'))
+
+    def test_other_repo_docs_link_counts_as_reference(self):
+        self.assert_parent_plan(self.with_row('- [ ] https://github.com/example/other の手順を確認'))
+
+    def test_same_repo_docs_link_without_number_is_still_unnumbered(self):
+        url = 'https://github.com/second-works/hermes-self-improvement/blob/main/docs/parent-issue-completion.md'
+        c = candidate(self.with_row(f'- [ ] {url} を照合する'))
+        self.assertEqual(c['kind'], 'acceptance')
+
+
 class NotParentTests(unittest.TestCase):
     def test_issue_without_children_is_unchanged(self):
         text = '# Goal\n合成課題\n# Dependencies\nnone'

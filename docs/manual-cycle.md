@@ -119,7 +119,7 @@ Harness判定はSTRENGTHEN。既存評価と採用は各工程を守るが、工
 
 以下の生成・独立評価・Docker40件は修正前head `a6d2fa6f6c8206e819d8b2ce80a4ee49ab47970c` の履歴である。
 PR #45のレビュー修正で制御側source hashが変わったため、現headのサイクル実証には流用しない。
-同じ候補bytesと閾値による新runは人間判断待ち。旧run・評価・lock・backup・未承認票は保全し、旧票を実行しない。
+同じ候補bytesと閾値による新runは人間の別承認後に再検証した（末尾参照）。旧run・評価・lock・backup・未承認票は保全し、旧票を実行しない。
 
 [PUBLIC証拠](../artifacts/manual-cycle/issue-9/summary.json)を、候補・評価・packet・bundleのhashで固定した。
 新runは `cycle-issue9-approved-20261029`、候補SHAは `8a32cf60008e28fd0175074018b13eceaa35e7ec`。
@@ -151,3 +151,14 @@ Product Accepted/Issue #9完了/親#31完了を宣言しない。
 実process exit72の再現と、書込前PROPOSED後のexit73の対称例は修正前2件失敗、修正後成功。
 完了記録のない操作を検出し、対象側とcycle側を停止状態へ揃える。復旧は新票で元hashへ戻り、正常対象不変、再statusで再記録・二重chargeなしを確認した。
 追加suiteは22件成功。評価と回帰callbackは合成であり、今回の22件を独立評価・実Docker・人間検収の代わりにしない。
+
+## レビュー修正後の再検証
+
+ユーザーがPR45-R1修正後の別runを明示承認し、`b94691e7f99aa408c76a5f43f0d7c42807392018` の制御sourceをfreezeして再検証した。
+最新の[PUBLIC証拠](../artifacts/manual-cycle/issue-9/r1/summary.json)は `cycle-issue9-r1-approved-20261029` に対応する。
+候補SHAは `4f643dc0a3b44a6f217922cb6356c7c45fe49d6a`、評価hashは `e4f5aecabec40cbfa5c900cc15edffa0c6c2c2112afdb365abe4058172737fe5`。
+候補bytesは初回独立生成から不変（内容hash `3e5354f0a2043112e5e38c46ee8793471bad1bc74621a5af29c8dfa4c6782a57`）。新集合で基準PUBLIC/hidden各5/10、候補各10/10、PASS、劣化対照FAIL、audit VERIFIED。
+合成承認票・別rootによるDocker40件も再実行し、正常ADOPTED/再観測、劣化と部分書込・exit71からのROLLED_BACK、候補/元hash一致を確認した。
+機械時間は約144秒、人間用targetは未採用AWAITING_APPROVALで不変、container残存0。有料API/キー確認0、cycle Gemma OFF。
+上記の再検証は人間の実操作検収ではない。人間承認による採用/故障注入/復旧、手動サイクル検収、最終Mergeは未実施。
+追加22件と標準verify/Security、同じ最終repo headのCI/CodeQL/正式再レビューはPRに別々に記録する。

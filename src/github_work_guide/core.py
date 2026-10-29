@@ -9,7 +9,8 @@ from . import guide
 
 REPO = 'second-works/hermes-self-improvement'
 VERSION = 1
-PLAN_VERSION = 4  # v4: unconfirmed dependency inspection hints
+PLAN_VERSION = 5  # v5: closed PR gate sources leave the fingerprint (#49); v4: unconfirmed dependency hints
+OLD_PLAN = '旧versionのplanです。新しくcollectし直してから再確認してください。'
 REQUIRED = ('ci', 'Security Preflight', 'Analyze (python)')
 # Review-gate sources read only for OPEN PRs (#49). Closed/merged PRs keep body, comments, head and closing links.
 GATE_FIELDS = ('checks', 'statuses', 'reviews', 'review_comments', 'threads')
@@ -643,6 +644,8 @@ def build_plan(snapshot, priority=()):
 
 
 def validate_plan(snapshot, plan):
+    # A plan saved by an older version is reported as such, not as an altered plan.
+    require(isinstance(plan, dict) and plan.get('version') == PLAN_VERSION, OLD_PLAN)
     require(plan == build_plan(snapshot, plan.get('priority', [])), 'untrusted or altered plan/evidence')
 
 

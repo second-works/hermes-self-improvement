@@ -119,7 +119,7 @@ CLOSED/MERGEDや本文チェックを成功・採用の認定に使わず、実�
 各候補は対象、原文の抜粋（1件300文字まで。切った場合は「抜粋」）、source hash、リンク、確認手順、保留、開始条件、成功判定、停止条件を持つ。
 抜粋は原文の完全な部分文字列で、識別子は行番号（`issue:7:L34-L39`、コメントは `issue:4:c1:L3:53`）。
 保存planはsnapshotからの再生成と全体一致が必要。種別変更、未知ID、捏造引用、余分な完了主張、順序改変を拒否する。
-planの形式はversion 4。version 3の履歴区別・子一覧に、未確定の依存確認先 `dependency_hints` を追加した。旧versionのplanを持つrunは再確認で拒否されるため、新しくcollectし直す。snapshotの形式（version 1）は変わらない。
+planの形式はversion 5。version 4から、閉じたPRの取得対象外の5系列を作業fingerprintから除いた（#49）。version 4はversion 3の履歴区別・子一覧に、未確定の依存確認先 `dependency_hints` を追加したもの。旧versionのplanを持つrunは、再確認の取得前に「旧versionのplanです。新しくcollectし直してから再確認してください。」で止まるため、新しくcollectし直す。保存済みsnapshotからの `report` による再計画は旧runでも行える。snapshotの形式（version 1）は変わらない。
 hashはローカル破損/改変の検知でありGitHub署名や発行元の証明ではない。snapshotを信頼できない人から受け取って実行根拠にしない。
 MERGEDからIssue Close、本番適用、検収済みを推定しない。本文中の完了主張も引用された未検証データであり、ハーネスの結論ではない。
 確認手順は固定の文型と、番号・head・日時・件数・根拠IDだけで作る。原文の文章は引用（JSON文字列として無害化）でだけ表示する。Issue番号ごとの判断文はコードにない。

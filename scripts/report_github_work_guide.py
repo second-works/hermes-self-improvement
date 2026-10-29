@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from github_work_guide.collector import Collector
-from github_work_guide.core import (Invalid, REPO, build_plan, diff, load_run, markdown,
+from github_work_guide.core import (OLD_PLAN, Invalid, REPO, build_plan, diff, load_run, markdown,
                                    read_json, recheck, require, save_run, validate_plan)
 
 
@@ -54,7 +54,11 @@ def main(argv=None):
         if result:
             print(f'dry_run={result["status"]}')
         return 0 if snapshot['coverage']['status'] == 'COMPLETE' and (not result or result['status'] == 'CONFIRMED') else 2
-    except (Invalid, OSError, KeyError, TypeError, AttributeError, ValueError):
+    except (Invalid, OSError, KeyError, TypeError, AttributeError, ValueError) as error:
+        # Only fixed messages are printed; raw errors may carry remote text or auth diagnostics.
+        if isinstance(error, Invalid) and str(error) == OLD_PLAN:
+            print(f'BLOCKED: {OLD_PLAN}', file=sys.stderr)
+            return 2
         print('BLOCKED: 入力/取得/保存を検証できません。原本と新規出力先を確認してください。', file=sys.stderr)
         return 2
 

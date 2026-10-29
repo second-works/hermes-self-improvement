@@ -1,15 +1,17 @@
 """#49: closed/merged PRs skip review-gate sources. PUBLIC synthetic API only; no network/model."""
 import copy
 from pathlib import Path
+import subprocess
 import sys
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from github_work_guide.collector import Collector, PREFIX
-from github_work_guide.core import (CLOSED_PR_OMITTED, GATE_FIELDS, Invalid, build_plan, diff, digest, markdown,
-                                    recheck, seal, validate)
+from github_work_guide.core import (CLOSED_PR_OMITTED, GATE_FIELDS, OLD_PLAN, Invalid, build_plan, diff, digest,
+                                    markdown, recheck, save_run, seal, validate, validate_plan)
 from test_github_work_guide import Fake, detail, item, snapshot
 
 GATE_ROUTES = ('/check-runs', '/statuses', '/reviews')
@@ -142,6 +144,38 @@ class CompareTests(unittest.TestCase):
         self.assertEqual(changes['pr:25']['status'], 'CHANGED')
         self.assertIn('threads', changes['pr:25']['fields'])
         self.assertEqual(recheck(old, build_plan(old), 'pr:25', new)['status'], 'STALE')
+
+
+class SavedPlanTests(unittest.TestCase):
+    """Codex review on PR #52: plans saved before #49 hold old fingerprints for closed PRs."""
+
+    def old_run(self):
+        value = snapshot(item(7), merged_item(with_gate=True))
+        plan = build_plan(value)
+        plan['version'] = 4  # what a run saved before #49 carries
+        return value, plan
+
+    def test_old_plan_is_reported_as_old_not_altered(self):
+        value, plan = self.old_run()
+        with self.assertRaises(Invalid) as caught:
+            validate_plan(value, plan)
+        self.assertEqual(str(caught.exception), OLD_PLAN)
+
+    def test_old_snapshot_can_be_replanned(self):
+        value, _ = self.old_run()
+        validate_plan(value, build_plan(value))
+
+    def test_cli_recheck_stops_before_collecting_with_clear_message(self):
+        value, plan = self.old_run()
+        with tempfile.TemporaryDirectory() as tmp:
+            run, out = Path(tmp).resolve() / 'runs' / 'old', Path(tmp).resolve() / 'runs' / 'pre'
+            save_run(run, {'snapshot.json': value, 'plan.json': plan})
+            proc = subprocess.run([sys.executable, '-I', '-B', str(ROOT / 'scripts/report_github_work_guide.py'),
+                                   'recheck', '--run', str(run), '--target', 'issue:7', '--out', str(out)],
+                                  capture_output=True, text=True, timeout=60)
+            self.assertEqual(proc.returncode, 2)
+            self.assertIn(OLD_PLAN, proc.stderr)
+            self.assertFalse(out.exists())  # stopped before collecting or saving
 
 
 class PlanAndReportTests(unittest.TestCase):

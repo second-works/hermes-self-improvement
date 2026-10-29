@@ -9,8 +9,12 @@ from . import guide
 
 REPO = 'second-works/hermes-self-improvement'
 VERSION = 1
-PLAN_VERSION = 5  # v5: parent acceptance kind (#50); v4: unconfirmed dependency inspection hints
+PLAN_VERSION = 6  # v6: parent acceptance kind (#50); v5: closed PR gate sources leave the fingerprint (#49)
+OLD_PLAN = '旧versionのplanです。新しくcollectし直してから再確認してください。'
 REQUIRED = ('ci', 'Security Preflight', 'Analyze (python)')
+# Review-gate sources read only for OPEN PRs (#49). Closed/merged PRs keep body, comments, head and closing links.
+GATE_FIELDS = ('checks', 'statuses', 'reviews', 'review_comments', 'threads')
+CLOSED_PR_OMITTED = 'CLOSED/MERGEDのPRは、check runs・commit status・レビュー・レビューコメント・threadを取得しない'
 KINDS = {
     'acceptance': ('親の検収待ち', '子の完了と親の完了条件・残課題を照合し、親の検収を人が判断する。'),
     'completion': ('完了範囲確認', 'IssueのDoneと関連PRの実装範囲を人が照合する。'),
@@ -93,6 +97,8 @@ def validate(snapshot):
     require(isinstance(cov, dict) and cov.get('status') in ('COMPLETE', 'INCOMPLETE'), 'coverage schema')
     require(isinstance(cov.get('connections'), list) and isinstance(cov.get('errors'), list), 'coverage details')
     require(type(cov.get('calls')) is int and isinstance(cov.get('limits'), dict), 'coverage limits')
+    # Only the fixed scope note is accepted, so the report never renders arbitrary text from this field.
+    require(cov.get('omitted', CLOSED_PR_OMITTED) == CLOSED_PR_OMITTED, 'coverage omitted')
     require(isinstance(snapshot['items'], dict), 'items schema')
     for key, item in snapshot['items'].items():
         require(isinstance(item, dict) and set(item) == {
@@ -123,19 +129,22 @@ def validate(snapshot):
             require(isinstance(comment, dict) and isinstance(comment.get('body'), str), 'comment schema')
         if item['kind'] == 'pr':
             require(re.fullmatch(r'[0-9a-f]{40}', detail['head']['sha']) is not None, 'head SHA')
-            for field in ('checks', 'statuses', 'reviews', 'review_comments', 'threads', 'closing'):
-                require(isinstance(raw[field], list), f'{field} missing')
-            for check in raw['checks']:
+            require(isinstance(raw.get('closing'), list), 'closing missing')
+            for field in GATE_FIELDS:
+                # Required for OPEN PRs. Closed/merged PRs may omit them (#49); older runs still carry them.
+                if item['state'] == 'OPEN' or field in raw:
+                    require(isinstance(raw.get(field), list), f'{field} missing')
+            for check in raw.get('checks', []):
                 require(type(check.get('id')) is int and isinstance(check.get('name'), str)
                         and isinstance(check.get('head_sha'), str), 'check identity')
                 require(check.get('status') in ('queued', 'in_progress', 'completed', 'waiting', 'requested', 'pending'), 'check state')
-            for status in raw['statuses']:
+            for status in raw.get('statuses', []):
                 require(type(status.get('id')) is int and isinstance(status.get('context'), str)
                         and status.get('state') in ('error', 'failure', 'pending', 'success'), 'status schema')
-            for review in raw['reviews']:
+            for review in raw.get('reviews', []):
                 require(review.get('state') in ('APPROVED', 'COMMENTED', 'CHANGES_REQUESTED', 'DISMISSED', 'PENDING')
                         and isinstance(review.get('commit_id'), str) and isinstance(review.get('user'), dict), 'review schema')
-            for thread in raw['threads']:
+            for thread in raw.get('threads', []):
                 require(type(thread.get('isResolved')) is bool, 'thread schema')
             for closing in raw['closing']:
                 number(closing['number'])
@@ -160,7 +169,13 @@ def work_view(raw):
             repo = ref['repo']
             ref['repo'] = repo.get('full_name') if isinstance(repo, dict) else repo
             detail[side] = ref
-    return {**raw, 'detail': detail}
+    view = {**raw, 'detail': detail}
+    if 'closing' in raw and detail.get('state') == 'closed':
+        # Closed/merged PR gate sources are outside the acquisition scope (#49), so they are not compared.
+        # This also keeps runs from before #49 comparable instead of reporting every closed PR as CHANGED.
+        for field in GATE_FIELDS:
+            view.pop(field, None)
+    return view
 
 
 def fingerprint(item):
@@ -674,6 +689,8 @@ def build_plan(snapshot, priority=()):
 
 
 def validate_plan(snapshot, plan):
+    # A plan saved by an older version is reported as such, not as an altered plan.
+    require(isinstance(plan, dict) and plan.get('version') == PLAN_VERSION, OLD_PLAN)
     require(plan == build_plan(snapshot, plan.get('priority', [])), 'untrusted or altered plan/evidence')
 
 
@@ -712,6 +729,8 @@ def markdown(snapshot, changes, plan=None, result=None):
     lines = ['# GitHub作業指針', '', f'取得: {snapshot["captured_at"]}',
              f'coverage: {snapshot["coverage"]["status"]} / API呼出 {snapshot["coverage"]["calls"]}',
              f'上限: {safe(snapshot["coverage"]["limits"])}',
+             f'取得対象外: {snapshot["coverage"].get("omitted") or "なし（#49より前の形式）"}。',
+             '閉じたPRのcheck・status・レビュー・レビューコメント・threadの変化は、差分・再確認で比較しない（「変化なし」を意味しない）。',
              '新規モデル通信0、GitHub書込0。意味精度・人の確認時間・有用性検収は未確認。',
              '', '## 今回の変更', '']
     first = [x for x in changes if x['status'] == 'FIRST']

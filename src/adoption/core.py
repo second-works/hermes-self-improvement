@@ -115,6 +115,13 @@ def source_packet(repo):
 
 
 class Controller:
+    def source(self):
+        """Trusted supervisor source; workers cannot select packets or roots."""
+        return source_packet(self.repo)
+
+    def public_cases(self):
+        return read(self.repo / 'artifacts/generated-repair/issue-33/public.json')
+
     def __init__(self, repo, area):
         self.repo, self.area = Path(repo).resolve(), Path(area).absolute()
         require(self.area.is_relative_to(self.repo / 'runs') and
@@ -129,7 +136,7 @@ class Controller:
         self.area.mkdir(parents=True, mode=0o700)
         for name in ('targets', 'approvals', 'snapshots'):
             (self.area / name).mkdir(mode=0o700)
-        packet, versions, patch = source_packet(self.repo)
+        packet, versions, patch = self.source()
         save(self.area / 'packet.json', packet)
         for label, data in versions.items():
             write_new(self.area / (label + '.py'), data)
@@ -138,7 +145,7 @@ class Controller:
         return packet
 
     def packet(self):
-        expected, _, _ = source_packet(self.repo)
+        expected, _, _ = self.source()
         require(read(self.area / 'packet.json') == expected, 'PACKET_CHANGED')
         for label, field in [('baseline', 'before_hash'), ('candidate', 'after_hash')]:
             require(digest(regular(self.area / (label + '.py'), self.area, LIMIT)) == expected[field], 'ARTIFACT_HASH')

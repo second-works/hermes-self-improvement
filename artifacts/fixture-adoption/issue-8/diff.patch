@@ -1,0 +1,64 @@
+--- a/scripts/review.py
++++ b/scripts/review.py
+@@ -60,0 +61,18 @@
++def invalid_input():
++    print('{"error":"INVALID_INPUT"}')
++    return 2
++
++
++def unique_object(pairs):
++    result = {}
++    for key, value in pairs:
++        if key in result:
++            raise ValueError("duplicate key")
++        result[key] = value
++    return result
++
++
++def reject_constant(value):
++    raise ValueError("non-JSON constant")
++
++
+@@ -62 +79,0 @@
+-    # Read JSON from stdin
+@@ -64,3 +81,16 @@
+-        input_data = sys.stdin.read().strip()
+-        if not input_data:
+-            return
++        raw = sys.stdin.buffer.read(16385)
++        if len(raw) > 16384:
++            return invalid_input()
++        data = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_object,
++                          parse_constant=reject_constant)
++        if not isinstance(data, dict) or set(data) != {"path", "patch"}:
++            return invalid_input()
++        path, patch = data["path"], data["patch"]
++        if (not isinstance(path, str)
++                or re.fullmatch(r"case_[a-z0-9]{8,32}\.py", path) is None
++                or not isinstance(patch, str) or not patch):
++            return invalid_input()
++    except (ValueError, UnicodeError, RecursionError):
++        return invalid_input()
++    print(analyze_diff(patch, path))
++    return 0
+@@ -68,17 +97,0 @@
+-        data = json.loads(input_data)
+-        path = data.get("path")
+-        patch = data.get("patch")
+-
+-        if not path or not patch:
+-            # Malformed input
+-            return
+-
+-        result_json = analyze_diff(patch, path)
+-        print(result_json)
+-
+-    except json.JSONDecodeError:
+-        # Error parsing input
+-        pass
+-    except Exception:
+-        # Catch all other errors during execution
+-        pass
+@@ -87 +100 @@
+-    main()
++    sys.exit(main())

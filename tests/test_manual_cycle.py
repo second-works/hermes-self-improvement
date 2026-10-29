@@ -14,10 +14,11 @@ from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
-from manual_cycle.core import Cycle, EvaluatedAdoption, DECISIONS
+from manual_cycle.core import Cycle, EvaluatedAdoption, DECISIONS, BudgetSandbox
 from adoption.core import save, read
 from delegation.generated import ARTIFACT, BASELINE_HASH, Controller as Generated, git
 from evaluation.core import EvaluationError, canonical, digest
+from evaluation.sandbox import Sandbox
 
 
 def expiry():
@@ -25,6 +26,16 @@ def expiry():
 
 
 class CycleTests(unittest.TestCase):
+    def test_deadline_stops_execution_but_preserves_bounded_container_cleanup(self):
+        box = object.__new__(BudgetSandbox)
+        box.deadline = time.monotonic() - 1
+        with patch.object(Sandbox,'command',return_value={'exit':0}) as command:
+            for args in [('container','ls'),('inspect','fixture'),('kill','fixture'),('rm','fixture')]:
+                self.assertEqual(box.command(*args,timeout=5),{'exit':0})
+            for action in ('create','start','info','image'):
+                with self.assertRaises(EvaluationError): box.command(action)
+            self.assertEqual(command.call_count,4)
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
         self.repo = Path(self.tmp.name).resolve()

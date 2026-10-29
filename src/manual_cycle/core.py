@@ -31,9 +31,13 @@ SOURCES = ['src/manual_cycle/core.py', 'scripts/manual_cycle.py', 'fixtures/manu
 
 class BudgetSandbox(Sandbox):
     def command(self, *args, timeout=30, **kwargs):
-        remaining = self.deadline - time.monotonic()
-        require(remaining > 0, 'CYCLE_BUDGET')
-        return super().command(*args, timeout=min(timeout, remaining), **kwargs)
+        # Safety reconciliation/cleanup already has independent five-second
+        # bounds in Sandbox. Never prevent kill/rm after execution time expires.
+        if args and args[0] in ('info', 'image', 'create', 'start'):
+            remaining = self.deadline - time.monotonic()
+            require(remaining > 0, 'CYCLE_BUDGET')
+            timeout = min(timeout, remaining)
+        return super().command(*args, timeout=timeout, **kwargs)
 
 
 class EvaluatedAdoption(Adoption):

@@ -9,13 +9,14 @@ from . import guide
 
 REPO = 'second-works/hermes-self-improvement'
 VERSION = 1
-PLAN_VERSION = 5  # v5: closed PR gate sources leave the fingerprint (#49); v4: unconfirmed dependency hints
+PLAN_VERSION = 6  # v6: parent acceptance kind (#50); v5: closed PR gate sources leave the fingerprint (#49)
 OLD_PLAN = '旧versionのplanです。新しくcollectし直してから再確認してください。'
 REQUIRED = ('ci', 'Security Preflight', 'Analyze (python)')
 # Review-gate sources read only for OPEN PRs (#49). Closed/merged PRs keep body, comments, head and closing links.
 GATE_FIELDS = ('checks', 'statuses', 'reviews', 'review_comments', 'threads')
 CLOSED_PR_OMITTED = 'CLOSED/MERGEDのPRは、check runs・commit status・レビュー・レビューコメント・threadを取得しない'
 KINDS = {
+    'acceptance': ('親の検収待ち', '子の完了と親の完了条件・残課題を照合し、親の検収を人が判断する。'),
     'completion': ('完了範囲確認', 'IssueのDoneと関連PRの実装範囲を人が照合する。'),
     'review': ('レビュー対応準備', '現headのレビューと未解決threadを人が確認する。'),
     'dependency': ('依存確認', '依存先と開始条件を人が確認する。'),
@@ -266,7 +267,7 @@ def analyze(key, item, a):
     named = [s for s in found if s['name']]
     evidence, holds, notes = {}, [], []
     child_sections = [s for s in named if s['name'] == 'children']
-    children = []
+    children, unverifiable, loose = [], [], []
     dependency_hints = []
 
     def cite(entry):
@@ -285,15 +286,40 @@ def analyze(key, item, a):
             if i in body.fenced or i in body.historical:
                 continue
             mark = guide.CHECKBOX.match(body.lines[i])
+            line_refs = [r for r in a.refs[key] if r['line'] == i and r['kind'] != 'pr'
+                         and r['evidence']['id'].startswith(f'{key}:L')]
             if not mark:
+                # Plain/continuation lines in the section's own text (before any subheading) are checked after all
+                # rows are known. Appended notes under subheadings are not child rows; their checkboxes still count.
+                total = guide.reference_count(body.lines[i], REPO) if i < section['end'] else 0
+                if total:
+                    loose.append((i, total, line_refs))
                 continue
-            targets = sorted({r['target'] for r in a.refs[key] if r['line'] == i and r['kind'] != 'pr'
-                              and r['evidence']['id'].startswith(f'{key}:L')})
+            targets = sorted({r['target'] for r in line_refs})
+            # A row is "unnumbered" only when it has no reference at all. Rows whose references are not all
+            # fetched same-repo Issues (other repo, PR, self, unresolved) cannot be confirmed by acquisition.
+            total = guide.reference_count(body.lines[i], REPO)
+            if total and (len(line_refs) != total or any(t not in items or items[t]['kind'] != 'issue' for t in targets)):
+                unverifiable.append(i)
             children.append({'checked': mark.group(1).lower() == 'x', 'targets': targets,
                              'states': {t: items[t]['state'] if t in items else 'UNFETCHED' for t in targets},
                              'evidence': cite(body.excerpt(i, i + 1))})
         cite(body.excerpt(section['line'], section['line'] + 1))
-    if child_sections:
+    # #50: every numbered child is checked with all targets CLOSED, no row refers to anything outside the
+    # acquisition, and only rows without any reference (human acceptance/reconciliation) remain unchecked.
+    # This routes to acceptance; it is not acceptance itself.
+    # References outside checkbox rows (plain list rows, continuation lines, notes) are accepted only when
+    # every one of them is a fetched same-repo Issue that already appears on a checked child row.
+    checked_targets = {t for c in children if c['checked'] for t in c['targets']}
+    for i, total, line_refs in loose:
+        if len(line_refs) != total or any(r['target'] not in checked_targets or r['target'] not in items
+                                          or items[r['target']]['kind'] != 'issue' for r in line_refs):
+            unverifiable.append(i)
+    numbered = [c for c in children if c['targets']]
+    acceptance = bool(numbered) and not unverifiable and all(
+        c['checked'] and all(s == 'CLOSED' for s in c['states'].values()) for c in numbered) and all(
+        c['checked'] or not c['targets'] for c in children)
+    if child_sections and not acceptance:
         holds.append(hold('parent_plan', 'semantic', '親計画の子一覧は、親自身の開始依存ではない',
                           [cite(body.excerpt(s['line'], s['line'] + 1)) for s in child_sections],
                           f'{key} の子一覧と各子のGoal/Dependencies',
@@ -481,6 +507,7 @@ def analyze(key, item, a):
     return {'sections': [{'name': s['name'], 'line': s['line'] + 1} for s in named], 'gaps': gaps, 'done': done,
             'related': related, 'external': external, 'holds': holds, 'notes': notes, 'other_headings': other,
             'numbers': numbers, 'merged': merged_targets, 'evidence': evidence, 'children': children,
+            'acceptance': acceptance,
             'dependency_hints': dependency_hints}
 
 
@@ -509,7 +536,21 @@ def steps_for(key, kind, item, info, deps, items):
             how = 'closing' if pr['relation'] == 'closing' else 'Refs（closingではない）'
             steps.append(f'依存確認先 {hint["target"]} の関連 {pr["target"]}（{pr["state"]}、head {pr["head"]}、'
                          f'関係: {how}、根拠 {pr["evidence"]}）の変更・検証を原文条件と照合する。Mergeだけで成功・採用としない。')
-    if info.get('children'):
+    if kind == 'acceptance':
+        rows = info['children']
+        numbered = [c for c in rows if c['targets']]
+        open_rows = [c['evidence'] for c in rows if not c['checked']]
+        steps.append(f'子一覧の番号付き{len(numbered)}項目はすべて本文チェック済みで、参照先はCLOSED。'
+                     'チェックとCLOSEDは成功・採用・検収の証明ではないため、各子の完了根拠を照合する。')
+        steps.append('docs/parent-issue-completion.md の5項目（子のMerge/Close、親本文のチェック更新、'
+                     '全体完了条件とPR・CI・Security・AIレビュー・手動確認の照合、残課題の切り出し、人間の最終確認）を照合する。')
+        if open_rows:
+            steps.append('未チェックの項目（' + '、'.join(open_rows) + '）を、人の検収・照合として確認する。')
+        if info['done']:
+            summary = '、'.join(f'L{d["line"]}: ' + (f'{d["checked"]}/{d["total"]}チェック' if d['total'] else 'チェック項目なし')
+                               for d in info['done'])
+            steps.append(f'親の完了条件（{summary}）の未チェック項目と、残課題を確認する。')
+    elif info.get('children'):
         steps.append('親計画を直接実装せず、子一覧の未完了項目と各子の依存・対象範囲を照合する。')
     if kind == 'completion':
         for r in info['related']:
@@ -528,6 +569,9 @@ def steps_for(key, kind, item, info, deps, items):
         steps.append(f'依存 {states} の完了条件を確認する。CLOSEDでも成功・採用は推定しない。')
     elif kind == 'scope':
         steps.append(f'保留{len(info["holds"])}件を解除するまで実装を始めない。')
+    elif kind == 'acceptance':
+        if info['holds']:
+            steps.append(f'保留{len(info["holds"])}件を解除するまで、検収の完了として扱わない。')
     else:
         steps.append('目的と作業範囲を照合し、実装Issueとして計画を整理する。')
     for r in info['related']:
@@ -544,7 +588,7 @@ def steps_for(key, kind, item, info, deps, items):
         missing = [guide.LABELS[g] for g in info['gaps'] if g not in ('goal', 'dependencies')]
         if missing:
             steps.append('未定義の欄: ' + '、'.join(missing) + '。Issueに追記するか、不要と人が判断して記録する。')
-    if kind == 'completion':
+    if kind in ('completion', 'acceptance'):
         steps.append('Issue Close・採用・本番適用は人間が判断する（ハーネスは推定しない）。')
     return steps
 
@@ -591,7 +635,8 @@ def build_plan(snapshot, priority=()):
             info['holds'].append(hold('dependency_state', 'state', reason, [], f'{dep} の状態と完了条件',
                                       '依存先は成功条件を満たしているか。', release))
         if kind not in ('none', 'review'):
-            kind = 'dependency' if deps[key] else 'completion' if info['merged'] else 'scope' if info['holds'] else 'plan'
+            kind = ('acceptance' if info.get('acceptance') else 'dependency' if deps[key] else
+                    'completion' if info['merged'] else 'scope' if info['holds'] else 'plan')
         label, action = KINDS[kind]
         related_ev = {}
         for r in info['related']:

@@ -156,6 +156,19 @@ def references(text, repo):
     return internal, external
 
 
+def reference_count(line, repo):
+    """How many references `references` would read on one line, internal or external (#50)."""
+    count, masked = 0, line
+    for m in URL.finditer(line):
+        masked = masked[:m.start()] + ' ' * (m.end() - m.start()) + masked[m.end():]
+        if (m.group(1) == repo and m.group(3)) or m.group(1) != repo:
+            count += 1
+    for m in QUALIFIED.finditer(masked):
+        masked = masked[:m.start()] + ' ' * (m.end() - m.start()) + masked[m.end():]
+        count += 1
+    return count + len(SHORT.findall(masked))
+
+
 def ref(text, line, match, kind, number, source):
     keyword = KEYWORD.search(source[:match.start()][-40:]) is not None
     return {'kind': kind, 'number': number, 'line': line, 'column': match.start(), 'relation': 'refs' if keyword else 'mention',

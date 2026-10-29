@@ -89,3 +89,6 @@ normalはADOPTED、degradationとcrashはRECOVERY_REQUIREDから合成の復旧�
 自己レビューはIssue #8とarchitecture/security-modelの承認binding・状態・復旧契約、CLI呼出元、既存Sandboxとの接続、PUBLIC提出境界を照合する。
 元版の既知の入力拒否欠陥、同一OS利用者の任意改変、初期失敗runの未復旧は残存制約として保持する。
 本Issueの人間操作と最終Mergeは人間判断であり、#9と親#31完了へ進まない。
+
+レビュー修正: 観測のDocker回帰はsnapshotを検査するため、成功後にも配備先のroot bindingと実体hashを再照合する。途中で実体またはrootが変わった場合はRECOVERY_REQUIREDにして、ADOPTEDを返さない。ファイル変更/root差替えの修正前失敗→修正後成功をtests/test_adoption.pyで検証する。
+安全試験は自分でruns/を準備し、新規checkoutでも上記の単独コマンドで実行できる。

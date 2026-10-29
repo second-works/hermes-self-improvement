@@ -19,6 +19,7 @@ from adoption.core import Controller, EvaluationError, ARTIFACT, canonical, dige
 
 class AdoptionTests(unittest.TestCase):
     def setUp(self):
+        (ROOT / 'runs').mkdir(exist_ok=True)
         self.temp = tempfile.TemporaryDirectory(dir=ROOT / 'runs', prefix='test-adoption-')
         self.addCleanup(self.temp.cleanup)
         self.c = Controller(ROOT, Path(self.temp.name) / 'control')
@@ -164,6 +165,30 @@ class AdoptionTests(unittest.TestCase):
         self.c.execute(key,lambda *_:True)
         with self.assertRaises(EvaluationError): self.c.execute(key,lambda *_:True)
         with self.assertRaises(EvaluationError): self.request()
+
+    def test_observation_rechecks_live_bytes_after_regression(self):
+        self.adopt()
+        def drift(*_):
+            self.file.write_bytes(b'changed during observation')
+            return True
+        with self.assertRaisesRegex(EvaluationError, 'DRIFT'):
+            self.c.observe('first', drift)
+        self.assertEqual(self.c.state('first'), 'RECOVERY_REQUIRED')
+        self.assertEqual(self.recover()['state'], 'ROLLED_BACK')
+        self.assertEqual(self.file.read_bytes(), self.original)
+
+    def test_observation_rechecks_root_after_regression(self):
+        self.adopt()
+        source = self.file.read_bytes()
+        def replace_root(*_):
+            self.root.rename(self.root.with_name('original'))
+            (self.root / 'scripts').mkdir(parents=True)
+            self.file.write_bytes(source)
+            return True
+        with self.assertRaisesRegex(EvaluationError, 'ROOT_REPLACED'):
+            self.c.observe('first', replace_root)
+        self.assertEqual(self.c.state('first'), 'RECOVERY_REQUIRED')
+        with self.assertRaises(EvaluationError): self.request('ROLLBACK')
 
     def test_post_adoption_degradation_requires_recovery(self):
         self.adopt()

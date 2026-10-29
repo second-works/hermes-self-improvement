@@ -405,6 +405,8 @@ class Controller:
                 packet, binding = self.packet(), self.binding(target)
                 require(self.actual(binding, packet['artifact_path'])[0] == packet['after_hash'], 'DRIFT')
                 require(regression(Path(binding['root']) / packet['artifact_path'], 'ADOPT') is True, 'REGRESSION_FAILED')
+                # Snapshot success must still agree with the live root and bytes.
+                require(self.actual(binding, packet['artifact_path'])[0] == packet['after_hash'], 'DRIFT')
             except Exception:
                 self.event(target, 'RECOVERY_REQUIRED', {'reason': 'DRIFT_OR_REGRESSION'})
                 raise

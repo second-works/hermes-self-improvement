@@ -125,10 +125,11 @@ class CurrentContracts(unittest.TestCase):
     def test_old_plan_version_is_not_reused(self):
         s = current_snapshot()
         plan = build_plan(s)
-        self.assertEqual(plan['version'], 4)
-        plan['version'] = 2
-        with self.assertRaises(Invalid):
-            validate_plan(s, plan)
+        self.assertEqual(plan['version'], 5)
+        for old in (2, 4):  # v4 plans predate the parent acceptance kind (#50)
+            stale = dict(plan, version=old)
+            with self.assertRaises(Invalid):
+                validate_plan(s, stale)
 
     def test_archive_is_still_part_of_snapshot_fingerprint(self):
         s = current_snapshot()

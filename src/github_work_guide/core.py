@@ -9,9 +9,10 @@ from . import guide
 
 REPO = 'second-works/hermes-self-improvement'
 VERSION = 1
-PLAN_VERSION = 4  # v4: unconfirmed dependency inspection hints
+PLAN_VERSION = 5  # v5: parent acceptance kind (#50); v4: unconfirmed dependency inspection hints
 REQUIRED = ('ci', 'Security Preflight', 'Analyze (python)')
 KINDS = {
+    'acceptance': ('親の検収待ち', '子の完了と親の完了条件・残課題を照合し、親の検収を人が判断する。'),
     'completion': ('完了範囲確認', 'IssueのDoneと関連PRの実装範囲を人が照合する。'),
     'review': ('レビュー対応準備', '現headのレビューと未解決threadを人が確認する。'),
     'dependency': ('依存確認', '依存先と開始条件を人が確認する。'),
@@ -278,7 +279,13 @@ def analyze(key, item, a):
                              'states': {t: items[t]['state'] if t in items else 'UNFETCHED' for t in targets},
                              'evidence': cite(body.excerpt(i, i + 1))})
         cite(body.excerpt(section['line'], section['line'] + 1))
-    if child_sections:
+    # #50: every numbered child is checked with all targets CLOSED, and only unnumbered rows
+    # (human acceptance/reconciliation) remain unchecked. This routes to acceptance; it is not acceptance itself.
+    numbered = [c for c in children if c['targets']]
+    acceptance = bool(numbered) and all(
+        c['checked'] and all(s == 'CLOSED' for s in c['states'].values()) for c in numbered) and all(
+        c['checked'] or not c['targets'] for c in children)
+    if child_sections and not acceptance:
         holds.append(hold('parent_plan', 'semantic', '親計画の子一覧は、親自身の開始依存ではない',
                           [cite(body.excerpt(s['line'], s['line'] + 1)) for s in child_sections],
                           f'{key} の子一覧と各子のGoal/Dependencies',
@@ -466,6 +473,7 @@ def analyze(key, item, a):
     return {'sections': [{'name': s['name'], 'line': s['line'] + 1} for s in named], 'gaps': gaps, 'done': done,
             'related': related, 'external': external, 'holds': holds, 'notes': notes, 'other_headings': other,
             'numbers': numbers, 'merged': merged_targets, 'evidence': evidence, 'children': children,
+            'acceptance': acceptance,
             'dependency_hints': dependency_hints}
 
 
@@ -494,7 +502,21 @@ def steps_for(key, kind, item, info, deps, items):
             how = 'closing' if pr['relation'] == 'closing' else 'Refs（closingではない）'
             steps.append(f'依存確認先 {hint["target"]} の関連 {pr["target"]}（{pr["state"]}、head {pr["head"]}、'
                          f'関係: {how}、根拠 {pr["evidence"]}）の変更・検証を原文条件と照合する。Mergeだけで成功・採用としない。')
-    if info.get('children'):
+    if kind == 'acceptance':
+        rows = info['children']
+        numbered = [c for c in rows if c['targets']]
+        open_rows = [c['evidence'] for c in rows if not c['checked']]
+        steps.append(f'子一覧の番号付き{len(numbered)}項目はすべて本文チェック済みで、参照先はCLOSED。'
+                     'チェックとCLOSEDは成功・採用・検収の証明ではないため、各子の完了根拠を照合する。')
+        steps.append('docs/parent-issue-completion.md の5項目（子のMerge/Close、親本文のチェック更新、'
+                     '全体完了条件とPR・CI・Security・AIレビュー・手動確認の照合、残課題の切り出し、人間の最終確認）を照合する。')
+        if open_rows:
+            steps.append('未チェックの項目（' + '、'.join(open_rows) + '）を、人の検収・照合として確認する。')
+        if info['done']:
+            summary = '、'.join(f'L{d["line"]}: ' + (f'{d["checked"]}/{d["total"]}チェック' if d['total'] else 'チェック項目なし')
+                               for d in info['done'])
+            steps.append(f'親の完了条件（{summary}）の未チェック項目と、残課題を確認する。')
+    elif info.get('children'):
         steps.append('親計画を直接実装せず、子一覧の未完了項目と各子の依存・対象範囲を照合する。')
     if kind == 'completion':
         for r in info['related']:
@@ -513,6 +535,9 @@ def steps_for(key, kind, item, info, deps, items):
         steps.append(f'依存 {states} の完了条件を確認する。CLOSEDでも成功・採用は推定しない。')
     elif kind == 'scope':
         steps.append(f'保留{len(info["holds"])}件を解除するまで実装を始めない。')
+    elif kind == 'acceptance':
+        if info['holds']:
+            steps.append(f'保留{len(info["holds"])}件を解除するまで、検収の完了として扱わない。')
     else:
         steps.append('目的と作業範囲を照合し、実装Issueとして計画を整理する。')
     for r in info['related']:
@@ -529,7 +554,7 @@ def steps_for(key, kind, item, info, deps, items):
         missing = [guide.LABELS[g] for g in info['gaps'] if g not in ('goal', 'dependencies')]
         if missing:
             steps.append('未定義の欄: ' + '、'.join(missing) + '。Issueに追記するか、不要と人が判断して記録する。')
-    if kind == 'completion':
+    if kind in ('completion', 'acceptance'):
         steps.append('Issue Close・採用・本番適用は人間が判断する（ハーネスは推定しない）。')
     return steps
 
@@ -576,7 +601,8 @@ def build_plan(snapshot, priority=()):
             info['holds'].append(hold('dependency_state', 'state', reason, [], f'{dep} の状態と完了条件',
                                       '依存先は成功条件を満たしているか。', release))
         if kind not in ('none', 'review'):
-            kind = 'dependency' if deps[key] else 'completion' if info['merged'] else 'scope' if info['holds'] else 'plan'
+            kind = ('acceptance' if info.get('acceptance') else 'dependency' if deps[key] else
+                    'completion' if info['merged'] else 'scope' if info['holds'] else 'plan')
         label, action = KINDS[kind]
         related_ev = {}
         for r in info['related']:

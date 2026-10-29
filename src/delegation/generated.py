@@ -173,7 +173,7 @@ class Controller:
                 require(digest(regular(repo/path, repo)) == value, 'PACKET_CHANGED')
         return baseline, candidate
 
-    def evaluate(self, name, sha):
+    def evaluate(self, name, sha, *, remaining_seconds=1200):
         from evaluation.generated import observe
         work = self.work(name)
         m = self.frozen(work)
@@ -187,7 +187,8 @@ class Controller:
         try:
             charged = self.gate.read(work, 'budget.json')['machine_seconds']
             require(type(charged) in (int, float) and 0 < charged < 1200, 'RUN_BUDGET')
-            deadline = time.monotonic()+1200-charged
+            require(type(remaining_seconds) in (int, float) and 0 < remaining_seconds <= 1200, 'RUN_BUDGET')
+            deadline = time.monotonic()+min(1200-charged, remaining_seconds)
             box = self.gate.sandbox(work)
             box.deadline = deadline
             records = {}

@@ -1,0 +1,71 @@
+--- a/scripts/review.py
++++ b/scripts/review.py
+@@ -60,0 +61,18 @@
++def reject_input():
++    print('{"error":"INVALID_INPUT"}')
++    return 2
++
++
++def unique_object(pairs):
++    result = {}
++    for key, value in pairs:
++        if key in result:
++            raise ValueError("Duplicate object key")
++        result[key] = value
++    return result
++
++
++def reject_constant(value):
++    raise ValueError("Non-JSON constant")
++
++
+@@ -62 +79,0 @@
+-    # Read JSON from stdin
+@@ -64,3 +81,20 @@
+-        input_data = sys.stdin.read().strip()
+-        if not input_data:
+-            return
++        # Bound the raw byte input before decoding or parsing it.
++        input_bytes = sys.stdin.buffer.read(16385)
++        if len(input_bytes) > 16384:
++            return reject_input()
++        input_data = input_bytes.decode("utf-8")
++        data = json.loads(
++            input_data,
++            object_pairs_hook=unique_object,
++            parse_constant=reject_constant,
++        )
++        if not isinstance(data, dict) or set(data) != {"path", "patch"}:
++            return reject_input()
++        path = data["path"]
++        patch = data["patch"]
++        if not isinstance(path, str) or re.fullmatch(r"case_[a-z0-9]{8,32}\.py", path) is None:
++            return reject_input()
++        if not isinstance(patch, str) or not patch:
++            return reject_input()
++    except (ValueError, UnicodeError, RecursionError):
++        return reject_input()
+@@ -68,3 +102,3 @@
+-        data = json.loads(input_data)
+-        path = data.get("path")
+-        patch = data.get("patch")
++    result_json = analyze_diff(patch, path)
++    print(result_json)
++    return 0
+@@ -72,13 +105,0 @@
+-        if not path or not patch:
+-            # Malformed input
+-            return
+-
+-        result_json = analyze_diff(patch, path)
+-        print(result_json)
+-
+-    except json.JSONDecodeError:
+-        # Error parsing input
+-        pass
+-    except Exception:
+-        # Catch all other errors during execution
+-        pass
+@@ -87 +108 @@
+-    main()
++    sys.exit(main())

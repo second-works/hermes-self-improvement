@@ -2,16 +2,18 @@
 import uuid
 from evaluation.core import canonical, digest, load_json, regular, require, write_new
 from evaluation.sandbox import Sandbox
-from .core import IMAGE, LIMIT, save, source_packet
+from .core import IMAGE, LIMIT, save
 
 
 class DockerRegression:
     def __init__(self, controller):
         self.controller = controller
+        self.deadline = None
+        self.sandbox_factory = Sandbox
 
     def __call__(self, program, operation):
         c = self.controller
-        packet, _, _ = source_packet(c.repo)
+        packet, _, _ = c.source()
         expected_hash = packet['after_hash' if operation == 'ADOPT' else 'before_hash']
         data = regular(program, c.area, LIMIT)
         require(digest(data) == expected_hash, 'REGRESSION_ARTIFACT')
@@ -20,11 +22,11 @@ class DockerRegression:
         snapshot = work / 'program.py'
         write_new(snapshot, data)
         snapshot.chmod(0o444)
-        box = Sandbox(c.repo, work, IMAGE)
+        box = self.sandbox_factory(c.repo, work, IMAGE, deadline=self.deadline)
         environment = box.environment()
         image = box.image_info(IMAGE)
         require(image['id'] == IMAGE, 'IMAGE_ID')
-        cases = load_json(regular(c.repo / 'artifacts/generated-repair/issue-33/public.json', c.repo))
+        cases = c.public_cases()
         # Baseline guarantees five valid-input cases; its known rejection defects
         # are not reclassified as successful validation during rollback.
         selected = cases if operation == 'ADOPT' else [r for r in cases if r['exit'] == 0]

@@ -1,13 +1,25 @@
 ---
 name: periodic-check
-description: 週1回程度、手で実行する定期点検の手順。作業指針ハーネスで前回からの変化と放置されたIssueを確認し、ハーネスの上限への近さ、mainのCI、正式レビューの設定、runs/の容量を点検して人に報告する。定期点検、棚卸し、放置Issueの確認を頼まれたときに使う。自動実行（cronなど）にはしない。
+description: 本repoの週1回の定期点検の手順。作業指針ハーネスで前回からの変化と放置されたIssueを確認し、ハーネスの上限への近さ、mainのCI、正式レビューの設定、runs/の容量を点検して人に報告する。定期点検、棚卸し、放置Issueの確認を頼まれたとき、利用者のMacの予定実行から呼ばれたときに使う。読み取りと報告だけで、GitHubへは書き込まない。
 ---
 
-# 定期点検（手で実行）
+# 定期点検
 
-cronや常駐での自動実行はしない（#31 の対象外）。点検の結果は報告だけで、Issueの更新・Close・削除は人の判断を待つ。
+点検の結果は報告だけで、Issueの更新・Close・削除は人の判断を待つ。手で実行してもよい。
+
+## 自動実行してよい条件（#59）
+
+2026-10-30、利用者の判断で、この点検だけを利用者のMacで週1回、Claude Code の予定実行として自動で行う。#31 の「Cron/定期運転」を対象外とした決定は改善サイクルの範囲のもので、これはその例外として記録する。ほかのスキルや操作は自動にしない。
+
+- 場所: 点検専用の checkout `/Users/work/Developer/hsi-periodic-check`（このrepoの git worktree）だけ。共有の元checkout（`/Users/work/Developer/hermes-self-improvement`）や、ほかのworktreeは使わない・変更しない。
+- 更新: 点検の始めに `git fetch origin` と `git checkout --detach origin/main` で main に合わせる。この checkout では編集・commit・push をしない。追跡ファイルに変更があれば点検を中止して報告する。
+- してはいけないこと: GitHubへの書き込み（Issue・PR・コメント・ラベル）、runs/ の削除・移動、モデルへの判断の受け渡し（judgment-handoff）、Gemma の使用、`~/.hermes` や本番への接続、予定の追加・変更。
+- 保存: 取得のrunは `runs/periodic-<YYYYMMDD-HHMM>`、報告は `runs/periodic-summaries/<YYYYMMDD-HHMM>.md`（どちらもGit管理外。既存の出力先は使わない）。報告の本文は予定実行の結果としても返す。
+- 停止: 取得が INCOMPLETE、checkout が汚れている、main に合わせられない、上限の8割を超えた、のどれかなら、その事実を報告して終える（回避のために再試行を重ねない。再試行は1回まで）。
 
 ## 1. 状態の変化を見る
+
+予定実行のときは、`runs/` の中で名前が `periodic-` で始まる、いちばん新しい collect のrun（`runs/periodic-summaries` を除く）を前回とする。なければ `--previous` なしで取得する。
 
 work-resume スキルの手順1で、前回の点検のrun（collect・report・recheck のrun。同じ checkout の `runs/` にあるもの）を `--previous` に渡して取得する。所要時間は `time python3 -I -B scripts/report_github_work_guide.py collect …` のように `time` を付けて測る。
 
@@ -47,4 +59,4 @@ work-resume スキルの手順1で、前回の点検のrun（collect・report・
 
 - 点検の結果を理由に、Issueを自動で更新・Closeする。
 - runs/ のファイルを削除・移動する。
-- 点検をcronやスケジュールに登録する。
+- 予定実行を登録・変更する（登録と変更は利用者の判断。#59 の条件の外で自動実行しない）。

@@ -1,6 +1,6 @@
 ---
 name: change-intake
-description: Codexなどが作ったコード修正やスキルを、作った側の自己申告ではなく、ハーネスの受取・独立評価・承認付き模擬採用で確かめてから取り込む手順。AIが提案した修正やスキルを採用したいとき、改善の前後を比べたいときに使う。Dockerと段階ごとの人間承認が必要。
+description: 本repoのPUBLIC合成課題（fixture）で、AIが作ったコード修正やスキルを、作った側の自己申告ではなく、ハーネスの受取・独立評価・承認付き模擬採用で確かめてから取り込む手順。fixture向けにAIが提案した修正やスキルを採用したいとき、その前後を比べたいときに使う。Dockerと段階ごとの人間承認が必要。
 ---
 
 # AIが作った変更を取り込む
@@ -34,7 +34,7 @@ AIの「直った」「合格した」という申告では採用しない。ハ
 
 ## 2. 独立して評価する
 
-`scripts/evaluate_fixture.py`（bootstrap → freeze → gate → evaluate → audit）。手順は docs/independent-evaluation.md。
+`scripts/evaluate_fixture.py`（bootstrap → gate → 検証とcommit → freeze → evaluate → audit）。手順と各段階の間にやることは docs/independent-evaluation.md。
 
 - 基準版・候補版・劣化版を同じ課題で比べ、PASS / HOLD / FAIL を出す。
 - PASS は「承認待ち」まで。採用の許可ではない。

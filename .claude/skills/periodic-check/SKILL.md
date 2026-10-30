@@ -9,7 +9,7 @@ cronや常駐での自動実行はしない（#31 の対象外）。点検の結
 
 ## 1. 状態の変化を見る
 
-work-resume スキルの手順1で、前回の点検のrunを `--previous` に渡して取得する。
+work-resume スキルの手順1で、前回の点検のrun（collect・report・recheck のrun。同じ checkout の `runs/` にあるもの）を `--previous` に渡して取得する。所要時間は `time python3 -I -B scripts/report_github_work_guide.py collect …` のように `time` を付けて測る。
 
 報告すること:
 
@@ -20,14 +20,14 @@ work-resume スキルの手順1で、前回の点検のrunを `--previous` に�
 
 ## 2. ハーネスの健全性を見る
 
-- collect の所要時間とAPI呼出数。上限（180秒、500呼出）の8割（144秒、400呼出）を超えたら報告する。2026-10-30の時点で57件、約76秒・144呼出。
+- collect の所要時間（`time` で測った値）とAPI呼出数（report.md 冒頭の「API呼出」）。上限（180秒、500呼出）の8割（144秒、400呼出）を超えたら報告する。2026-10-30の時点で57件、約76秒・144呼出。
 - coverage が COMPLETE でなかった場合は、その原因。
 - report.md 冒頭の「取得対象外」が、閉じたPRのcheck等を取得しない旨になっていること（#49）。
 
 ## 3. mainとレビューの設定を見る
 
 - mainの最新commitで CI と CodeQL の結果を確認する（`gh run list --repo second-works/hermes-self-improvement --branch main --limit 5`）。失敗や、移行予告などの notice があれば報告する。workflow は変更しない。
-- `.github/pr-gate-review` の内容を確認し、利用者の現在の指示（2026-10-30時点は `claude-code`）と合っているかを報告する。
+- 照合が読むのは GitHub 上の main の `.github/pr-gate-review`。`git fetch origin` の後に `git show origin/main:.github/pr-gate-review` で確認し、利用者の現在の指示（2026-10-30時点は `claude-code`）と合っているかを報告する。
 
 ## 4. 保存物を見る
 

@@ -6,12 +6,12 @@
 - このリポジトリの変更だけを扱う。Hermes Agent本体 `~/.hermes`、本番設定、認証情報、会話履歴、サービスは読み込み・変更・起動しない。CIはGitHub-hosted runnerだけを使い、本番への接続や自己改善の自動適用を行わない。
 - 標準検証は `./scripts/verify.sh`。SecurityはBash 5以上で `bash scripts/security-preflight.sh .`。`.agents/skills/` と `templates/` は共通ルールの参照資産であり、自動起動や本番変更の許可ではない。
 - 通常レーンだけを採用し、Auto-Fix / Auto-Merge例外は採用しない。最終Mergeは必ず人間が判断する。
-- Codexレビュー未実施・認証失敗・利用制限・head不一致を成功扱いしない。手順は `docs/repository-setup.md`。
+- 正式レビューは `.github/pr-gate-review` が指定する種類（`codex` / `claude-code`）。現在は利用者の指示（2026-10-30、#55）でClaude Codeのレビュー。レビュー未実施・認証失敗・利用制限・head不一致を成功扱いしない。手順は `docs/repository-setup.md`。
 - マージ依頼の前の必須checkは `.github/pr-gate-checks`（`ci`、`Security Preflight`、`Analyze (python)`）。`scripts/check-pr-head.sh` がこれで照合する。
 
 ## Code Review Rules
 - Issue #1では、最小権限、Secrets非公開、失敗を成功扱いしないこと、CIからHermes本番へ接続しないことを確認する。
-- docs/repository-setup.mdの採用範囲と実際のworkflowを照合し、Codex連携の未確認をレビュー成功と報告しない。
+- docs/repository-setup.mdの採用範囲と実際のworkflowを照合し、正式レビュー（Codex連携またはClaude Codeのレビュー記録）の未確認をレビュー成功と報告しない。
 
 <!-- lightweight:begin (managed by the ai-development lightweight placement; edit outside this block) -->
 # AGENTS.md

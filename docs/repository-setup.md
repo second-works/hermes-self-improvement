@@ -43,6 +43,18 @@ CodeQLだけsecurity-events: writeをjob単位で付与。CI/CodeQLはPRとmain 
 
 指摘は同じPR branchで修正し、head変更後にlocal → CI → Security → CodeQL → Codex Reviewをやり直す。P0/P1/BLOCKING P2は未解決で進めない。最終Mergeは人間が判断する。CIの必須チェックはCodex完了を代替しない。
 
+## Claude Codeによる正式レビュー（#55）
+
+2026-10-30、ChatGPTの利用量が切迫したため、利用者がPRの正式レビューをClaude Codeで行うよう指示し、Codexの自動レビューを停止した。`.github/pr-gate-review` に `claude-code` を書き、`scripts/check-pr-head.sh` がClaude Codeのレビュー記録を正式レビューとして読む。Codexに戻すときは、このファイルを `codex` にする（両方を書けば、どちらかの完了で通り、どちらかに未解決の指摘があれば止まる）。
+
+レビューはClaude Codeの `/code-review <PR番号>` で最終headに対して行い、指摘と対応をPRコメントに記録する。そのコメントに、次の機械可読な記録を1行で付ける。
+
+```text
+<!-- claude-code-review:v1 {"commit_sha":"<最終headのfull SHA>","status":"completed","has_unresolved_findings":false} -->
+```
+
+公開repoでは誰でもコメントできるため、照合が読むのは投稿者が OWNER / MEMBER / COLLABORATOR の記録だけで、そのうち最新のものを使う。記録のheadが最終headと違う、未完了、未解決の指摘あり、形式が壊れている場合はREADYにしない。Claude Codeのレビューは実装と同じ会話でも行えるため、Risk TierがHIGHのIssueでは、stewardの手順どおり別のセッションでもレビューする。ClaudeのGitHub Action（`@claude`）は導入していない。
+
 ## 検証責務
 
 標準ライブラリのunittestで、Security成功、stage後の作業ツリー消去・checkout filterでも提出内容を検査する回帰、秘密検出の非zeroと値非表示、依存監査未対応のUNAVAILABLE、symlink非追跡、verify全skip拒否と失敗後停止、AGENTS参照先を検査する。fixtureは一時ディレクトリ内の無害な値だけを使う。`~/.hermes`は読み込まない。

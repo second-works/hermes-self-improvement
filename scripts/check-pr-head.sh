@@ -12,7 +12,15 @@
 #      branch on GitHub (one per line; blank lines and lines starting with # are
 #      ignored), else the default. The base branch copy is used so that neither local
 #      edits nor the PR itself can drop a required check.
-#   3. the formal review finished on this head with no unresolved findings
+#   3. the formal review finished on this head with no unresolved findings. Accepted kinds
+#      come from PR_GATE_REVIEW (comma separated), else .github/pr-gate-review on the base
+#      branch (one per line, like pr-gate-checks), else "codex". Kinds:
+#        codex        the Codex summary comment (codex-review-state:v1) by PR_GATE_REVIEWER
+#        claude-code  a PR comment with <!-- claude-code-review:v1 {json} --> whose author
+#                     is OWNER, MEMBER or COLLABORATOR; json has commit_sha, status and
+#                     has_unresolved_findings (same meaning as the Codex state)
+#      One accepted kind completed on this head with no findings passes; any accepted kind
+#      reporting unresolved findings on this head stops it.
 #   4. no review thread is unresolved
 #   5. GitHub reports no conflict with the base branch
 #   6. no reviewer has requested changes: the latest APPROVED / CHANGES_REQUESTED /
@@ -24,6 +32,7 @@
 set -u
 
 default_checks='verification,Security Preflight'
+default_review='codex'
 reviewer="${PR_GATE_REVIEWER:-chatgpt-codex-connector}"
 
 report() {
@@ -51,24 +60,32 @@ printf 'PR_GATE_HEAD=%s\n' "$head"
 local_head="$(git rev-parse HEAD 2>/dev/null)" || report UNAVAILABLE "could not read the local HEAD"
 [[ $local_head == "$head" ]] || report STALE_HEAD "local HEAD $local_head differs from PR head $head"
 
-required=()
-if [[ -n ${PR_GATE_CHECKS:-} ]]; then
-  IFS=',' read -r -a required <<<"$PR_GATE_CHECKS"
-else
-  base="$(jq -er '.baseRefName' <<<"$pr_json" 2>/dev/null)" || report CHECK_UNAVAILABLE "PR base branch is missing"
+# Reads a list file from the PR's base branch on GitHub into the named array.
+# Returns 0 when read, 1 when the file does not exist; any other error stops with <status>.
+read_base_list() { # <path> <status> <array-name>
+  local base contents listed err line
+  base="$(jq -er '.baseRefName' <<<"$pr_json" 2>/dev/null)" || report "$2" "PR base branch is missing"
   # The branch name goes through --raw-field, so a name with + or & is sent as it is.
-  contents=(--method GET --raw-field "ref=$base" "repos/$repo/contents/.github/pr-gate-checks")
+  contents=(--method GET --raw-field "ref=$base" "repos/$repo/contents/$1")
   if listed="$(gh api -H 'Accept: application/vnd.github.raw+json' "${contents[@]}" 2>/dev/null)"; then
     while IFS= read -r line || [[ -n $line ]]; do
       line="${line%$'\r'}"
       [[ -z ${line//[[:space:]]/} || $line == '#'* ]] && continue
-      required+=("$line")
+      eval "$3+=(\"\$line\")"
     done <<<"$listed"
-  else
-    # Only "no such file" falls back to the default; any other error is not success.
-    err="$(gh api "${contents[@]}" 2>&1 >/dev/null)"
-    grep -q 'HTTP 404' <<<"$err" || report CHECK_UNAVAILABLE "could not read .github/pr-gate-checks on $base"
+    return 0
   fi
+  # Only "no such file" falls back to the default; any other error is not success.
+  err="$(gh api "${contents[@]}" 2>&1 >/dev/null)"
+  grep -q 'HTTP 404' <<<"$err" || report "$2" "could not read $1 on $base"
+  return 1
+}
+
+required=()
+if [[ -n ${PR_GATE_CHECKS:-} ]]; then
+  IFS=',' read -r -a required <<<"$PR_GATE_CHECKS"
+else
+  read_base_list .github/pr-gate-checks CHECK_UNAVAILABLE required || true
 fi
 [[ ${#required[@]} -gt 0 ]] || IFS=',' read -r -a required <<<"$default_checks"
 
@@ -114,17 +131,46 @@ for name in "${required[@]}"; do
   esac
 done
 
+kinds=()
+if [[ -n ${PR_GATE_REVIEW:-} ]]; then
+  IFS=',' read -r -a kinds <<<"$PR_GATE_REVIEW"
+else
+  read_base_list .github/pr-gate-review REVIEW_UNAVAILABLE kinds || true
+fi
+[[ ${#kinds[@]} -gt 0 ]] || kinds=("$default_review")
+
 comments="$(gh pr view "$pr" --json comments 2>/dev/null)" || report REVIEW_UNAVAILABLE "could not read PR comments"
-review="$(jq -r --arg who "$reviewer" '
-  [.comments[] | select(.author.login == $who) | .body
-   | (capture("codex-review-state:v1 (?<s>\\{.*\\}) -->") | .s)?] | last // empty' <<<"$comments" 2>/dev/null)"
-[[ -n $review ]] || report REVIEW_UNAVAILABLE "no review state from $reviewer"
-r_sha="$(jq -r '.code_review.commit_sha // empty' <<<"$review" 2>/dev/null)"
-r_status="$(jq -r '.code_review.status // empty' <<<"$review" 2>/dev/null)"
-r_open="$(jq -r '.code_review.has_unresolved_findings' <<<"$review" 2>/dev/null)"
-[[ $r_sha == "$head" ]] || report REVIEW_PENDING "latest review is for ${r_sha:-unknown}, not $head"
-[[ $r_status == completed ]] || report REVIEW_PENDING "review on $head is ${r_status:-unknown}"
-[[ $r_open == false ]] || report REVIEW_FINDINGS "review on $head has unresolved findings"
+passed='' waiting=()
+for kind in "${kinds[@]}"; do
+  kind="${kind//[[:space:]]/}"
+  case "$kind" in
+    codex)
+      review="$(jq -r --arg who "$reviewer" '
+        [.comments[] | select(.author.login == $who) | .body
+         | (capture("codex-review-state:v1 (?<s>\\{.*\\}) -->") | .s)?] | last // empty' <<<"$comments" 2>/dev/null)"
+      sha_path='.code_review.commit_sha' status_path='.code_review.status' open_path='.code_review.has_unresolved_findings' ;;
+    claude-code)
+      # Anyone can comment on a public repository, so only trusted authors count.
+      review="$(jq -r '
+        [.comments[] | select(.authorAssociation == "OWNER" or .authorAssociation == "MEMBER" or .authorAssociation == "COLLABORATOR")
+         | .body | (capture("claude-code-review:v1 (?<s>\\{[^\\n]*?\\}) -->") | .s)?] | last // empty' <<<"$comments" 2>/dev/null)"
+      sha_path='.commit_sha' status_path='.status' open_path='.has_unresolved_findings' ;;
+    *) report REVIEW_UNAVAILABLE "unknown review kind '$kind' in the review setting" ;;
+  esac
+  if [[ -z $review ]]; then waiting+=("no $kind review"); continue; fi
+  r_sha="$(jq -r "$sha_path // empty" <<<"$review" 2>/dev/null)"
+  r_status="$(jq -r "$status_path // empty" <<<"$review" 2>/dev/null)"
+  r_open="$(jq -r "$open_path" <<<"$review" 2>/dev/null)"
+  if [[ $r_sha != "$head" ]]; then waiting+=("latest $kind review is for ${r_sha:-unknown}"); continue; fi
+  if [[ $r_status != completed ]]; then waiting+=("$kind review on $head is ${r_status:-unknown}"); continue; fi
+  [[ $r_open == false ]] || report REVIEW_FINDINGS "$kind review on $head has unresolved findings"
+  passed="$kind"
+done
+if [[ -z $passed ]]; then
+  reason="$(IFS=';'; printf '%s' "${waiting[*]}")"
+  if [[ $reason == *"review on $head is"* || $reason == *"review is for"* ]]; then report REVIEW_PENDING "$reason"; fi
+  report REVIEW_UNAVAILABLE "$reason"
+fi
 
 owner="${repo%%/*}" name="${repo#*/}"
 threads="$(gh api graphql -F owner="$owner" -F name="$name" -F pr="$pr" -f query='
@@ -164,4 +210,4 @@ again="$(gh pr view "$pr" --json headRefOid,baseRefName,url,state,mergeable,revi
 [[ $(jq -r '.state' <<<"$again") == OPEN ]] || report NOT_OPEN "PR #$pr is no longer open"
 check_snapshot "$again"
 
-report READY "checks, review, threads and conflicts are clear on $head"
+report READY "checks, review ($passed), threads and conflicts are clear on $head"

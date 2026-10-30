@@ -38,8 +38,10 @@ Doneから確認項目を作って依頼する。OKが出るまで次へ進ま�
 
 ## 6. 正式レビュー
 
-1. Codex Reviewを最終headで実施する。自動で始まらなければ `@codex review` とコメントする。
-2. 指摘がないときは要約コメントの更新や👍だけで終わることがある。そのheadの完了を確認してから次へ進む。
+1. `.github/pr-gate-review` が指定する種類のレビューを最終headで実施する。
+   - `claude-code`: Claude Codeの `/code-review <PR番号>` で最終headをレビューし、指摘と対応をPRコメントに記録する。コメントの末尾に、機械可読な記録 `<!-- claude-code-review:v1 {"commit_sha":"<最終headのfull SHA>","status":"completed","has_unresolved_findings":false} -->` を1行で付ける。未対応の指摘が残るときは `has_unresolved_findings` を `true` にする。
+   - `codex`: Codex Reviewを最終headで実施する。自動で始まらなければ `@codex review` とコメントする。
+2. 指摘がないときは、Codexでは要約コメントの更新や👍だけで終わることがある。そのheadの完了を確認してから次へ進む。headが変わったら、変更分をレビューし直して新しい記録を付ける。
 3. Risk TierがHIGHのIssueでは、実装したセッションとは別のセッションでもレビューする。
 
 ## 7. 指摘への対応
@@ -54,7 +56,7 @@ Doneから確認項目を作って依頼する。OKが出るまで次へ進ま�
 次がすべて同じ最終headでそろったら、人間にマージを依頼する。`scripts/check-pr-head.sh <PR番号>` が `PR_GATE_STATUS=READY` を返すことも確かめる。
 
 - ローカルの標準検証、CI、Securityが成功している
-- 正式レビューが完了し、未対応の指摘と未解決のスレッドがない（通常のPRコメントで届いた指摘と、Codex以外のレビュアーの結果は、照合スクリプトでは読めないので自分で読む）
+- 正式レビューが完了し、未対応の指摘と未解決のスレッドがない（通常のPRコメントで届いた指摘と、`.github/pr-gate-review` が指定していないレビュアーの結果は、照合スクリプトでは読めないので自分で読む）
 - mainとの競合がない
 - 必要なユーザー検収が済んでいる
 

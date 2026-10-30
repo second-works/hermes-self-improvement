@@ -34,7 +34,7 @@ class AnalyseTests(unittest.TestCase):
         snap = snapshot([item(1), item(2, updated='2026-10-01T00:00:00Z'), item(3, state='CLOSED', updated='2026-01-01T00:00:00Z')])
         result = pc.analyse(snap, plan({'issue:1': 'acceptance', 'issue:2': 'completion', 'issue:3': 'none'}),
                             [{'target': 'issue:1', 'status': 'CHANGED'}, {'target': 'issue:2', 'status': 'UNCHANGED'}],
-                            60.0, NOW)
+                            60.0, NOW, True)
         self.assertEqual(result['acceptance'], [('issue:1', 'acceptance')])
         self.assertEqual(result['completion'], [('issue:2', 'completion')])
         self.assertEqual([k for k, _, _ in result['stale']], ['issue:2'])  # closed items are not stale
@@ -52,28 +52,39 @@ class AnalyseTests(unittest.TestCase):
         result = pc.analyse(snapshot([item(1, updated=None)]), plan({}), [], 1.0, NOW)
         self.assertEqual(result['stale'][0][2], '不明')
 
-    def test_first_run(self):
-        result = pc.analyse(snapshot([item(1)]), plan({}), [{'target': 'issue:1', 'status': 'FIRST'}], 1.0, NOW)
-        self.assertTrue(result['first'])
+    def test_first_run_follows_previous_not_items(self):
+        self.assertTrue(pc.analyse(snapshot([item(1)]), plan({}), [], 1.0, NOW)['first'])
+        self.assertFalse(pc.analyse(snapshot([]), plan({}), [], 1.0, NOW, True)['first'])
+
+    def test_naive_update_time_is_unknown_not_a_crash(self):
+        result = pc.analyse(snapshot([item(1, updated='2026-01-01T00:00:00')]), plan({}), [], 1.0, NOW)
+        self.assertEqual(result['stale'][0][2], '不明')
+
+
+sys.path.insert(0, str(ROOT / 'tests'))
+from test_github_work_guide import item as gw_item, snapshot as gw_snapshot  # noqa: E402
+from github_work_guide.core import build_plan, save_run  # noqa: E402
 
 
 class PreviousRunTests(unittest.TestCase):
-    def make(self, runs, name, files=('snapshot.json', 'plan.json')):
-        path = runs / name
-        path.mkdir(parents=True)
-        (path / 'manifest.json').write_text(json.dumps({'files': {f: 'x' for f in files}}))
-        return path
+    def save(self, runs, name):
+        value = gw_snapshot(gw_item(7))
+        save_run(runs / name, {'snapshot.json': value, 'plan.json': build_plan(value)})
+        return runs / name
 
-    def test_newest_complete_periodic_run(self):
+    def test_newest_loadable_periodic_run(self):
         with tempfile.TemporaryDirectory() as tmp:
-            runs = Path(tmp)
-            self.make(runs, 'periodic-20261023-0900')
-            newest = self.make(runs, 'periodic-20261030-0900')
-            self.make(runs, 'periodic-20261031-0900', files=('snapshot.json',))  # no plan: incomplete
-            self.make(runs, 'wg-20261101-0900')  # not a periodic run
+            runs = Path(tmp).resolve() / 'runs'
+            older = self.save(runs, 'periodic-20261023-0900')
+            newest = self.save(runs, 'periodic-20261030-0900')
+            self.save(runs, 'wg-20261101-0900')  # not a periodic run
             (runs / 'periodic-summaries').mkdir()
-            (runs / 'periodic-20261102-0900').mkdir()  # no manifest: interrupted
+            (runs / 'periodic-20261102-0900').mkdir()  # interrupted: no manifest
             self.assertEqual(pc.previous_run(runs), newest)
+            # a run the harness cannot load (here: altered after saving) is skipped
+            snap = newest / 'snapshot.json'
+            snap.write_text(snap.read_text().replace('Synthetic', 'Altered', 1))
+            self.assertEqual(pc.previous_run(runs), older)
 
     def test_no_previous(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -81,39 +92,84 @@ class PreviousRunTests(unittest.TestCase):
             self.assertIsNone(pc.previous_run(Path(tmp) / 'missing'))
 
 
+class RunTests(unittest.TestCase):
+    def test_timeout_and_missing_command_do_not_raise(self):
+        self.assertEqual(pc.run(['sleep', '5'], timeout=1)[0], -1)
+        self.assertEqual(pc.run(['no-such-command-for-periodic-check'])[0], -1)
+
+    def test_notification_text_is_an_argument(self):
+        calls = []
+        with patch.object(pc, 'run', lambda args, **kw: calls.append(args) or (0, '', '')), \
+                patch.object(pc.shutil, 'which', lambda name: '/usr/bin/osascript'):
+            pc.notify('停止: "x" & do shell script "id"')
+        args = calls[0]
+        script = ' '.join(args[:args.index('--')])
+        self.assertNotIn('do shell script', script)
+        self.assertEqual(args[-1], '停止: "x" & do shell script "id"')
+
+
 class UpdateGuardTests(unittest.TestCase):
     def git(self, cwd, *args):
-        subprocess.run(['git', *args], cwd=cwd, check=True, capture_output=True)
+        return subprocess.run(['git', '-c', 'user.name=t', '-c', 'user.email=t@example.invalid', *args],
+                              cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
 
-    def repo(self, tmp):
-        path = Path(tmp)
-        self.git(path, 'init', '-q', '-b', 'main')
-        self.git(path, '-c', 'user.name=t', '-c', 'user.email=t@example.invalid', 'commit', '-q', '--allow-empty', '-m', 'x')
-        (path / 'f.txt').write_text('a')
-        self.git(path, 'add', 'f.txt')
-        self.git(path, '-c', 'user.name=t', '-c', 'user.email=t@example.invalid', 'commit', '-q', '-m', 'f')
-        return path
+    def checkout(self, tmp, marker=True):
+        """A detached clone of a bare 'origin' with two commits on main, sitting on the first one."""
+        tmp = Path(tmp)
+        seed = tmp / 'seed'
+        seed.mkdir()
+        self.git(seed, 'init', '-q', '-b', 'main')
+        (seed / '.gitignore').write_text('runs/\n')
+        self.git(seed, 'add', '.gitignore')
+        self.git(seed, 'commit', '-q', '-m', 'one')
+        self.git(seed, 'commit', '-q', '--allow-empty', '-m', 'two')
+        self.git(tmp, 'clone', '-q', '--bare', str(seed), 'origin.git')
+        work = tmp / 'work'
+        self.git(tmp, 'clone', '-q', str(tmp / 'origin.git'), 'work')
+        self.git(work, 'checkout', '-q', '--detach', 'HEAD~1')
+        if marker:
+            (work / 'runs').mkdir()
+            (work / pc.MARKER).write_text('')
+        return work
+
+    def update(self, work):
+        with patch.object(pc, 'ROOT', work):
+            return pc.update_checkout()
+
+    def test_moves_dedicated_checkout_to_origin_main(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            work = self.checkout(tmp)
+            self.assertIsNone(self.update(work))
+            self.assertEqual(self.git(work, 'rev-parse', 'HEAD'), self.git(work, 'rev-parse', 'origin/main'))
+
+    def test_refuses_without_marker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIn('is missing', self.update(self.checkout(tmp, marker=False)))
 
     def test_refuses_branch_checkout(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = self.repo(tmp)
-            with patch.object(pc, 'ROOT', path):
-                self.assertIn('on branch', pc.update_checkout())
+            work = self.checkout(tmp)
+            self.git(work, 'switch', '-q', 'main')
+            self.assertIn('on branch', self.update(work))
 
-    def test_refuses_tracked_changes_on_detached_checkout(self):
+    def test_refuses_changed_or_untracked_files(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = self.repo(tmp)
-            self.git(path, 'checkout', '-q', '--detach')
-            (path / 'f.txt').write_text('changed')
-            with patch.object(pc, 'ROOT', path):
-                self.assertIn('tracked changes', pc.update_checkout())
+            work = self.checkout(tmp)
+            (work / 'note.txt').write_text('mine')
+            self.assertIn('untracked', self.update(work))
+            before = self.git(work, 'rev-parse', 'HEAD')
+            (work / 'note.txt').unlink()
+            (work / '.gitignore').write_text('changed\n')
+            self.assertIn('changed', self.update(work))
+            self.assertEqual(self.git(work, 'rev-parse', 'HEAD'), before)
 
-    def test_detached_clean_checkout_without_remote_reports_fetch_failure(self):
+    def test_refuses_commits_not_on_main(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = self.repo(tmp)
-            self.git(path, 'checkout', '-q', '--detach')
-            with patch.object(pc, 'ROOT', path):
-                self.assertIn('git fetch failed', pc.update_checkout())
+            work = self.checkout(tmp)
+            self.git(work, 'commit', '-q', '--allow-empty', '-m', 'local only')
+            local = self.git(work, 'rev-parse', 'HEAD')
+            self.assertIn('not on origin/main', self.update(work))
+            self.assertEqual(self.git(work, 'rev-parse', 'HEAD'), local)
 
 
 class RenderTests(unittest.TestCase):

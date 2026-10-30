@@ -19,7 +19,12 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'src'))
+from github_work_guide.core import load_run  # noqa: E402
+
 REPO = 'second-works/hermes-self-improvement'
+# Present only in the dedicated check checkout (runs/ is not tracked). --update refuses without it.
+MARKER = 'runs/.periodic-check-checkout'
 RUN_NAME = re.compile(r'periodic-\d{8}-\d{4}\Z')
 LIMIT_SECONDS, LIMIT_CALLS = 180, 500
 WARN_RATIO = 0.8
@@ -27,37 +32,51 @@ STALE_DAYS = 14
 
 
 def run(args, cwd=None, timeout=300):
-    proc = subprocess.run(args, cwd=cwd or ROOT, capture_output=True, text=True, timeout=timeout)
+    """Never raises: a timeout or a missing command is a failed result, so the summary is still written."""
+    try:
+        proc = subprocess.run(args, cwd=cwd or ROOT, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return -1, '', f'timeout after {timeout}s'
+    except OSError as error:
+        return -1, '', type(error).__name__
     return proc.returncode, proc.stdout, proc.stderr
 
 
 def update_checkout():
     """Move the dedicated checkout to origin/main. Returns an error text or None."""
+    if not (ROOT / MARKER).is_file():
+        return f'{MARKER} is missing; only the dedicated check checkout is updated'
     code, out, _ = run(['git', 'symbolic-ref', '-q', 'HEAD'])
     if code == 0:
         return f'checkout is on branch {out.strip()}; only a detached check checkout is updated'
-    code, out, _ = run(['git', 'status', '--porcelain', '--untracked-files=no'])
+    # Ignored files (runs/) are not listed; any other untracked or changed file stops the update.
+    code, out, _ = run(['git', 'status', '--porcelain', '--untracked-files=normal'])
     if code != 0 or out.strip():
-        return 'checkout has tracked changes or git status failed'
-    for args in (['git', 'fetch', '--quiet', 'origin', 'main'], ['git', 'checkout', '--quiet', '--detach', 'origin/main']):
-        code, _, _ = run(args)
-        if code != 0:
-            return f'{" ".join(args[:2])} failed'
+        return 'checkout has changed or untracked files, or git status failed'
+    code, _, _ = run(['git', 'fetch', '--quiet', 'origin', 'main'])
+    if code != 0:
+        return 'git fetch failed'
+    # A commit that is not on main would be left behind by the checkout below.
+    code, _, _ = run(['git', 'merge-base', '--is-ancestor', 'HEAD', 'origin/main'])
+    if code != 0:
+        return 'checkout has commits that are not on origin/main'
+    code, _, _ = run(['git', 'checkout', '--quiet', '--detach', 'origin/main'])
+    if code != 0:
+        return 'git checkout failed'
     return None
 
 
 def previous_run(runs):
-    """Newest earlier periodic collect run that finished saving (has a manifest with a snapshot)."""
-    found = []
-    for path in runs.iterdir() if runs.is_dir() else []:
-        if RUN_NAME.fullmatch(path.name) and not path.is_symlink() and (path / 'manifest.json').is_file():
-            try:
-                files = json.loads((path / 'manifest.json').read_text(encoding='utf-8'))['files']
-            except (OSError, ValueError, KeyError, TypeError):
-                continue
-            if 'snapshot.json' in files and 'plan.json' in files:
-                found.append(path)
-    return max(found, key=lambda p: p.name) if found else None
+    """Newest periodic run that the harness itself can load (manifest, hashes, version, schema)."""
+    names = sorted((p for p in (runs.iterdir() if runs.is_dir() else [])
+                    if RUN_NAME.fullmatch(p.name) and not p.is_symlink()), key=lambda p: p.name, reverse=True)
+    for path in names:
+        try:
+            load_run(path)
+        except Exception:  # noqa: BLE001 - an unloadable run is skipped, never trusted
+            continue
+        return path
+    return None
 
 
 def stale_open(snapshot, now, days=STALE_DAYS):
@@ -69,6 +88,8 @@ def stale_open(snapshot, now, days=STALE_DAYS):
         try:
             when = datetime.fromisoformat(updated.replace('Z', '+00:00'))
         except (AttributeError, ValueError):
+            when = None
+        if when is None or when.tzinfo is None:
             rows.append((key, item['title'], '不明'))
             continue
         if now - when >= timedelta(days=days):
@@ -76,7 +97,7 @@ def stale_open(snapshot, now, days=STALE_DAYS):
     return rows
 
 
-def analyse(snapshot, plan, changes, seconds, now):
+def analyse(snapshot, plan, changes, seconds, now, has_previous=False):
     """Pure summary of one collect run (all values come from the saved files)."""
     coverage = snapshot['coverage']
     candidates = plan['candidates'] if plan else {}
@@ -91,7 +112,7 @@ def analyse(snapshot, plan, changes, seconds, now):
         warnings.append(f'API呼出 {coverage["calls"]}回が上限{LIMIT_CALLS}回の8割以上')
     return {'status': coverage['status'], 'items': len(snapshot['items']), 'calls': coverage.get('calls'),
             'seconds': seconds, 'omitted': coverage.get('omitted', ''), 'moved': moved,
-            'first': all(x['status'] == 'FIRST' for x in changes) if changes else True,
+            'first': not has_previous,
             'acceptance': by_kind.get('acceptance', []), 'completion': by_kind.get('completion', []),
             'open': [(k, c['kind']) for k, c in sorted(candidates.items()) if c['kind'] != 'none'],
             'stale': stale_open(snapshot, now), 'warnings': warnings}
@@ -169,8 +190,9 @@ def render(stamp, result, previous, ci, ci_error, setting, size, stop=None):
 
 def notify(text):
     if shutil.which('osascript'):
-        subprocess.run(['osascript', '-e', f'display notification {json.dumps(text)} with title "hermes 定期点検"'],
-                       capture_output=True, timeout=30)
+        # The text goes in as an argument, never into the script source.
+        run(['osascript', '-e', 'on run argv', '-e', 'display notification (item 1 of argv) with title "hermes 定期点検"',
+             '-e', 'end run', '--', text], timeout=30)
 
 
 def main(argv=None):
@@ -191,6 +213,9 @@ def main(argv=None):
     if not stop:
         previous = previous_run(runs)
         out_dir = runs / f'periodic-{stamp}'
+        if out_dir.exists():
+            stop = f'{out_dir.name} already exists; not reading an old run as this week\'s result'
+    if not stop:
         command = [sys.executable, '-I', '-B', str(ROOT / 'scripts/report_github_work_guide.py'), 'collect', '--out', str(out_dir)]
         if previous:
             command[-2:-2] = ['--previous', str(previous)]
@@ -202,7 +227,9 @@ def main(argv=None):
             changes = json.loads((out_dir / 'diff.json').read_text(encoding='utf-8'))
             plan_file = out_dir / 'plan.json'
             plan = json.loads(plan_file.read_text(encoding='utf-8')) if plan_file.is_file() else None
-            result = analyse(snapshot, plan, changes, seconds, datetime.now(timezone.utc))
+            if not (out_dir / 'manifest.json').is_file():
+                raise ValueError('no manifest written by this collect')
+            result = analyse(snapshot, plan, changes, seconds, datetime.now(timezone.utc), previous is not None)
         except (OSError, ValueError, KeyError, TypeError):
             stop = f'取得の結果を読めない（collect の終了コード {code}）'
         if result and (code != 0 or result['status'] != 'COMPLETE'):

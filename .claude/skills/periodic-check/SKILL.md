@@ -11,15 +11,15 @@ description: 本repoの週1回の定期点検の手順と、その自動実行�
 
 2026-10-30、利用者の判断で、この点検を利用者のMacで週1回、launchd から **モデルを使わない点検スクリプト** `scripts/periodic_check.py` で自動実行する。#31 の「Cron/定期運転」を対象外とした決定は改善サイクルの範囲のもので、これはその例外として記録する。ほかのスキルや操作は自動にしない。
 
-- 場所: 点検専用の checkout `/Users/work/Developer/hsi-periodic-check`（このrepoの git worktree、detached HEAD）だけ。共有の元checkout（`/Users/work/Developer/hermes-self-improvement`）や、ほかのworktreeは使わない・変更しない。
-- 更新: `--update` で `git fetch origin main` と `git checkout --detach origin/main` を行う。ブランチ上にある checkout や、追跡ファイルに変更がある checkout では何も変えずに止まる。この checkout では編集・commit・push をしない。
+- 場所: 点検専用の checkout `/Users/work/Developer/hsi-periodic-check`（このrepoの git worktree、detached HEAD）だけ。目印として、その checkout に空のファイル `runs/.periodic-check-checkout`（Git管理外）を置く。共有の元checkout（`/Users/work/Developer/hermes-self-improvement`）や、ほかのworktreeは使わない・変更しない。
+- 更新: `--update` で `git fetch origin main` と `git checkout --detach origin/main` を行う。目印がない、ブランチ上にある、追跡ファイルの変更か未追跡のファイル（`runs/` を除く）がある、main に載っていないコミットがある、のどれかなら何も変えずに止まる。この checkout では編集・commit・push をしない。更新の後の取得は新しい main のハーネスで行うが、`periodic_check.py` 自身はその回は更新前の版で動く（翌週からそろう）。
 - 中身: 下の1〜4をスクリプトが行う（取得、差分、親の検収待ち・完了範囲確認・14日以上動いていないOPEN、上限の8割の警告、mainのCI、`origin/main` の `.github/pr-gate-review`、`runs/` の容量）。
 - 保存: 取得のrunは `runs/periodic-<YYYYMMDD-HHMM>`、報告は `runs/periodic-summaries/<YYYYMMDD-HHMM>.md`（どちらもGit管理外。既存の報告があれば止まる）。`--notify` でmacOSの通知を出す。
 - してはいけないこと: GitHubへの書き込み（Issue・PR・コメント・ラベル）、runs/ の削除・移動、モデル（Claude・Codex・Gemma）の使用、`~/.hermes` や本番への接続。GitHubへの通信は、作業指針ハーネスの読取と `gh run list` だけ。
-- 停止: 取得が INCOMPLETE、checkout が更新できない、のどれかなら、報告に「停止」として書いて終了コード1で終える。再試行はしない。上限の8割を超えたら警告として報告する。
+- 停止: 取得が INCOMPLETE、checkout が更新できない、時間切れ（collect 600秒、git fetch 300秒、gh 60秒）、コマンドが見つからない、のどれかなら、報告に「停止」として書いて終了コード1で終える。再試行はしない。上限の8割を超えたら警告として報告する。前回のrunは、ハーネスの `load_run` の検証を通る、いちばん新しい `periodic-<YYYYMMDD-HHMM>` を使う（通らないrunは飛ばす）。
 - 報告を読んで判断が要るときは、人がこのスキルの「5. 報告する」の観点で確認するか、Claude Code に報告ファイルを読ませて相談する。
 
-launchd の設定例（`~/Library/LaunchAgents/com.second-works.hsi-periodic-check.plist`、毎週月曜9:00。設定は利用者のMacの判断で置く）:
+launchd の設定例（`~/Library/LaunchAgents/com.second-works.hsi-periodic-check.plist`、毎週月曜9:00。ログは `runs/` の外。設定は利用者のMacの判断で置く。gh の認証はログイン中のユーザーで使える前提で、ログアウト中は停止として報告される）:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -38,8 +38,8 @@ launchd の設定例（`~/Library/LaunchAgents/com.second-works.hsi-periodic-che
   <dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string></dict>
   <key>StartCalendarInterval</key>
   <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
-  <key>StandardOutPath</key><string>/Users/work/Developer/hsi-periodic-check/runs/periodic-launchd.log</string>
-  <key>StandardErrorPath</key><string>/Users/work/Developer/hsi-periodic-check/runs/periodic-launchd.log</string>
+  <key>StandardOutPath</key><string>/Users/work/Library/Logs/hsi-periodic-check.log</string>
+  <key>StandardErrorPath</key><string>/Users/work/Library/Logs/hsi-periodic-check.log</string>
 </dict>
 </plist>
 ```

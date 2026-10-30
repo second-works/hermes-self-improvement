@@ -72,6 +72,13 @@ class ExcerptTests(unittest.TestCase):
             self.assertNotIn(f'関連候補: issue:{n}（', self.text)
         self.assertIn('関連候補のうち30件', self.text)
 
+    def test_unfetched_related_is_kept_not_counted_as_closed(self):
+        text = target_text() + '参考: See #999\n'
+        value = snapshot(issue(1, text), *[issue(n, state='closed') for n in CLOSED], issue(40), issue(41))
+        out = excerpt(value, build_plan(value), 'issue:1', 'run')
+        self.assertIn('関連候補: #999（UNFETCHED', out)
+        self.assertIn('関連候補のうち30件', out)
+
     def test_excerpt_is_smaller_than_the_full_section(self):
         full = markdown(self.value, diff(self.value), self.plan)
         self.assertLess(len(self.text), len(full))

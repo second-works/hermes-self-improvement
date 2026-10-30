@@ -832,7 +832,8 @@ def excerpt(snapshot, plan, target, run_name):
     hold_ids = {i for h in c['holds'] for i in h['evidence']}
     reasons = json.dumps(c['holds'], ensure_ascii=False) + '\n' + '\n'.join(c['steps'])
     cited_owners = {':'.join(i.split(':')[:2]) for i in hold_ids}
-    kept = [r for r in c['related'] if r['state'] == 'OPEN' or r['target'] in cited_owners
+    # Only terminal (CLOSED/MERGED) related items may be omitted; OPEN and UNFETCHED stay visible.
+    kept = [r for r in c['related'] if r['state'] not in ('CLOSED', 'MERGED') or r['target'] in cited_owners
             or mentions(reasons, r['target'])]
     omitted = len({r['target'] for r in c['related']}) - len({r['target'] for r in kept})
     steps = '\n'.join(c['steps'])

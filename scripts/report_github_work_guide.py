@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""Manual collect/report/recheck; deliberately no write or execution subcommand."""
+"""Manual collect/report/recheck/excerpt; deliberately no write or execution subcommand."""
 import argparse
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from github_work_guide.collector import Collector
-from github_work_guide.core import (OLD_PLAN, Invalid, REPO, build_plan, diff, load_run, markdown,
+from github_work_guide.core import (OLD_PLAN, Invalid, REPO, build_plan, diff, excerpt, load_run, markdown,
                                    read_json, recheck, require, save_run, validate_plan)
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=('collect', 'report', 'recheck'))
+    parser.add_argument('mode', choices=('collect', 'report', 'recheck', 'excerpt'))
     parser.add_argument('--repo', default=REPO)
     parser.add_argument('--run', type=Path, help='explicit saved planning run')
     parser.add_argument('--previous', type=Path, help='explicit previous run')
@@ -23,7 +23,16 @@ def main(argv=None):
     try:
         require(args.repo == REPO, 'repository not allowlisted')
         require(args.mode == 'collect' or args.run is not None, '--run required')
-        require(args.mode != 'recheck' or args.target is not None, '--target required')
+        require(args.mode not in ('recheck', 'excerpt') or args.target is not None, '--target required')
+        if args.mode == 'excerpt':
+            # Saved-run read only: verified manifest/hash, complete acquisition and a matching saved plan.
+            require(args.previous is None and not args.priority, 'excerpt does not take --previous/--priority')
+            snapshot = load_run(args.run)
+            require('plan.json' in read_json(args.run / 'manifest.json')['files'], 'saved plan required')
+            text = excerpt(snapshot, read_json(args.run / 'plan.json'), args.target, args.run.name)
+            save_run(args.out, {'excerpt.md': text})
+            print(f'excerpt={len(text)} chars target={args.target} out={args.out}')
+            return 0
         previous = load_run(args.previous) if args.previous else None
         result = None
         if args.mode == 'collect':

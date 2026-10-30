@@ -19,7 +19,14 @@ python3 -I -B scripts/report_github_work_guide.py collect --previous runs/first 
 python3 -I -B scripts/report_github_work_guide.py report --run runs/second --previous runs/first --out runs/report
 # 選んだ候補だけを判定する。再取得は関係の追加/欠落を検知するため同じrepo全範囲を取得する
 python3 -I -B scripts/report_github_work_guide.py recheck --run runs/second --target issue:2 --out runs/preflight
+# 1件分の案内だけを取り出す（保存済みrunの読取だけ。通信・モデル呼出なし）
+python3 -I -B scripts/report_github_work_guide.py excerpt --run runs/second --target issue:2 --out runs/excerpt-2
 ```
+
+`excerpt`（#51）は、判断を別の担当（#31・#36の役割分担ではCodex）へ渡すための1件分の抜粋 `excerpt.md` を、新しい `runs/<名前>` に書く。
+runのmanifestとhash、取得の完了、保存済みplanが現在のコードで再生成したplanと一致することを確かめてから出力する。改変されたrun、取得が不完全なrun、planがないrun、存在しない対象は、出力せずに拒否する。旧versionのplanは「旧versionのplanです…」で止まる。
+確認手順・保留（問いと解除条件）・進める/止める条件・子一覧は全文を残す。関連候補はOPENのものと、保留・確認手順に出てくるものだけを残し、ほかは件数だけにする。根拠の引用は、抜粋の中で参照されているものだけを残す（すべてsnapshot原文の部分文字列）。
+先頭にrun名・snapshot hash・取得時刻・対象・plan versionを付ける。期待回答や人の判断は含めない。12,000文字（#36の目安）を超えた場合も切り詰めず、末尾に注意を付ける。2026-10-30の実データで、#31の抜粋は6,156文字（report.md の#31の節は約3.6万バイト）。
 
 `issue:2` は指定方法の例で、特別な実装分岐はない。
 人間の優先順を渡す場合は `collect` / `report` に `--priority issue:9 issue:8` のように指定する。

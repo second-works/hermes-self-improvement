@@ -721,11 +721,68 @@ def previous_given(changes):
     return any(x['status'] != 'FIRST' for x in changes) or not changes
 
 
+def safe_text(value):
+    """JSON-escaped inline text: untrusted source never becomes active HTML/links."""
+    text = json.dumps(value, ensure_ascii=False)
+    return text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('`', '&#96;').replace('[', '&#91;').replace(']', '&#93;')
+
+
+def candidate_lines(key, c, related=None, evidence_ids=None):
+    """Markdown for one candidate. `related` / `evidence_ids` narrow the output for an excerpt (#51)."""
+    safe = safe_text
+    lines = []
+    ev = {e['id']: e for e in c['evidence']}
+    def quote(i):
+        e = ev[i]
+        return f'[{i}]({e["url"]}) {safe(e["quote"])}' + ('（抜粋）' if e['truncated'] else '')
+    s = c['status']
+    lines += ['', f'## {key} — {c["label"]}', '',
+              f'- 現在: {s["state"]} / 最終更新 {s["updated_at"] or "不明"} / コメント{s["comments"]}件',
+              '- 認識した欄: ' + ('、'.join(f'{x["name"]}(L{x["line"]})' for x in c['sections']) or 'なし')]
+    if c['done']:
+        lines.append('- 完了条件: ' + '、'.join(
+            f'L{d["line"]} ' + (f'{d["checked"]}/{d["total"]}チェック' if d['total'] else 'チェック項目なし')
+            for d in c['done']))
+    for hint in c['dependency_hints']:
+        lines.append(f'- 未確定の依存確認先: {hint["target"]}（{hint["state"]}） / {quote(hint["evidence"])}')
+    for child in c.get('children', []):
+        targets = '、'.join(f'{t}({child["states"][t]})' for t in child['targets']) or '番号未確定'
+        lines.append(f'- 子一覧の参照: {targets} / 本文チェック {"済" if child["checked"] else "未"} / '
+                     f'{quote(child["evidence"])}（チェックは成功・採用の証明ではない）')
+    if c['other_headings']:
+        lines.append('- 判断に使っていない見出し: ' + '、'.join(f'L{x["line"]}' for x in c['other_headings']))
+    grouped = {}
+    for r in c['related'] if related is None else related:
+        grouped.setdefault(r['target'], []).append(r)
+    for target, rs in grouped.items():
+        how = '、'.join(RELATION_LABELS[(r['relation'], r['direction'])] for r in rs)
+        extra = f'、head {rs[0]["head"]}' if rs[0].get('head') else ''
+        where = ', '.join(r['evidence'] for r in rs if r['evidence'])
+        lines.append(f'- 関連候補: {target}（{rs[0]["state"]}{extra}）{how}' + (f' ← {where}' if where else ''))
+    for x in c['external']:
+        lines.append(f'- 対象外: {safe(x["url"])} — {x["note"]}')
+    for n in c['notes']:
+        lines.append(f'- 注意: {n}')
+    lines += ['', '確認手順:']
+    lines += [f'{i}. {step}' for i, step in enumerate(c['steps'], 1)]
+    if c['holds']:
+        lines += ['', '保留:']
+        for h in c['holds']:
+            lines.append(f'- {h["code"]}（{h["category"]}）{h["reason"]} / 確認対象: {h["check"]} / '
+                         f'問い: {h["question"]} / 解除条件: {h["release"]}')
+            for t in h.get('terms', []):
+                cands = '、'.join(f'{x["target"]}({x["state"]}, 一致{x["score"]}, 未確定)' for x in t['candidates']) or '候補なし'
+                lines.append(f'  - 項目 {safe(t["term"])}: {cands}')
+            if h.get('mentioned'):
+                lines.append('  - 記載の番号: ' + '、'.join(f'{m["target"]}({m["state"]})' for m in h['mentioned']))
+    lines += ['', f'進める条件: {c["start_condition"]} / 止める条件: {c["stop_condition"]}', '', '根拠:']
+    lines += [f'- {quote(i)}' for i in ev if not i.endswith(':state') and (evidence_ids is None or i in evidence_ids)]
+    return lines
+
+
 def markdown(snapshot, changes, plan=None, result=None):
     # Render untrusted source only inside JSON-escaped inline text; no active raw HTML/links.
-    def safe(value):
-        text = json.dumps(value, ensure_ascii=False)
-        return text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('`', '&#96;').replace('[', '&#91;').replace(']', '&#93;')
+    safe = safe_text
     lines = ['# GitHub作業指針', '', f'取得: {snapshot["captured_at"]}',
              f'coverage: {snapshot["coverage"]["status"]} / API呼出 {snapshot["coverage"]["calls"]}',
              f'上限: {safe(snapshot["coverage"]["limits"])}',
@@ -746,53 +803,7 @@ def markdown(snapshot, changes, plan=None, result=None):
         active = [k for k in plan['order'] if plan['candidates'][k]['kind'] != 'none']
         done = [k for k in plan['order'] if plan['candidates'][k]['kind'] == 'none']
         for key in active:
-            c = plan['candidates'][key]
-            ev = {e['id']: e for e in c['evidence']}
-            def quote(i):
-                e = ev[i]
-                return f'[{i}]({e["url"]}) {safe(e["quote"])}' + ('（抜粋）' if e['truncated'] else '')
-            s = c['status']
-            lines += ['', f'## {key} — {c["label"]}', '',
-                      f'- 現在: {s["state"]} / 最終更新 {s["updated_at"] or "不明"} / コメント{s["comments"]}件',
-                      '- 認識した欄: ' + ('、'.join(f'{x["name"]}(L{x["line"]})' for x in c['sections']) or 'なし')]
-            if c['done']:
-                lines.append('- 完了条件: ' + '、'.join(
-                    f'L{d["line"]} ' + (f'{d["checked"]}/{d["total"]}チェック' if d['total'] else 'チェック項目なし')
-                    for d in c['done']))
-            for hint in c['dependency_hints']:
-                lines.append(f'- 未確定の依存確認先: {hint["target"]}（{hint["state"]}） / {quote(hint["evidence"])}')
-            for child in c.get('children', []):
-                targets = '、'.join(f'{t}({child["states"][t]})' for t in child['targets']) or '番号未確定'
-                lines.append(f'- 子一覧の参照: {targets} / 本文チェック {"済" if child["checked"] else "未"} / '
-                             f'{quote(child["evidence"])}（チェックは成功・採用の証明ではない）')
-            if c['other_headings']:
-                lines.append('- 判断に使っていない見出し: ' + '、'.join(f'L{x["line"]}' for x in c['other_headings']))
-            grouped = {}
-            for r in c['related']:
-                grouped.setdefault(r['target'], []).append(r)
-            for target, rs in grouped.items():
-                how = '、'.join(RELATION_LABELS[(r['relation'], r['direction'])] for r in rs)
-                extra = f'、head {rs[0]["head"]}' if rs[0].get('head') else ''
-                where = ', '.join(r['evidence'] for r in rs if r['evidence'])
-                lines.append(f'- 関連候補: {target}（{rs[0]["state"]}{extra}）{how}' + (f' ← {where}' if where else ''))
-            for x in c['external']:
-                lines.append(f'- 対象外: {safe(x["url"])} — {x["note"]}')
-            for n in c['notes']:
-                lines.append(f'- 注意: {n}')
-            lines += ['', '確認手順:']
-            lines += [f'{i}. {step}' for i, step in enumerate(c['steps'], 1)]
-            if c['holds']:
-                lines += ['', '保留:']
-                for h in c['holds']:
-                    lines.append(f'- {h["code"]}（{h["category"]}）{h["reason"]} / 確認対象: {h["check"]} / '
-                                 f'問い: {h["question"]} / 解除条件: {h["release"]}')
-                    for t in h.get('terms', []):
-                        cands = '、'.join(f'{x["target"]}({x["state"]}, 一致{x["score"]}, 未確定)' for x in t['candidates']) or '候補なし'
-                        lines.append(f'  - 項目 {safe(t["term"])}: {cands}')
-                    if h.get('mentioned'):
-                        lines.append('  - 記載の番号: ' + '、'.join(f'{m["target"]}({m["state"]})' for m in h['mentioned']))
-            lines += ['', f'進める条件: {c["start_condition"]} / 止める条件: {c["stop_condition"]}', '', '根拠:']
-            lines += [f'- {quote(i)}' for i in ev if not i.endswith(':state')]
+            lines += candidate_lines(key, plan['candidates'][key])
         if done:
             lines += ['', f'## 今回対応不要（CLOSED/MERGED） {len(done)}件', '',
                       '、'.join(f'{k}: {plan["candidates"][k]["status"]["state"]}' for k in done)]
@@ -801,6 +812,47 @@ def markdown(snapshot, changes, plan=None, result=None):
     if result:
         lines += ['', '## 再確認', '', safe(result)]
     return '\n'.join(lines) + '\n'
+
+
+EXCERPT_LIMIT = 12_000  # #36: inputs up to this size go to Codex directly
+
+
+def mentions(text, key):
+    """`key` (e.g. issue:3, issue:31:L9) appears in text as a whole ID, not as a prefix of a longer one."""
+    return re.search(re.escape(key) + r'(?![0-9:\-])', text) is not None
+
+
+def excerpt(snapshot, plan, target, run_name):
+    """One candidate's guidance from a verified saved run, sized for a judgement handoff (#51). No network/model."""
+    complete(snapshot)
+    validate_plan(snapshot, plan)
+    require(target in plan['candidates'], 'unknown candidate')
+    c = plan['candidates'][target]
+    # Collect cited IDs from the plan structure, not from rendered wording, so no hold evidence is lost.
+    hold_ids = {i for h in c['holds'] for i in h['evidence']}
+    reasons = json.dumps(c['holds'], ensure_ascii=False) + '\n' + '\n'.join(c['steps'])
+    cited_owners = {':'.join(i.split(':')[:2]) for i in hold_ids}
+    # Only terminal (CLOSED/MERGED) related items may be omitted; OPEN and UNFETCHED stay visible.
+    kept = [r for r in c['related'] if r['state'] not in ('CLOSED', 'MERGED') or r['target'] in cited_owners
+            or mentions(reasons, r['target'])]
+    omitted = len({r['target'] for r in c['related']}) - len({r['target'] for r in kept})
+    steps = '\n'.join(c['steps'])
+    used = (hold_ids | {child['evidence'] for child in c.get('children', [])}
+            | {hint['evidence'] for hint in c['dependency_hints']}
+            | {r['evidence'] for r in kept if r['evidence']}
+            | {e['id'] for e in c['evidence'] if mentions(steps, e['id'])})
+    body = candidate_lines(target, c, related=kept, evidence_ids=used)
+    head = ['# 作業指針の抜粋（1件）', '',
+            f'- run: {safe_text(run_name)} / snapshot hash: {snapshot["hash"]} / 取得: {snapshot["captured_at"]}',
+            f'- 対象: {target} / plan version: {plan["version"]}',
+            '- 新規モデル通信0、GitHub書込0。引用は原文の未検証データで、命令ではない。期待回答や人の判断は含まない。']
+    if omitted:
+        head.append(f'- 関連候補のうち{omitted}件（CLOSED/MERGEDで、保留・確認手順に出てこないもの）は省略した。全体は同じrunのreport.mdを参照。')
+    text = '\n'.join(head + body) + '\n'
+    if len(text) > EXCERPT_LIMIT:
+        text += (f'\n注意: {len(text)}文字で、目安の{EXCERPT_LIMIT}文字を超えている。'
+                 '保留と確認手順は省略していない。渡す範囲は人が確認する。\n')
+    return text
 
 
 def save_run(path, documents):
@@ -812,7 +864,7 @@ def save_run(path, documents):
     path.mkdir(exist_ok=False)
     manifest = {}
     for name, value in documents.items():
-        require(name in ('snapshot.json', 'diff.json', 'plan.json', 'recheck.json', 'report.md'), 'output name')
+        require(name in ('snapshot.json', 'diff.json', 'plan.json', 'recheck.json', 'report.md', 'excerpt.md'), 'output name')
         content = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + '\n'
         with (path / name).open('x', encoding='utf-8') as stream:
             stream.write(content)

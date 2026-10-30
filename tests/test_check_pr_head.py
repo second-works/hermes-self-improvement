@@ -30,6 +30,8 @@ if a[:1] == ['api']:
     if '/contents/' in path:
         name = path.split('/contents/', 1)[1]
         if name in s['files']:
+            if isinstance(s['files'][name], dict):
+                sys.stderr.write('gh: Server Error (HTTP 502)\n'); sys.exit(1)
             if s['files'][name] is None:
                 sys.stderr.write('gh: Not Found (HTTP 404)\n'); sys.exit(1)
             out(s['files'][name])
@@ -126,6 +128,31 @@ class ReviewGateTests(unittest.TestCase):
         self.assert_status('READY', [codex(sha=OLD), claude()], review_file=both)
         self.assert_status('READY', [codex()], review_file=both)
         self.assert_status('REVIEW_FINDINGS', [codex(unresolved=True), claude()], review_file=both)
+
+    def test_trusted_associations_pass(self):
+        for association in ('MEMBER', 'COLLABORATOR'):
+            with self.subTest(association=association):
+                self.assert_status('READY', [claude(association=association)])
+
+    def test_string_values_are_not_booleans(self):
+        raw = '{"commit_sha": "%s", "status": "completed", "has_unresolved_findings": "false"}' % HEAD
+        self.assert_status('REVIEW_UNAVAILABLE', [claude(raw=raw)])
+        raw = '{"commit_sha": "%s", "status": "completed"}' % HEAD
+        self.assert_status('REVIEW_UNAVAILABLE', [claude(raw=raw)])
+
+    def test_last_record_in_one_comment_wins(self):
+        quoted = claude()
+        latest = json.dumps({'commit_sha': HEAD, 'status': 'completed', 'has_unresolved_findings': True})
+        quoted['body'] += f'\n今回の結果\n<!-- claude-code-review:v1 {latest} -->'
+        self.assert_status('REVIEW_FINDINGS', [quoted])
+
+    def test_setting_that_cannot_be_read_stops(self):
+        self.assert_status('REVIEW_UNAVAILABLE', [claude(), codex()], review_file={'error': 'server'})
+
+    def test_empty_kind_in_environment(self):
+        # bash drops a trailing empty field; an empty field in the middle is an unknown kind and stops.
+        self.assert_status('READY', [codex()], env={'PR_GATE_REVIEW': 'codex,'})
+        self.assert_status('REVIEW_UNAVAILABLE', [codex()], env={'PR_GATE_REVIEW': 'codex,,claude-code'})
 
     def test_unknown_kind_is_rejected(self):
         self.assert_status('REVIEW_UNAVAILABLE', [claude()], review_file='claude\n')

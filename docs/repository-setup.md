@@ -41,7 +41,7 @@ CodeQLだけsecurity-events: writeをjob単位で付与。CI/CodeQLはPRとmain 
 
 このPRを実動テストに使う。自動発火が確認できなければ `@codex review` をPRコメントで依頼する。👀反応は受付であって完了ではない。botのreviewまたは明示的な完了コメントと対象headを照合する。認証不足、repo未接続、利用制限、無応答、途中失敗はNOT_VERIFIED / BLOCKEDとし、Merge可能と報告しない。GitHubのCI成功やレビュー要求コメント自体をCodex成功の証拠にしない。
 
-指摘は同じPR branchで修正し、head変更後にlocal → CI → Security → CodeQL → Codex Reviewをやり直す。P0/P1/BLOCKING P2は未解決で進めない。最終Mergeは人間が判断する。CIの必須チェックはCodex完了を代替しない。
+指摘は同じPR branchで修正し、head変更後にlocal → CI → Security → CodeQL → 正式レビュー（`.github/pr-gate-review` の種類）をやり直す。P0/P1/BLOCKING P2は未解決で進めない。最終Mergeは人間が判断する。CIの必須チェックは正式レビューの完了を代替しない。
 
 ## Claude Codeによる正式レビュー（#55）
 
@@ -53,7 +53,9 @@ CodeQLだけsecurity-events: writeをjob単位で付与。CI/CodeQLはPRとmain 
 <!-- claude-code-review:v1 {"commit_sha":"<最終headのfull SHA>","status":"completed","has_unresolved_findings":false} -->
 ```
 
-公開repoでは誰でもコメントできるため、照合が読むのは投稿者が OWNER / MEMBER / COLLABORATOR の記録だけで、そのうち最新のものを使う。記録のheadが最終headと違う、未完了、未解決の指摘あり、形式が壊れている場合はREADYにしない。Claude Codeのレビューは実装と同じ会話でも行えるため、Risk TierがHIGHのIssueでは、stewardの手順どおり別のセッションでもレビューする。ClaudeのGitHub Action（`@claude`）は導入していない。
+公開repoでは誰でもコメントできるため、照合が読むのは投稿者が OWNER / MEMBER / COLLABORATOR の記録だけで、そのうち最新のもの（1つのコメントに複数あれば最後のもの）を使う。`has_unresolved_findings` は真偽値、`status` と `commit_sha` は文字列でなければ認めない。
+
+照合が確かめるのは記録の内容で、`/code-review` を実際に実行したかどうかではない。実装したセッションが自分で記録を書けば READY にできるため、記録はレビューの結果に基づいて書き、HIGHのIssueでは別のセッションのレビューも行う。この前提は#55で利用者が受け入れた。`codex` と `claude-code` を両方書いた場合は、片方が最終headで完了・指摘なしなら、もう片方が古いheadや実行中でも通る。記録のheadが最終headと違う、未完了、未解決の指摘あり、形式が壊れている場合はREADYにしない。Claude Codeのレビューは実装と同じ会話でも行えるため、Risk TierがHIGHのIssueでは、stewardの手順どおり別のセッションでもレビューする。ClaudeのGitHub Action（`@claude`）は導入していない。
 
 ## 検証責務
 

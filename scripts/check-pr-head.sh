@@ -147,22 +147,25 @@ for kind in "${kinds[@]}"; do
     codex)
       review="$(jq -r --arg who "$reviewer" '
         [.comments[] | select(.author.login == $who) | .body
-         | (capture("codex-review-state:v1 (?<s>\\{.*\\}) -->") | .s)?] | last // empty' <<<"$comments" 2>/dev/null)"
+         | ([capture("codex-review-state:v1 (?<s>\\{.*?\\}) -->"; "g") | .s] | last) // empty] | last // empty' <<<"$comments" 2>/dev/null)"
       sha_path='.code_review.commit_sha' status_path='.code_review.status' open_path='.code_review.has_unresolved_findings' ;;
     claude-code)
       # Anyone can comment on a public repository, so only trusted authors count.
       review="$(jq -r '
         [.comments[] | select(.authorAssociation == "OWNER" or .authorAssociation == "MEMBER" or .authorAssociation == "COLLABORATOR")
-         | .body | (capture("claude-code-review:v1 (?<s>\\{[^\\n]*?\\}) -->") | .s)?] | last // empty' <<<"$comments" 2>/dev/null)"
+         | .body | ([capture("claude-code-review:v1 (?<s>\\{[^\\n]*?\\}) -->"; "g") | .s] | last) // empty] | last // empty' <<<"$comments" 2>/dev/null)"
       sha_path='.commit_sha' status_path='.status' open_path='.has_unresolved_findings' ;;
     *) report REVIEW_UNAVAILABLE "unknown review kind '$kind' in the review setting" ;;
   esac
   if [[ -z $review ]]; then waiting+=("no $kind review"); continue; fi
-  r_sha="$(jq -r "$sha_path // empty" <<<"$review" 2>/dev/null)"
-  r_status="$(jq -r "$status_path // empty" <<<"$review" 2>/dev/null)"
-  r_open="$(jq -r "$open_path" <<<"$review" 2>/dev/null)"
+  # Types are checked too: the string "false" or "completed" in the wrong field is not accepted.
+  r_sha="$(jq -r "$sha_path | if type == \"string\" then . else empty end" <<<"$review" 2>/dev/null)"
+  r_status="$(jq -r "$status_path | if type == \"string\" then . else empty end" <<<"$review" 2>/dev/null)"
+  r_open="$(jq -r "$open_path | if type == \"boolean\" then tostring else \"invalid\" end" <<<"$review" 2>/dev/null)"
+  [[ -n $r_open ]] || r_open=invalid
   if [[ $r_sha != "$head" ]]; then waiting+=("latest $kind review is for ${r_sha:-unknown}"); continue; fi
   if [[ $r_status != completed ]]; then waiting+=("$kind review on $head is ${r_status:-unknown}"); continue; fi
+  if [[ $r_open == invalid ]]; then waiting+=("$kind review on $head has no boolean has_unresolved_findings"); continue; fi
   [[ $r_open == false ]] || report REVIEW_FINDINGS "$kind review on $head has unresolved findings"
   passed="$kind"
 done

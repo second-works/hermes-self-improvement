@@ -819,7 +819,7 @@ EXCERPT_LIMIT = 12_000  # #36: inputs up to this size go to Codex directly
 
 def mentions(text, key):
     """`key` (e.g. issue:3, issue:31:L9) appears in text as a whole ID, not as a prefix of a longer one."""
-    return re.search(re.escape(key) + r'(?![0-9:])', text) is not None
+    return re.search(re.escape(key) + r'(?![0-9:\-])', text) is not None
 
 
 def excerpt(snapshot, plan, target, run_name):
@@ -828,11 +828,18 @@ def excerpt(snapshot, plan, target, run_name):
     validate_plan(snapshot, plan)
     require(target in plan['candidates'], 'unknown candidate')
     c = plan['candidates'][target]
+    # Collect cited IDs from the plan structure, not from rendered wording, so no hold evidence is lost.
+    hold_ids = {i for h in c['holds'] for i in h['evidence']}
     reasons = json.dumps(c['holds'], ensure_ascii=False) + '\n' + '\n'.join(c['steps'])
-    kept = [r for r in c['related'] if r['state'] == 'OPEN' or mentions(reasons, r['target'])]
+    cited_owners = {':'.join(i.split(':')[:2]) for i in hold_ids}
+    kept = [r for r in c['related'] if r['state'] == 'OPEN' or r['target'] in cited_owners
+            or mentions(reasons, r['target'])]
     omitted = len({r['target'] for r in c['related']}) - len({r['target'] for r in kept})
-    body = candidate_lines(target, c, related=kept, evidence_ids=set())
-    used = {i for i in (e['id'] for e in c['evidence']) if mentions('\n'.join(body), i)}
+    steps = '\n'.join(c['steps'])
+    used = (hold_ids | {child['evidence'] for child in c.get('children', [])}
+            | {hint['evidence'] for hint in c['dependency_hints']}
+            | {r['evidence'] for r in kept if r['evidence']}
+            | {e['id'] for e in c['evidence'] if mentions(steps, e['id'])})
     body = candidate_lines(target, c, related=kept, evidence_ids=used)
     head = ['# 作業指針の抜粋（1件）', '',
             f'- run: {safe_text(run_name)} / snapshot hash: {snapshot["hash"]} / 取得: {snapshot["captured_at"]}',

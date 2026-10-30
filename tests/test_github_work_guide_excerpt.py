@@ -117,7 +117,23 @@ class ExcerptTests(unittest.TestCase):
         for step in self.c['steps']:
             self.assertIn(step, text)
 
+    def test_every_hold_evidence_is_kept(self):
+        text = '# Goal\n目的A\n# Goal\n目的B\n# Dependencies\nnone\n'
+        value = snapshot(issue(1, text))
+        plan = build_plan(value)
+        c = plan['candidates']['issue:1']
+        out = excerpt(value, plan, 'issue:1', 'run')
+        ids = [i for h in c['holds'] for i in h['evidence']]
+        self.assertGreater(len(ids), 1)  # goal_multiple cites both goal sections
+        for i in ids:
+            self.assertIn(f'[{i}]', out)
+        for h in self.c['holds']:
+            for i in h['evidence']:
+                self.assertIn(f'[{i}]', self.text)
+
     def test_mentions_matches_whole_ids_only(self):
+        self.assertFalse(mentions('issue:1:L1-L2', 'issue:1:L1'))
+        self.assertTrue(mentions('issue:1:L1-L2', 'issue:1:L1-L2'))
         self.assertTrue(mentions('issue:31 と issue:3。', 'issue:3'))
         self.assertFalse(mentions('issue:31 だけ', 'issue:3'))
         self.assertFalse(mentions('issue:31:L9:1', 'issue:31:L9'))
@@ -175,6 +191,18 @@ class CliTests(unittest.TestCase):
             self.assertEqual(proc.returncode, 2)
             self.assertIn(OLD_PLAN, proc.stderr)
             self.assertFalse((run.parent / 'ex-old').exists())
+
+    def test_cli_rejects_unsupported_flags(self):
+        value = run_snapshot()
+        with tempfile.TemporaryDirectory() as tmp:
+            run = self.make_run(tmp, **{'snapshot.json': value, 'plan.json': build_plan(value)})
+            for flags in (['--priority', 'issue:1'], ['--previous', str(run)]):
+                out = run.parent / ('ex-flag' + flags[0])
+                proc = subprocess.run([sys.executable, '-I', '-B', str(CLI), 'excerpt', '--run', str(run),
+                                       '--target', 'issue:1', '--out', str(out)] + flags,
+                                      capture_output=True, text=True, timeout=60)
+                self.assertEqual(proc.returncode, 2)
+                self.assertFalse(out.exists())
 
     def test_cli_rejects_incomplete_run(self):
         value = run_snapshot()

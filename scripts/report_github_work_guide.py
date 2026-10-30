@@ -26,6 +26,7 @@ def main(argv=None):
         require(args.mode not in ('recheck', 'excerpt') or args.target is not None, '--target required')
         if args.mode == 'excerpt':
             # Saved-run read only: verified manifest/hash, complete acquisition and a matching saved plan.
+            require(args.previous is None and not args.priority, 'excerpt does not take --previous/--priority')
             snapshot = load_run(args.run)
             require('plan.json' in read_json(args.run / 'manifest.json')['files'], 'saved plan required')
             text = excerpt(snapshot, read_json(args.run / 'plan.json'), args.target, args.run.name)

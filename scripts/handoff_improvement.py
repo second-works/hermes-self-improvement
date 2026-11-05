@@ -121,9 +121,13 @@ class HandoffAdoption(Controller):
     def regression(self, program, operation):
         packet, _, _ = self.source()
         expected = packet['after_hash' if operation == 'ADOPT' else 'before_hash']
-        require(digest(regular(program, self.area)) == expected, 'REGRESSION_ARTIFACT')
+        data = regular(program, self.area)
+        require(digest(data) == expected, 'REGRESSION_ARTIFACT')
         work = self.area / ('check-' + uuid.uuid4().hex)
         work.mkdir(mode=0o700)
+        snapshot = work / 'program.py'
+        write_new(snapshot, data)
+        snapshot.chmod(0o444)
         pinned = evaluator.read(self.work, 'environment.json')
         box = evaluator.Sandbox(self.repo, work, pinned['image']['id'])
         require(box.environment() == pinned['environment']
@@ -132,7 +136,7 @@ class HandoffAdoption(Controller):
         if operation == 'ROLLBACK':
             selected = selected[:10]
         for case in selected:
-            result = box.run(program, canonical(case['input']))
+            result = box.run(snapshot, canonical(case['input']))
             require(result['exit'] == result['container_exit'] == 0 and
                     not any(result[key] for key in ('stderr', 'error', 'oom')), 'REGRESSION_EXECUTION')
             actual, _ = findings(load_json(result['stdout']))

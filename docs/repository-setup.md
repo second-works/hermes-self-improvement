@@ -45,7 +45,8 @@ CodeQLだけsecurity-events: writeをjob単位で付与。CI/CodeQLはPRとmain 
 
 ## Claude Codeによる正式レビュー（#55）
 
-2026-10-30、ChatGPTの利用量が切迫したため、利用者がPRの正式レビューをClaude Codeで行うよう指示し、Codexの自動レビューを停止した。`.github/pr-gate-review` に `claude-code` を書き、`scripts/check-pr-head.sh` がClaude Codeのレビュー記録を正式レビューとして読む。Codexに戻すときは、このファイルを `codex` にする（両方を書けば、どちらかの完了で通り、どちらかに未解決の指摘があれば止まる）。
+利用者は #69 で、Codexで実装したPRの正式レビューにCodexを使うと決めた。マージ前に、最終headのCodexレビューが完了し、未解決の指摘がないことを確認する。
+`.github/pr-gate-review` には `codex` と `claude-code` を登録し、#55で導入したClaude Codeの正式レビュー経路も維持する。照合スクリプトは実装担当を判定しないため、担当に対応するレビュー結果はマージ判断時に確認する。
 
 レビューはClaude Codeの `/code-review <PR番号>` で最終headに対して行い、指摘と対応をPRコメントに記録する。そのコメントに、次の機械可読な記録を1行で付ける。
 

@@ -1,14 +1,17 @@
 """Exercise the mock controller with a packet emitted by the #63 producer."""
 import json
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from test_github_work_guide import ROOT, change, save_run
 
 sys.path.insert(0, str(ROOT / 'scripts'))
 from build_improvement_packet import build_packet
+from handoff_improvement import HandoffAdoption, digest, evaluator
 from run_mock_improvement import EvaluationError, canonical, run
 
 
@@ -34,6 +37,40 @@ class MockImprovementTest(unittest.TestCase):
                      'evidence_refs': [self.packet['evidence']['audit'][0]['pointer']]}
         self.edit = {'path': self.packet['change_allowlist'][0],
                      'before': 'skip_check()', 'after': 'perform_check()'}
+
+    def test_cli_imports_in_isolated_python(self):
+        for script in ('run_mock_improvement.py', 'handoff_improvement.py'):
+            with self.subTest(script=script):
+                subprocess.run([sys.executable, '-I', '-B', str(ROOT / 'scripts' / script), '--help'],
+                               check=True, capture_output=True)
+
+    def test_regression_mounts_readable_snapshot_not_private_target(self):
+        self.state.mkdir(parents=True)
+        program = self.state / 'private.py'
+        data = b'# private fixture artifact'
+        program.write_bytes(data)
+        program.chmod(0o600)
+        controller = HandoffAdoption.__new__(HandoffAdoption)
+        controller.repo, controller.area, controller.work = self.state.parents[1], self.state, self.state
+        controller.source = lambda: ({'before_hash': digest(data), 'after_hash': digest(data)}, {}, '')
+        case = {'input': {'patch': ''}, 'expected': []}
+        pinned = {'environment': {}, 'image': {'id': 'fixture-image'}}
+        for operation, expected_count in (('ADOPT', 12), ('ROLLBACK', 10)):
+            with self.subTest(operation=operation), patch.object(evaluator, 'Sandbox') as factory, \
+                    patch.object(evaluator, 'read', side_effect=[pinned, [case] * 12]):
+                box = factory.return_value
+                box.environment.return_value = pinned['environment']
+                box.image_info.return_value = pinned['image']
+                def check_snapshot(snapshot, _):
+                    self.assertNotEqual(snapshot, program)
+                    self.assertEqual(snapshot.read_bytes(), data)
+                    self.assertEqual(snapshot.stat().st_mode & 0o777, 0o444)
+                    return {'exit': 0, 'container_exit': 0, 'stderr': b'', 'error': None,
+                            'oom': False, 'stdout': b'{"findings":[],"cpu_seconds":0}'}
+                box.run.side_effect = check_snapshot
+                self.assertTrue(controller.regression(program, operation))
+                self.assertEqual(box.run.call_count, expected_count)
+        self.assertEqual(program.stat().st_mode & 0o777, 0o600)
 
     def test_proposal_and_durable_duplicate(self):
         response = canonical({**self.base, 'decision': 'PROPOSE', 'edit': self.edit})

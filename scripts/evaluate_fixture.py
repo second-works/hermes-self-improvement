@@ -84,7 +84,7 @@ def event(work, state, payload_hash):
         os.fsync(stream.fileno())
 
 
-def bootstrap():
+def bootstrap(image_id=None):
     require(not RUNS.is_symlink(), 'RUN_SYMLINK')
     RUNS.mkdir(exist_ok=True)
     run_id = 'evaluation-' + datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ-') + secrets.token_hex(6)
@@ -93,8 +93,12 @@ def bootstrap():
     box = Sandbox(ROOT, work)
     environment = box.environment()
     # Explicit bootstrap-only network operation; never performed by evaluate/run.
-    box.checked('pull', '--platform=linux/arm64', 'docker.io/library/python:3.12-slim-bookworm', timeout=180)
-    image = box.image_info('docker.io/library/python:3.12-slim-bookworm')
+    if image_id is None:
+        box.checked('pull', '--platform=linux/arm64', 'docker.io/library/python:3.12-slim-bookworm', timeout=180)
+    else:
+        require(re.fullmatch(r'sha256:[a-f0-9]{64}', image_id), 'IMAGE_ID')
+    image = box.image_info(image_id or 'docker.io/library/python:3.12-slim-bookworm')
+    require(image_id is None or image['id'] == image_id, 'IMAGE_CHANGED')
     save(work, 'environment.json', {'run_id': run_id, 'environment': environment, 'image': image,
                                  'approval': 'human chat approval 2026-10-15; Issue #5 proposal',
                                  'classification': 'PUBLIC', 'utc': stamp()})
@@ -157,7 +161,7 @@ def gate(work):
         raise
 
 
-def cases(hidden):
+def cases(hidden, *, multiline=False):
     """Fixed categories, unknown individual paths/lines/values; never print hidden bytes."""
     rows = []
     for index, kind in enumerate(['eval'] * 3 + ['shell'] * 3 + ['safe'] * 4):
@@ -170,6 +174,16 @@ def cases(hidden):
         patch = f'--- a/{path}\n+++ b/{path}\n@@ -1,0 +{line},1 @@\n+{expression}\n'
         expected = [] if kind == 'safe' else [[path, line, 'dynamic-eval' if kind == 'eval' else 'shell-execution']]
         rows.append({'input': {'path': path, 'patch': patch}, 'expected': expected})
+    if multiline:
+        for unsafe in (True, False):
+            tag = secrets.token_hex(8) if hidden else ('1' if unsafe else '2') * 16
+            path = 'case_' + tag + '.py'
+            line = secrets.randbelow(60) + 2 if hidden else 12
+            option = 'True' if unsafe else 'False'
+            patch = (f'@@ -1,0 +{line},4 @@\n+value = subprocess.run(\n'
+                     f'+    user_input,\n+    shell={option},\n+)\n')
+            rows.append({'input': {'path': path, 'patch': patch},
+                         'expected': [[path, line, 'shell-execution']] if unsafe else []})
     return rows
 
 
@@ -182,7 +196,7 @@ def verify_gate(work):
     return value
 
 
-def freeze(work):
+def freeze(work, *, multiline=False):
     verify_gate(work)
     require(not (work / 'manifest.json').exists(), 'ALREADY_FROZEN')
     require(load_json(regular(ROOT / 'fixtures/evaluation/policy.json', ROOT)) == policy(), 'POLICY_MISMATCH')
@@ -192,10 +206,11 @@ def freeze(work):
     for name, expected in source_hashes().items():
         stored = git_command('show', baseline_sha + ':' + name)
         require(digest(stored) == expected, 'EVALUATOR_NOT_COMMITTED')
-    save(work, 'public.json', cases(False))
-    save(work, 'hidden.json', cases(True))
+    save(work, 'public.json', cases(False, multiline=multiline))
+    save(work, 'hidden.json', cases(True, multiline=multiline))
     manifest = {'schema_version': 1, 'run_id': work.name, 'utc': stamp(), 'policy': policy(),
                 'baseline_sha': baseline_sha, 'baseline_artifact_hash': digest(baseline_data),
+                'suite': 'multiline-shell-v1' if multiline else 'default',
                 'sources': source_hashes(), 'seed_id': secrets.token_hex(16),
                 'dataset_hashes': {name: digest(regular(work / (name + '.json'), RUNS))
                                    for name in ('public', 'hidden')},
@@ -253,7 +268,7 @@ def compare_records(records):
     return result, unstable
 
 
-def evaluate(work, baseline_sha, candidate_sha):
+def evaluate(work, baseline_sha, candidate_sha, *, handoff_hash=None):
     require(not (work / 'evaluation-lock.json').exists(), 'RUN_ALREADY_USED')
     manifest = verify_manifest(work)
     box = sandbox(work)
@@ -263,18 +278,26 @@ def evaluate(work, baseline_sha, candidate_sha):
     require(baseline_sha != candidate_sha and baseline != candidate, 'CANDIDATE_NOT_DISTINCT')
     # Ancestry ensures the baseline predates the candidate; timestamps alone cannot prove ordering.
     git_command('merge-base', '--is-ancestor', baseline_sha, candidate_sha)
-    save(work, 'evaluation-lock.json', {'baseline_sha': baseline_sha, 'candidate_sha': candidate_sha,
-                                      'manifest_hash': digest(regular(work / 'manifest.json', RUNS)),
-                                      'utc': stamp(), 'state': 'EVALUATING'})
+    lock = {'baseline_sha': baseline_sha, 'candidate_sha': candidate_sha,
+            'manifest_hash': digest(regular(work / 'manifest.json', RUNS)),
+            'utc': stamp(), 'state': 'EVALUATING'}
+    if handoff_hash is not None:
+        lock['handoff_hash'] = handoff_hash
+    save(work, 'evaluation-lock.json', lock)
     event(work, 'EVALUATING', digest(regular(work / 'evaluation-lock.json', RUNS)))
     programs = {'baseline': baseline, 'candidate': candidate,
                 'degraded': b'import json\nprint(json.dumps({"findings":[],"cpu_seconds":0}))\n'}
     for label, data in programs.items():
         write_new(work / (label + '.py'), data)
         os.chmod(work / (label + '.py'), 0o644)
-    data = read(work, 'public.json') + read(work, 'hidden.json')
-    require(len(data) == 20, 'SAMPLE_COUNT')
-    records = {label: [[] for _ in range(20)] for label in programs}
+    public, hidden = read(work, 'public.json'), read(work, 'hidden.json')
+    suite = manifest.get('suite', 'default')
+    require(suite in ('default', 'multiline-shell-v1'), 'EVALUATION_SUITE')
+    count = 12 if suite == 'multiline-shell-v1' else 10
+    require(len(public) == len(hidden) == count, 'SAMPLE_COUNT')
+    data = public + hidden
+    total, executions = len(data), len(data) * 3
+    records = {label: [[] for _ in data] for label in programs}
     safety = True
     violation_codes = []
     try:
@@ -303,7 +326,8 @@ def evaluate(work, baseline_sha, candidate_sha):
             require(digest(regular(work / (label + '.py'), RUNS)) == digest(original), 'ARTIFACT_CHANGED')
         metrics, unstable = compare_records(records)
         decisions = {label: judge(metrics['baseline'], metrics[label], safety=safety,
-                                  same_artifact=label == 'baseline', contaminated=unstable)
+                                  same_artifact=label == 'baseline', contaminated=unstable,
+                                  public_count=count, hidden_count=count)
                      for label in programs}
         # A run is an evaluation result, not an adoption action. A failed control can never complete it.
         control_verified = decisions['degraded']['status'] == 'FAIL' and decisions['baseline']['status'] == 'HOLD'
@@ -317,9 +341,9 @@ def evaluate(work, baseline_sha, candidate_sha):
                   'manifest_hash': digest(regular(work / 'manifest.json', RUNS)),
                   'image': read(work, 'environment.json')['image'],
                   'dataset_commitments': manifest['dataset_hashes'],
-                  'metrics': {label: {'public_correct': sum(m['correct'][:10]), 'hidden_correct': sum(m['correct'][10:]),
-                              'cases': 20, 'executions': 60, 'failures': m['failures'],
-                              'failure_rate': m['failures'] / 60, 'median_wall_seconds': m['latency'],
+                  'metrics': {label: {'public_correct': sum(m['correct'][:count]), 'hidden_correct': sum(m['correct'][count:]),
+                              'cases': total, 'executions': executions, 'failures': m['failures'],
+                              'failure_rate': m['failures'] / executions, 'median_wall_seconds': m['latency'],
                               'api_calls': 0, 'tokens': 0, 'api_cost_usd': 0, 'inference': 'not_applicable'}
                               for label, m in metrics.items()},
                   'decisions': decisions, 'control_verified': control_verified,
@@ -334,7 +358,7 @@ def evaluate(work, baseline_sha, candidate_sha):
         save(work, 'report.json', report)
         lines = ['# 独立評価結果', '', f"全体判定: {status} / 状態: {report['state']}",
                  f'基準SHA: {baseline_sha}', f'候補SHA: {candidate_sha}', '',
-                 '| 版 | 公開正答/10 | hidden正答/10 | 失敗/60 | median秒 | 判定 |',
+                 f'| 版 | 公開正答/{count} | hidden正答/{count} | 失敗/{executions} | median秒 | 判定 |',
                  '| --- | --- | --- | --- | --- | --- |']
         for label, row in report['metrics'].items():
             lines.append(f"| {label} | {row['public_correct']} | {row['hidden_correct']} | {row['failures']} | "
@@ -378,7 +402,7 @@ def verify_events(work):
     return rows
 
 
-def audit(work):
+def audit(work, *, emit=True):
     verify_manifest(work)
     rows = verify_events(work)
     require([r['state'] for r in rows] == ['ENVIRONMENT_PINNED', 'ISOLATION_VERIFIED',
@@ -393,6 +417,8 @@ def audit(work):
     lock = read(work, 'evaluation-lock.json')
     require(lock['baseline_sha'] == report['baseline_sha'] and lock['candidate_sha'] == report['candidate_sha'] and
             lock['manifest_hash'] == report['manifest_hash'], 'AUDIT_LOCK')
+    require(rows[-2]['payload_hash'] == digest(regular(work / 'evaluation-lock.json', RUNS)),
+            'AUDIT_LOCK_ANCHOR')
     require(digest(regular(work / 'metrics.private.json', RUNS, 2097152)) == report['private_metrics_hash'],
             'AUDIT_METRICS')
     require(report['manifest_hash'] == digest(regular(work / 'manifest.json', RUNS)), 'AUDIT_MANIFEST')
@@ -400,25 +426,31 @@ def audit(work):
         require(digest(regular(work / (label + '.py'), RUNS)) == expected, 'AUDIT_ARTIFACT')
     require(digest(git_bytes(report['baseline_sha'])) == report['artifact_hashes']['baseline'] and
             digest(git_bytes(report['candidate_sha'])) == report['artifact_hashes']['candidate'], 'AUDIT_SHA')
-    print(json.dumps({'run_id': work.name, 'audit': 'VERIFIED', **checkpoint}))
+    if emit:
+        print(json.dumps({'run_id': work.name, 'audit': 'VERIFIED', **checkpoint}))
+    return checkpoint
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('operation', choices=('bootstrap', 'gate', 'freeze', 'evaluate', 'audit'))
     parser.add_argument('run_id', nargs='?')
+    parser.add_argument('--local-image')
+    parser.add_argument('--multiline-shell', action='store_true')
     parser.add_argument('--baseline-sha')
     parser.add_argument('--candidate-sha')
     args = parser.parse_args()
     try:
         if args.operation == 'bootstrap':
-            bootstrap()
+            bootstrap(args.local_image)
         else:
             work = run_path(args.run_id or '')
             if args.operation == 'evaluate':
                 evaluate(work, args.baseline_sha, args.candidate_sha)
+            elif args.operation == 'freeze':
+                freeze(work, multiline=args.multiline_shell)
             else:
-                {'gate': gate, 'freeze': freeze, 'audit': audit}[args.operation](work)
+                {'gate': gate, 'audit': audit}[args.operation](work)
     except (EvaluationError, OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
         code = str(error) if isinstance(error, EvaluationError) else 'CONTROLLER_ERROR'
         print(json.dumps({'status': 'STOPPED', 'reason': code}))

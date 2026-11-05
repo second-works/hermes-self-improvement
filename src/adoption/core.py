@@ -171,7 +171,7 @@ class Controller:
             # The human can inspect this concrete snapshot before approving.
             # Registration is not adoption and never changes destination bytes.
             with self.open_directory(root):
-                original = regular(root / ARTIFACT, self.area, LIMIT)
+                original = regular(root / self.packet()['artifact_path'], self.area, LIMIT)
             require(digest(original) == self.packet()['before_hash'], 'BASELINE_CHANGED')
             write_new(self.area / 'snapshots' / (target + '.baseline.py'), original)
             syncdir(self.area / 'snapshots')

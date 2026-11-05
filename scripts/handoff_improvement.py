@@ -12,6 +12,7 @@ from pathlib import Path
 import sys
 import uuid
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import evaluate_fixture as evaluator
 from adoption.core import Controller, save, read, utc
 from evaluation.core import (EvaluationError, canonical, digest, findings, load_json,
@@ -141,7 +142,7 @@ class HandoffAdoption(Controller):
     def memory_record(self, target):
         packet = self.packet()
         events = self.events(target)
-        adopted = next((event for event in reversed(events) if event['state'] == 'ADOPTED'), None)
+        adopted = next((event for event in reversed(events) if event['state'] == 'ADOPTING'), None)
         restored = next((event for event in reversed(events) if event['state'] == 'ROLLED_BACK'), None)
         def artifact(label, field):
             return {'commit_sha': packet[label + '_sha'], 'artifact_sha256': packet[field]}

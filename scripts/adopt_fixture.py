@@ -37,6 +37,7 @@ def main():
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
     if args.evaluation_run:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
         from handoff_improvement import HandoffAdoption, evaluator
         c = HandoffAdoption(Path(args.area), evaluator.run_path(args.evaluation_run))
         regression = c.regression

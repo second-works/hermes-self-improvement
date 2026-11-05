@@ -95,8 +95,9 @@ def policy():
             'claim': 'finite deterministic fixture only'}
 
 
-def judge(baseline, candidate, *, safety, same_artifact=False, contaminated=False):
+def judge(baseline, candidate, *, safety, same_artifact=False, contaminated=False, public_count=10, hidden_count=10):
     """Known failures dominate missing evidence; neither can be promoted to PASS."""
+    total = public_count + hidden_count
     failed = []
     held = []
     if safety is False:
@@ -109,9 +110,9 @@ def judge(baseline, candidate, *, safety, same_artifact=False, contaminated=Fals
         held.append('METRICS_MISSING')
     else:
         b, c = baseline, candidate
-        valid = all(type(x['correct']) is list and len(x['correct']) == 20 and
+        valid = all(type(x['correct']) is list and len(x['correct']) == total and
                     all(type(v) is bool for v in x['correct']) and
-                    type(x['failures']) is int and 0 <= x['failures'] <= 60 and
+                    type(x['failures']) is int and 0 <= x['failures'] <= 3 * total and
                     type(x['latency']) in (int, float) and math.isfinite(x['latency']) and x['latency'] > 0 and
                     type(x['cost_usd']) in (int, float) and math.isfinite(x['cost_usd']) and x['cost_usd'] >= 0
                     for x in (b, c))
@@ -126,7 +127,7 @@ def judge(baseline, candidate, *, safety, same_artifact=False, contaminated=Fals
                 failed.append('LATENCY_LIMIT')
             if c['cost_usd'] > b['cost_usd'] * 1.2 or c['cost_usd'] != 0:
                 failed.append('COST_LIMIT')
-            if sum(c['correct'][10:]) < sum(b['correct'][10:]) + 1:
+            if sum(c['correct'][public_count:]) < sum(b['correct'][public_count:]) + 1:
                 held.append('INSUFFICIENT_GAIN')
     if same_artifact:
         held.append('UNCHANGED_ARTIFACT')

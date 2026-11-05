@@ -12,6 +12,7 @@ from adoption.regression import DockerRegression
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--area', required=True, help='new controller directory under repo/runs')
+    parser.add_argument('--evaluation-run', help='verified #65 evaluation run')
     commands = parser.add_subparsers(dest='command', required=True)
     commands.add_parser('prepare')
     commands.add_parser('submission', help='print PUBLIC packet; no GitHub write')
@@ -35,7 +36,13 @@ def main():
     observe.add_argument('--target', required=True)
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
-    c = Controller(repo, Path(args.area))
+    if args.evaluation_run:
+        from handoff_improvement import HandoffAdoption, evaluator
+        c = HandoffAdoption(Path(args.area), evaluator.run_path(args.evaluation_run))
+        regression = c.regression
+    else:
+        c = Controller(repo, Path(args.area))
+        regression = DockerRegression(c)
     if args.command == 'prepare':
         result = c.initialize()
     elif args.command == 'submission':
@@ -52,9 +59,9 @@ def main():
             raise EvaluationError('REQUEST_BOUNDARY')
         result = {'approval_hash':c.approve(load_json(regular(file, c.area)), confirmation=args.confirm_request_hash)}
     elif args.command == 'execute':
-        result = c.execute(args.approval_hash, DockerRegression(c))
+        result = c.execute(args.approval_hash, regression)
     elif args.command == 'observe':
-        result = {'state':c.observe(args.target, DockerRegression(c))}
+        result = {'state':c.observe(args.target, regression)}
     else:
         with c.guard():
             state = c.state(args.target)

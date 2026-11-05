@@ -1,6 +1,7 @@
 """Exercise the mock controller with a packet emitted by the #63 producer."""
 import json
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -34,6 +35,12 @@ class MockImprovementTest(unittest.TestCase):
                      'evidence_refs': [self.packet['evidence']['audit'][0]['pointer']]}
         self.edit = {'path': self.packet['change_allowlist'][0],
                      'before': 'skip_check()', 'after': 'perform_check()'}
+
+    def test_cli_imports_in_isolated_python(self):
+        for script in ('run_mock_improvement.py', 'handoff_improvement.py'):
+            with self.subTest(script=script):
+                subprocess.run([sys.executable, '-I', '-B', str(ROOT / 'scripts' / script), '--help'],
+                               check=True, capture_output=True)
 
     def test_proposal_and_durable_duplicate(self):
         response = canonical({**self.base, 'decision': 'PROPOSE', 'edit': self.edit})

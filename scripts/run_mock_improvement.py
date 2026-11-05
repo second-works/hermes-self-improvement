@@ -25,6 +25,8 @@ from adoption.core import save, syncdir
 from audit.core import CODES
 from evaluation.core import EvaluationError, canonical, digest, load_json, regular, require
 from github_work_guide.core import REPO
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 from build_improvement_packet import CHANGE_ALLOWLIST, MAX_PACKET_BYTES, SKILL
 
 DEADLINE_SECONDS = 5

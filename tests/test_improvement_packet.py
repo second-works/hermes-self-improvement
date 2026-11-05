@@ -43,6 +43,19 @@ class ImprovementPacketTest(unittest.TestCase):
         self.assertEqual(repeated['event_id'], packet['event_id'])
         self.assertEqual(build_packet(run, self.evidence, [packet['event_id']])['reason'], 'ALREADY_SEEN')
 
+    def test_distinct_observations_of_same_failed_check(self):
+        run = self.save('distinct', self.failed)
+        audit_input = self.evidence['audit_input']
+        first = next(row for row in audit_input['observations'] if row['id'] == 'procedure')
+        audit_input['observations'].append({**first, 'id': 'other-procedure',
+                                            'logs': [{'line': 2, 'code': 'STEP_SKIPPED'}]})
+        packet = build_packet(run, self.evidence)
+        other = {**self.evidence, 'observation_id': 'other-procedure'}
+        second = build_packet(run, other, [packet['event_id']])
+        self.assertEqual(second['status'], 'READY')
+        self.assertNotEqual(second['event_id'], packet['event_id'])
+        self.assertEqual(second['evidence']['audit'][0]['line'], 2)
+
     def test_healthy_and_superseded_failure(self):
         self.assertEqual(build_packet(self.save('healthy', self.healthy), self.evidence)['reason'],
                          'NO_CURRENT_CI_FAILURE')

@@ -54,7 +54,8 @@ def build_packet(run, evidence, seen_events=()):
     if diagnosis['cause'] != 'procedure' or observation['selected_skill'] != SKILL:
         return {'status': 'SKIP', 'reason': 'OUTSIDE_FIXTURE_SKILL_SCOPE'}
     # Exclude capture time and unrelated changes so repeated collection deduplicates.
-    event_id = digest([REPO, target['number'], head, check['id']])
+    event_id = digest([REPO, target['number'], head, check['id'],
+                       report['fixture_id'], observation['id']])
     if event_id in seen_events:
         return {'status': 'SKIP', 'reason': 'ALREADY_SEEN'}
     packet = {

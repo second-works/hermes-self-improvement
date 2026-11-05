@@ -2,7 +2,11 @@
 
 Hermes Agentの改善案をIssueとPRで検討する開発リポジトリです。合成課題で監査、評価、登録済み操作による候補修正を検証します。Hermes Agent本体 `~/.hermes` は操作しません。
 
-1 Issue = 1 PRで進め、ローカル検証 → self-review → PR → CI / Security / CodeQL → Codexレビュー → 必要修正と同じheadの再検証 → 人間のMerge判断を維持します。
+[新しい開発方針（#61）](https://github.com/second-works/hermes-self-improvement/issues/61)では、定型監視をPython／launchdに任せ、障害分析・Skills修正案・改善判断にOpenAIのクラウド推論を使う構成を目指します。GemmaやローカルLLMサーバーは新経路の依存から外します。既存のGemma調査・実験資料は当時の記録です。
+
+最初の検証は公開の合成データと模擬応答で行います。[接続判定](docs/openai-connection-decision.md)にPlus OAuthの候補版、実通信前の承認条件、停止条件を記載しています。
+
+1 Issue = 1 PRで進め、ローカル検証 → self-review → PR → CI / Security / CodeQL → mainの `.github/pr-gate-review` が指定する正式レビュー → 必要修正と同じheadの再検証 → 人間のMerge判断を維持します。
 
 ```sh
 ./scripts/verify.sh

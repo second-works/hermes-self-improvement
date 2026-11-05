@@ -4,6 +4,18 @@
 Memory、公式Self-Evolution、Cronは実証と承認を経て接続する。本番採用と定期運転は最後に判断する。
 [Issue #2](https://github.com/second-works/hermes-self-improvement/issues/2) の成果物は [architecture](architecture.md) と [security-model](security-model.md) を含む文書3点。Risk Tier: HIGH（安全境界の設計）。後続Issueの本文は今回変更せず、重要未決を解消するまで実装しない。
 
+## #61 の着手順
+
+1. #62で新方針と[接続判定](openai-connection-decision.md)を文書化する。
+2. #62のMerge後、#63で#59の完了済み観測から改善入力を作る。既存の週次点検を再利用する。
+3. #63のMerge後、#64で模擬応答、候補上限、重複防止、停止を検証する。
+4. #64のMerge後、#65で既存の独立評価・隔離Memoryの監査記録・承認・復旧をつなぐ。
+
+この4件は追加0円・実推論0回。実Hermesの手動1件は #46 の後続で扱う。#47 の未確認事項、#31 の全体検収または順序変更の明示判断、接続条件の承認を先に確認する。自律運転の有効化と本番採用は手動試行の後に別途判断する。
+#36 とGemma関連の資料は過去の調査記録として参照できる。新経路でGemmaの実測やサービス操作は行わない。
+
+以下は #2 の段階計画と既存資産の依存関係。
+
 ## 既存Issueとの依存
 
 Issue番号は実行順を意味しない。依存を満たしてから、1子Issue=1 PRで進める。

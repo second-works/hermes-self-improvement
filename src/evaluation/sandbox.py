@@ -188,9 +188,11 @@ class Sandbox:
         require(c['WorkingDir'] == '/run/work' and c['Entrypoint'] is None and
                 c['Cmd'] == args[args.index(self.image) + 1:], 'COMMAND_MISMATCH')
 
-    def run(self, program, data=b'', *, timeout=30):
+    def run(self, program, data=b'', *, timeout=30, name=None):
         program = Path(program).absolute()
-        name = 'hermes-eval-' + uuid.uuid4().hex
+        if name is None:
+            name = 'hermes-eval-' + uuid.uuid4().hex
+        require(re.fullmatch(r'hermes-eval-[0-9a-f]{32}', name) is not None, 'CONTAINER_IDENTITY_UNKNOWN')
         started = time.monotonic()
         case_deadline = min(started + timeout, self.deadline)
         def remaining():

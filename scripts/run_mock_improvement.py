@@ -18,6 +18,7 @@ from pathlib import Path
 import re
 import sys
 import time
+import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
@@ -25,11 +26,15 @@ from adoption.core import save, syncdir
 from audit.core import CODES
 from evaluation.core import EvaluationError, canonical, digest, load_json, regular, require
 from github_work_guide.core import REPO
+from evaluation.sandbox import Sandbox
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from build_improvement_packet import CHANGE_ALLOWLIST, MAX_PACKET_BYTES, SKILL
 
 DEADLINE_SECONDS = 5
+ISOLATED_DEADLINE_SECONDS = 30
+MOCK_IMAGE = 'python@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258'
+MOCK_PROGRAM = ROOT / 'fixtures/shadow-improvement/worker.py'
 MAX_RESPONSE_BYTES = 32_768
 STOP_REASONS = ('AUTH_FAILED', 'QUOTA_EXHAUSTED', 'TIMEOUT')
 
@@ -100,7 +105,23 @@ def response_result(response, refs):
     return {key: value for key, value in response.items() if key != 'schema_version'}
 
 
-def run(packet, read_mock, state_dir, clock=time.monotonic):
+def isolated_response(data, event_dir, deadline, name, *, stall=False):
+    sandbox = Sandbox(ROOT, event_dir, deadline=deadline)
+    remaining = deadline - time.monotonic()
+    require(remaining > 0, 'TIMEOUT')
+    image = load_json(sandbox.checked('image', 'inspect', MOCK_IMAGE, timeout=remaining))[0]
+    sandbox.image = image['Id']
+    require(image['Os'] == 'linux' and image['Architecture'] == 'arm64', 'IMAGE_BOUNDARY')
+    remaining = deadline - time.monotonic()
+    require(remaining > 0, 'TIMEOUT')
+    result = sandbox.run(MOCK_PROGRAM, (b'1' if stall else b'0') + data, timeout=remaining, name=name)
+    require(result['error'] != 'TIMEOUT' and time.monotonic() < deadline, 'TIMEOUT')
+    require(not result['error'] and result['exit'] == 0 and result['container_exit'] == 0
+            and not result['oom'], 'MOCK_WORKER_FAILED')
+    return result['stdout']
+
+
+def run(packet, read_mock, state_dir, clock=time.monotonic, *, isolated=False, stall=False):
     require(len(canonical(packet)) <= MAX_PACKET_BYTES, 'PACKET_SIZE')
     refs = packet_refs(packet)
     require(not any(path.is_symlink() for path in (state_dir, *state_dir.parents)), 'STATE_PATH')
@@ -114,6 +135,8 @@ def run(packet, read_mock, state_dir, clock=time.monotonic):
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             raise EvaluationError('CONCURRENT_RUN') from None
+        pending = state_dir / 'isolation-pending.json'
+        require(not os.path.lexists(pending), 'ISOLATION_PENDING')
         event_dir = state_dir / packet['event_id']
         try:
             event_dir.mkdir(mode=0o700)
@@ -122,11 +145,24 @@ def run(packet, read_mock, state_dir, clock=time.monotonic):
         syncdir(state_dir)
         receipt = {'event_id': packet['event_id'], 'packet_hash': digest(canonical(packet))}
         save(event_dir / 'started.json', {**receipt, 'status': 'STARTED', 'mock_attempts': 1})
-        deadline = clock() + DEADLINE_SECONDS
+        deadline = clock() + (ISOLATED_DEADLINE_SECONDS if isolated else DEADLINE_SECONDS)
         try:
             data = read_mock()
             require(clock() < deadline, 'TIMEOUT')
             require(len(data) <= MAX_RESPONSE_BYTES, 'RESPONSE_SIZE')
+            if isolated:
+                name = 'hermes-eval-' + uuid.uuid4().hex
+                save(pending, {**receipt, 'container': name})
+                try:
+                    data = isolated_response(data, event_dir, deadline, name, stall=stall)
+                except EvaluationError as error:
+                    if getattr(error, 'pending_container', None) is None:
+                        pending.unlink()
+                        syncdir(state_dir)
+                    raise
+                pending.unlink()
+                syncdir(state_dir)
+                require(len(data) <= MAX_RESPONSE_BYTES, 'RESPONSE_SIZE')
             result = {
                 'schema_version': 1, **receipt, 'classification': 'PUBLIC',
                 'target_skill': SKILL, 'baseline_sha': packet['baseline_sha'],
@@ -149,11 +185,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--packet', type=Path, required=True)
     parser.add_argument('--response', type=Path, required=True)
+    parser.add_argument('--isolated', action='store_true', help='run a fixed offline worker in Docker')
+    parser.add_argument('--simulate-stall', action='store_true', help='emit partial output then stall')
     args = parser.parse_args()
+    if args.simulate_stall and not args.isolated:
+        parser.error('--simulate-stall requires --isolated')
     try:
         packet = load_json(regular(args.packet, args.packet.absolute().parent, MAX_PACKET_BYTES))
         encoded = run(packet, lambda: regular(args.response, args.response.absolute().parent,
-                                              MAX_RESPONSE_BYTES), ROOT / 'runs' / 'mock-improvement')
+                                              MAX_RESPONSE_BYTES), ROOT / 'runs' / 'mock-improvement',
+                      isolated=args.isolated, stall=args.simulate_stall)
     except (EvaluationError, OSError, RecursionError) as error:
         reason = str(error) if isinstance(error, EvaluationError) else 'INPUT_OR_STATE_ERROR'
         print(canonical({'status': 'STOPPED', 'reason': reason}).decode(), file=sys.stderr)

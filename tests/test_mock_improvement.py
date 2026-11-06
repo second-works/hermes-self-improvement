@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from threading import Event, Thread
 import unittest
 from unittest.mock import patch
 
@@ -12,7 +13,7 @@ from test_github_work_guide import ROOT, change, save_run
 sys.path.insert(0, str(ROOT / 'scripts'))
 from build_improvement_packet import build_packet
 from handoff_improvement import HandoffAdoption, digest, evaluator
-from run_mock_improvement import EvaluationError, canonical, run
+from run_mock_improvement import EvaluationError, canonical, control_intake, run
 
 
 class MockImprovementTest(unittest.TestCase):
@@ -80,6 +81,65 @@ class MockImprovementTest(unittest.TestCase):
         self.assertNotIn(self.edit['after'], (self.receipt / 'finished.json').read_text())
         with self.assertRaisesRegex(EvaluationError, 'EVENT_ALREADY_CLAIMED'):
             run(self.packet, lambda: self.fail('mock must not be read again'), self.state)
+
+    def test_stop_persists_until_explicit_resume_without_replaying(self):
+        response = canonical({**self.base, 'decision': 'HOLD'})
+        run(self.packet, lambda: response, self.state)
+        self.assertEqual(control_intake(self.state, 'stop'), 'INTAKE_STOPPED')
+        fresh = {**self.packet, 'event_id': 'a' * 64}
+        with self.assertRaisesRegex(EvaluationError, 'INTAKE_STOPPED'):
+            run(fresh, lambda: self.fail('worker read while stopped'), self.state)
+        self.assertFalse((self.state / fresh['event_id']).exists())
+        self.assertEqual(control_intake(self.state, 'resume'), 'ACCEPTING')
+        run(fresh, lambda: response, self.state)
+        with self.assertRaisesRegex(EvaluationError, 'EVENT_ALREADY_CLAIMED'):
+            run(self.packet, lambda: self.fail('old event replayed'), self.state)
+
+    def test_corrupt_stop_and_unconfirmed_cleanup_keep_intake_closed(self):
+        control_intake(self.state, 'stop')
+        marker = self.state / 'intake-stop.json'
+        marker.write_text('{}')
+        with self.assertRaisesRegex(EvaluationError, 'STOP_RECORD_INVALID'):
+            control_intake(self.state, 'resume')
+        marker.write_bytes(canonical({'status': 'STOP_REQUESTED'}))
+        (self.state / 'isolation-pending.json').write_text('{}')
+        for action in ('stop', 'resume'):
+            with self.assertRaisesRegex(EvaluationError, 'ISOLATION_PENDING'):
+                control_intake(self.state, action)
+        with self.assertRaisesRegex(EvaluationError, 'INTAKE_STOPPED'):
+            run(self.packet, lambda: self.fail('worker read while stopped'), self.state)
+
+    def test_stop_between_claim_and_isolated_start(self):
+        response = canonical({**self.base, 'decision': 'HOLD'})
+        claimed, release = Event(), Event()
+        errors = []
+
+        def read_response():
+            claimed.set()
+            if not release.wait(5):
+                raise AssertionError('test did not release the reader')
+            return response
+
+        def worker():
+            try:
+                run(self.packet, read_response, self.state, isolated=True)
+            except EvaluationError as error:
+                errors.append(str(error))
+
+        thread = Thread(target=worker)
+        with patch('run_mock_improvement.interrupt_worker',
+                   side_effect=lambda *_: release.set()), patch('run_mock_improvement.isolated_response') as isolated:
+            thread.start()
+            try:
+                self.assertTrue(claimed.wait(5))
+                self.assertEqual(control_intake(self.state, 'stop'), 'INTAKE_STOPPED')
+            finally:
+                release.set()
+                thread.join(5)
+            isolated.assert_not_called()
+        self.assertEqual(errors, ['INTAKE_STOPPED'])
+        receipt = json.loads((self.receipt / 'finished.json').read_text())
+        self.assertEqual(receipt['status'], 'STOPPED')
 
     def test_non_proposal_decisions(self):
         for decision in ('REUSE', 'NO_CHANGE', 'HOLD'):

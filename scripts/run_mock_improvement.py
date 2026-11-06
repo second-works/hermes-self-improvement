@@ -12,6 +12,7 @@ The candidate is a single replacement for downstream evaluation, emitted
 on stdout. No candidate is applied or run.
 """
 import argparse
+from contextlib import contextmanager
 import fcntl
 import os
 from pathlib import Path
@@ -121,20 +122,106 @@ def isolated_response(data, event_dir, deadline, name, *, stall=False):
     return result['stdout']
 
 
-def run(packet, read_mock, state_dir, clock=time.monotonic, *, isolated=False, stall=False):
-    require(len(canonical(packet)) <= MAX_PACKET_BYTES, 'PACKET_SIZE')
-    refs = packet_refs(packet)
+STOP_RECORD = {'status': 'STOP_REQUESTED'}
+
+
+def prepare_state(state_dir):
     require(not any(path.is_symlink() for path in (state_dir, *state_dir.parents)), 'STATE_PATH')
     state_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     syncdir(state_dir.parent)
     syncdir(state_dir.parent.parent)
-    lock = os.open(state_dir / 'controller.lock',
-                   os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
+
+
+@contextmanager
+def state_lock(state_dir, filename):
+    fd = os.open(state_dir / filename,
+                 os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
     try:
         try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             raise EvaluationError('CONCURRENT_RUN') from None
+        yield
+    finally:
+        os.close(fd)
+
+
+def reject_stopped(marker):
+    require(not os.path.lexists(marker), 'INTAKE_STOPPED')
+
+
+def interrupt_worker(state_dir, pending):
+    if not os.path.lexists(pending):
+        return
+    try:
+        record = load_json(regular(pending, state_dir, 1024))
+    except FileNotFoundError:
+        # The worker may have removed the receipt while completing normally.
+        return
+    fields(record, 'event_id packet_hash container', 'PENDING_SCHEMA')
+    name = record['container']
+    require(hex_id(record['event_id'], 64) and hex_id(record['packet_hash'], 64)
+            and isinstance(name, str) and re.fullmatch(r'hermes-eval-[0-9a-f]{32}', name),
+            'PENDING_SCHEMA')
+    event_dir = state_dir / record['event_id']
+    started = load_json(regular(event_dir / 'started.json', state_dir, 1024))
+    require(started == {'event_id': record['event_id'], 'packet_hash': record['packet_hash'],
+                        'status': 'STARTED', 'mock_attempts': 1}, 'PENDING_BINDING')
+    box = Sandbox(ROOT, event_dir)
+    if not box.container_exists(name):
+        return
+    try:
+        info = box.inspect(name, timeout=5)
+        if not info['State']['Running']:
+            return
+        image = load_json(box.checked('image', 'inspect', MOCK_IMAGE, timeout=5))[0]
+        box.image = image['Id']
+        box.verify_config(info, MOCK_PROGRAM)
+        # Use the inspected container ID, so a name being reused cannot redirect the kill.
+        require(hex_id(info['Id'], 64), 'CONTAINER_IDENTITY_UNKNOWN')
+        box.checked('kill', info['Id'], timeout=5)
+    except EvaluationError:
+        if box.container_exists(name):
+            raise
+
+
+def control_intake(state_dir, action):
+    prepare_state(state_dir)
+    marker = state_dir / 'intake-stop.json'
+    pending = state_dir / 'isolation-pending.json'
+    with state_lock(state_dir, 'intake.lock'):
+        if action == 'resume':
+            with state_lock(state_dir, 'controller.lock'):
+                require(not os.path.lexists(pending), 'ISOLATION_PENDING')
+                require(load_json(regular(marker, state_dir, 1024)) == STOP_RECORD, 'STOP_RECORD_INVALID')
+                marker.unlink()
+                syncdir(state_dir)
+            return 'ACCEPTING'
+        if not os.path.lexists(marker):
+            save(marker, STOP_RECORD)
+        require(load_json(regular(marker, state_dir, 1024)) == STOP_RECORD, 'STOP_RECORD_INVALID')
+        deadline = time.monotonic() + 10
+        while True:
+            try:
+                with state_lock(state_dir, 'controller.lock'):
+                    require(not os.path.lexists(pending), 'ISOLATION_PENDING')
+                    return 'INTAKE_STOPPED'
+            except EvaluationError as error:
+                if str(error) != 'CONCURRENT_RUN':
+                    raise
+            require(time.monotonic() < deadline, 'STOP_UNCONFIRMED')
+            interrupt_worker(state_dir, pending)
+            time.sleep(0.1)
+
+
+def run(packet, read_mock, state_dir, clock=time.monotonic, *, isolated=False, stall=False):
+    require(len(canonical(packet)) <= MAX_PACKET_BYTES, 'PACKET_SIZE')
+    refs = packet_refs(packet)
+    prepare_state(state_dir)
+    marker = state_dir / 'intake-stop.json'
+    reject_stopped(marker)
+    with state_lock(state_dir, 'controller.lock'):
+        reject_stopped(marker)
         pending = state_dir / 'isolation-pending.json'
         require(not os.path.lexists(pending), 'ISOLATION_PENDING')
         event_dir = state_dir / packet['event_id']
@@ -148,6 +235,7 @@ def run(packet, read_mock, state_dir, clock=time.monotonic, *, isolated=False, s
         deadline = clock() + (ISOLATED_DEADLINE_SECONDS if isolated else DEADLINE_SECONDS)
         try:
             data = read_mock()
+            reject_stopped(marker)
             require(clock() < deadline, 'TIMEOUT')
             require(len(data) <= MAX_RESPONSE_BYTES, 'RESPONSE_SIZE')
             if isolated:
@@ -168,6 +256,7 @@ def run(packet, read_mock, state_dir, clock=time.monotonic, *, isolated=False, s
                 'target_skill': SKILL, 'baseline_sha': packet['baseline_sha'],
                 **response_result(load_json(data), refs),
             }
+            reject_stopped(marker)
             encoded = canonical(result)
             require(clock() < deadline, 'TIMEOUT')
         except (EvaluationError, OSError) as error:
@@ -177,23 +266,32 @@ def run(packet, read_mock, state_dir, clock=time.monotonic, *, isolated=False, s
         save(event_dir / 'finished.json', {**receipt, 'status': 'COMPLETED',
                                           'decision': result['decision'], 'result_hash': digest(encoded)})
         return encoded
-    finally:
-        os.close(lock)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('--packet', type=Path, required=True)
-    parser.add_argument('--response', type=Path, required=True)
+    operation = parser.add_mutually_exclusive_group()
+    operation.add_argument('--stop', action='store_const', dest='control', const='stop')
+    operation.add_argument('--resume', action='store_const', dest='control', const='resume')
+    parser.add_argument('--packet', type=Path)
+    parser.add_argument('--response', type=Path)
     parser.add_argument('--isolated', action='store_true', help='run a fixed offline worker in Docker')
     parser.add_argument('--simulate-stall', action='store_true', help='emit partial output then stall')
     args = parser.parse_args()
+    if args.control and (args.packet or args.response or args.isolated or args.simulate_stall):
+        parser.error('--stop and --resume cannot be combined with worker arguments')
+    if not args.control and not (args.packet and args.response):
+        parser.error('--packet and --response are required for a worker')
     if args.simulate_stall and not args.isolated:
         parser.error('--simulate-stall requires --isolated')
+    state_dir = ROOT / 'runs' / 'mock-improvement'
     try:
+        if args.control:
+            print(canonical({'status': control_intake(state_dir, args.control)}).decode())
+            return 0
         packet = load_json(regular(args.packet, args.packet.absolute().parent, MAX_PACKET_BYTES))
         encoded = run(packet, lambda: regular(args.response, args.response.absolute().parent,
-                                              MAX_RESPONSE_BYTES), ROOT / 'runs' / 'mock-improvement',
+                                              MAX_RESPONSE_BYTES), state_dir,
                       isolated=args.isolated, stall=args.simulate_stall)
     except (EvaluationError, OSError, RecursionError) as error:
         reason = str(error) if isinstance(error, EvaluationError) else 'INPUT_OR_STATE_ERROR'

@@ -101,6 +101,28 @@ class MockImprovementTest(unittest.TestCase):
                 with self.assertRaisesRegex(EvaluationError, 'EVENT_ALREADY_CLAIMED'):
                     run(self.packet, lambda: self.fail('retry'), state)
 
+    def test_isolated_timeout_discards_response_and_prevents_retry(self):
+        with patch('run_mock_improvement.isolated_response', side_effect=EvaluationError('TIMEOUT')) as worker:
+            with self.assertRaisesRegex(EvaluationError, 'TIMEOUT'):
+                run(self.packet, lambda: b'partial', self.state, isolated=True)
+            with self.assertRaisesRegex(EvaluationError, 'EVENT_ALREADY_CLAIMED'):
+                run(self.packet, lambda: self.fail('retry'), self.state, isolated=True)
+        self.assertEqual(worker.call_count, 1)
+        self.assertFalse((self.state / 'isolation-pending.json').exists())
+        self.assertEqual(json.loads((self.receipt / 'finished.json').read_text())['reason'], 'TIMEOUT')
+
+    def test_unconfirmed_isolation_blocks_other_events(self):
+        error = EvaluationError('ISOLATION_CLEANUP_FAILED')
+        error.pending_container = 'hermes-eval-fixture'
+        with patch('run_mock_improvement.isolated_response', side_effect=error):
+            with self.assertRaisesRegex(EvaluationError, 'ISOLATION_CLEANUP_FAILED'):
+                run(self.packet, lambda: b'partial', self.state, isolated=True)
+        pending = json.loads((self.state / 'isolation-pending.json').read_text())
+        self.assertRegex(pending['container'], r'^hermes-eval-[0-9a-f]{32}$')
+        other = {**self.packet, 'event_id': 'a' * 64}
+        with self.assertRaisesRegex(EvaluationError, 'ISOLATION_PENDING'):
+            run(other, lambda: self.fail('must not start'), self.state, isolated=True)
+
     def test_rejects_bad_schema_and_path(self):
         response = {**self.base, 'decision': 'PROPOSE', 'edit': self.edit}
         cases = [

@@ -41,3 +41,18 @@
 - [macOSコード署名](https://developer.apple.com/documentation/xcode/creating-distribution-signed-code-for-the-mac/)
 
 固定版の実装根拠は [Hermes auth.py](https://github.com/NousResearch/hermes-agent/blob/b200f5bc60e31588ba2cb60e288029c4a54ba5fa/hermes_cli/auth.py) の _save_auth_store と [auth_codex.py](https://github.com/NousResearch/hermes-agent/blob/b200f5bc60e31588ba2cb60e288029c4a54ba5fa/hermes_cli/auth_codex.py) の保存・読込経路。
+
+## 実機確認の結果（2026-11-07 JST）
+
+保存済み試験用OAuthを読み込む一時LaunchAgentで、固定版Hermesから公開合成文をGPT-6 Lunaへ1回送信した。
+HTTP 200、期待した固定応答、推論1回、再送0回、ツール0を照合した。
+一時LaunchAgentと実行コンテナの消失も確認した。
+認証更新はこの試験の送信ガードで遮断する。
+
+先行試行では、ローカル期限が有効でもサーバー側のトークン無効化で401となった。
+承認された更新1回も401となり、本人の再認証を経て試験専用プロファイルへ保存した後、上記の試行が成功した。
+認証失効をローカル期限だけで判断せず、拒否時は停止して人間に確認する。
+
+この実機試行は一時の検証ハーネスで行った。
+リポジトリの通常入口は現在、通信遮断の模擬ワーカーである。
+選定から実際のHermes起動へ接続する入口と、画面ロック中の実行確認は残る。

@@ -33,6 +33,7 @@ gate.SOURCES += ['src/evaluation/profiles.py', 'scripts/evaluate_skill_candidate
                  'src/evaluation/semantic.py', 'scripts/evaluate_skill_semantics.py',
                  'src/delegation/hermes_cloud.py', 'fixtures/cloud-improvement/worker.py',
                  'schemas/improvement-log.schema.json',
+                 'scripts/periodic_improvement.py', 'scripts/periodic_check.py',
                  'fixtures/generated_skills/event-counts-task/contract.json']
 STATE = ROOT / 'runs/profile-evaluation'
 

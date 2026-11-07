@@ -30,6 +30,7 @@ REFS = {'/reproduction_sha256'}
 
 def reject_profile_pending():
     require(not os.path.lexists(ROOT / 'runs/profile-evaluation/pending.json'), 'PROFILE_RECOVERY_REQUIRED')
+    require(not os.path.lexists(ROOT / 'runs/semantic-evaluation/pending.json'), 'SEMANTIC_RECOVERY_REQUIRED')
 
 
 def request_prompt(entry, profile_context=None):

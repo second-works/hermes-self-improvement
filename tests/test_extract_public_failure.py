@@ -1,4 +1,5 @@
 """Check the data boundary with a saved snapshot and stubbed GitHub reads."""
+from copy import deepcopy
 import json
 from pathlib import Path
 import sys
@@ -9,7 +10,9 @@ from test_github_work_guide import ROOT, change, save_run, seal
 
 sys.path.insert(0, str(ROOT / 'scripts'))
 from extract_public_failure import Invalid, PREFIX, extract
-from intake_public_failure import intake
+from intake_public_failure import failure_event_id, intake
+from select_public_failure import select
+from github_work_guide.core import digest
 from bind_public_reproduction import BINDING, bind
 from run_mock_improvement import EvaluationError, packet_refs
 
@@ -105,6 +108,55 @@ class PublicFailureTest(unittest.TestCase):
         self.routes[PREFIX, None]['private'] = True
         with self.assertRaises(Invalid):
             bind(self.run, 25, path, self)
+
+    def test_select_at_most_one_and_skip_seen_or_stale(self):
+        items = deepcopy(self.snapshot['items'])
+        earlier = deepcopy(items['pr:25'])
+        earlier.update(number=24, url=earlier['url'].replace('/25', '/24'))
+        detail = earlier['raw']['detail']
+        detail.update(number=24, html_url=earlier['url'])
+        earlier['hash'] = digest(earlier['raw'])
+        items['pr:24'] = earlier
+        snapshot = seal(items, self.snapshot['coverage'])
+        run = self.run.with_name('two-failures')
+        save_run(run, {'snapshot.json': snapshot})
+        directory = self.run.parent / 'evidence'
+        directory.mkdir()
+        self.routes[PREFIX + '/pulls/24', None] = detail
+
+        events = {}
+        for number in (24, 25):
+            entry = intake(run, number, self)
+            events[number] = entry['event_id']
+            evidence = {'schema_version': 1, 'reproduction_sha256': 'a' * 64,
+                        'observed': 'FAIL', 'expected': 'PASS',
+                        **{field: entry[field] for field in BINDING}}
+            (directory / (events[number] + '.json')).write_text(json.dumps(evidence))
+
+        self.assertEqual(select(run, directory, [], self)['candidate']['pr_number'], 24)
+        result = select(run, directory, [events[24]], self)
+        self.assertEqual(result['candidate']['pr_number'], 25)
+        self.assertEqual(result['skipped'], {'ALREADY_CLAIMED': 1})
+        self.routes[PREFIX + '/pulls/24', None] = {**detail, 'head': {'sha': '0' * 40}}
+        result = select(run, directory, [], self)
+        self.assertEqual(result['candidate']['pr_number'], 25)
+        self.assertEqual(result['skipped'], {'NO_CURRENT_CI_FAILURE': 1})
+        self.assertEqual(select(run, directory, list(events.values()), self)['status'], 'SKIP')
+
+    def test_select_missing_reproduction_and_untrusted_evidence(self):
+        directory = self.run.parent / 'evidence'
+        directory.mkdir()
+        result = select(self.run, directory, [], self)
+        self.assertEqual(result['skipped'], {'REPRODUCTION_EVIDENCE_REQUIRED': 1})
+        event = failure_event_id(25, self.head, self.check['id'])
+        (directory / (event + '.json')).write_text('{}')
+        with self.assertRaises(Invalid):
+            select(self.run, directory, [], self)
+        self.routes[PREFIX, None]['private'] = True
+        with self.assertRaises(Invalid):
+            select(self.run, directory, [], self)
+        with self.assertRaises(Invalid):
+            select(self.run, directory, ['bad'], self)
 
     def test_rejects_private_unknown_and_wrong_repository(self):
         metadata = self.routes[PREFIX, None]

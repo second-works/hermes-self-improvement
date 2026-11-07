@@ -15,6 +15,7 @@ from evaluation.semantic import Budget,ROLES,TRIALS,observation,verdict
 import evaluate_skill_semantics as semantic
 import evaluate_skill_candidate as profiles
 import run_public_hermes as generation
+import run_mock_improvement as intake
 
 
 class BudgetTests(unittest.TestCase):
@@ -229,6 +230,44 @@ class SemanticCampaignTests(unittest.TestCase):
         self.assertEqual(result['state'],'STOPPED')
         box.verify_config.assert_called_once_with(box.inspect.return_value,self.root/semantic.hermes_cloud.WORKER_PATH)
         box.checked.assert_called_once_with('kill','f'*64,timeout=5)
+
+    def test_stop_checks_semantic_cleanup_after_controller_has_exited(self):
+        error=EvaluationError('ISOLATION_CLEANUP_FAILED');error.pending_container='hermes-eval-'+'f'*32
+        def broken(*_):raise error
+        with self.assertRaisesRegex(EvaluationError,'SEMANTIC_RECOVERY_REQUIRED'):self.run_campaign(broken)
+        pending=semantic.STATE/'pending.json'
+        original=pending.read_bytes()
+        state=self.root/'runs/public-hermes'
+        box=Mock()
+        box.container_exists.return_value=True
+        box.inspect.return_value={'State':{'Running':True},'Id':'f'*64}
+        with patch.object(intake,'ROOT',self.root),patch.object(semantic.hermes_cloud,'CloudSandbox',return_value=box):
+            with self.assertRaisesRegex(EvaluationError,'SEMANTIC_RECOVERY_REQUIRED'):
+                intake.control_intake(state,'stop')
+        box.verify_config.assert_called_once_with(box.inspect.return_value,self.root/semantic.hermes_cloud.WORKER_PATH)
+        box.checked.assert_called_once_with('kill','f'*64,timeout=5)
+        self.assertEqual(pending.read_bytes(),original)
+        self.assertEqual(json.loads((state/'intake-stop.json').read_text()),intake.STOP_RECORD)
+        # Unknown identity/configuration must fail before any kill or success response.
+        box.reset_mock();box.verify_config.side_effect=EvaluationError('CONTAINER_CONFIG')
+        with patch.object(intake,'ROOT',self.root),patch.object(semantic.hermes_cloud,'CloudSandbox',return_value=box):
+            with self.assertRaisesRegex(EvaluationError,'CONTAINER_CONFIG'):
+                intake.control_intake(state,'stop')
+        box.checked.assert_not_called()
+        self.assertEqual(pending.read_bytes(),original)
+
+    def test_stop_rejects_corrupt_semantic_pending_with_free_lock(self):
+        (semantic.STATE/'pending.json').write_text('{}')
+        state=self.root/'runs/public-hermes'
+        with patch.object(intake,'ROOT',self.root),patch.object(semantic.hermes_cloud,'CloudSandbox') as box:
+            with self.assertRaisesRegex(EvaluationError,'SEMANTIC_PENDING'):
+                intake.control_intake(state,'stop')
+        box.assert_not_called()
+        self.assertTrue((state/'intake-stop.json').exists())
+
+    def test_stop_without_semantic_pending_still_succeeds(self):
+        with patch.object(intake,'ROOT',self.root):
+            self.assertEqual(intake.control_intake(self.root/'runs/public-hermes','stop'),'INTAKE_STOPPED')
 
     def test_late_stop_never_becomes_approval_pending(self):
         def last(*args):

@@ -215,6 +215,12 @@ def control_intake(state_dir, action):
         while True:
             try:
                 with state_lock(state_dir, 'controller.lock'):
+                    if state_dir == ROOT / 'runs/public-hermes':
+                        from evaluate_skill_semantics import STATE, interrupt
+                        interrupt()
+                        # A crashed controller's pending receipt still requires recovery,
+                        # even if its inspected worker was killed or is already absent.
+                        require(not os.path.lexists(STATE / 'pending.json'), 'SEMANTIC_RECOVERY_REQUIRED')
                     require(not os.path.lexists(pending), 'ISOLATION_PENDING')
                     return 'INTAKE_STOPPED'
             except EvaluationError as error:

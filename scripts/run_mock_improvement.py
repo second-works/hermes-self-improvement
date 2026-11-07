@@ -217,6 +217,21 @@ def control_intake(state_dir, action):
 def run(packet, read_mock, state_dir, clock=time.monotonic, *, isolated=False, stall=False):
     require(len(canonical(packet)) <= MAX_PACKET_BYTES, 'PACKET_SIZE')
     refs = packet_refs(packet)
+
+    def build_result(receipt, data):
+        return {
+            'schema_version': 1, **receipt, 'classification': 'PUBLIC',
+            'target_skill': SKILL, 'baseline_sha': packet['baseline_sha'],
+            **response_result(load_json(data), refs),
+        }
+
+    return execute_trial(packet, read_mock, state_dir, build_result, clock,
+                         isolated=isolated, stall=stall)
+
+
+def execute_trial(packet, read_mock, state_dir, build_result, clock=time.monotonic,
+                  *, isolated=False, stall=False, one_per_snapshot=False):
+    require(hex_id(packet.get('event_id'), 64), 'EVENT_ID')
     prepare_state(state_dir)
     marker = state_dir / 'intake-stop.json'
     reject_stopped(marker)
@@ -225,6 +240,15 @@ def run(packet, read_mock, state_dir, clock=time.monotonic, *, isolated=False, s
         pending = state_dir / 'isolation-pending.json'
         require(not os.path.lexists(pending), 'ISOLATION_PENDING')
         event_dir = state_dir / packet['event_id']
+        require(not os.path.lexists(event_dir), 'EVENT_ALREADY_CLAIMED')
+        if one_per_snapshot:
+            snapshot = packet['snapshot_hash']
+            require(hex_id(snapshot, 64), 'SNAPSHOT_HASH')
+            try:
+                (state_dir / ('snapshot-' + snapshot)).mkdir(mode=0o700)
+            except FileExistsError:
+                raise EvaluationError('SNAPSHOT_ALREADY_CLAIMED') from None
+            syncdir(state_dir)
         try:
             event_dir.mkdir(mode=0o700)
         except FileExistsError:
@@ -251,11 +275,7 @@ def run(packet, read_mock, state_dir, clock=time.monotonic, *, isolated=False, s
                 pending.unlink()
                 syncdir(state_dir)
                 require(len(data) <= MAX_RESPONSE_BYTES, 'RESPONSE_SIZE')
-            result = {
-                'schema_version': 1, **receipt, 'classification': 'PUBLIC',
-                'target_skill': SKILL, 'baseline_sha': packet['baseline_sha'],
-                **response_result(load_json(data), refs),
-            }
+            result = build_result(receipt, data)
             reject_stopped(marker)
             encoded = canonical(result)
             require(clock() < deadline, 'TIMEOUT')

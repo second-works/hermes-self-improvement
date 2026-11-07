@@ -151,6 +151,9 @@ def reject_stopped(marker):
 
 
 def interrupt_worker(state_dir, pending):
+    if state_dir == ROOT / 'runs/public-hermes':
+        from evaluate_skill_semantics import interrupt
+        interrupt()
     if not os.path.lexists(pending):
         return
     try:

@@ -30,6 +30,7 @@ gate.SOURCES += ['src/evaluation/profiles.py', 'scripts/evaluate_skill_candidate
                  'scripts/run_public_hermes.py', 'scripts/run_mock_improvement.py',
                  'scripts/intake_public_failure.py', 'src/github_work_guide/core.py',
                  'src/delegation/generated.py', 'src/delegation/core.py', 'src/adoption/core.py',
+                 'src/evaluation/semantic.py', 'scripts/evaluate_skill_semantics.py',
                  'fixtures/generated_skills/event-counts-task/contract.json']
 STATE = ROOT / 'runs/profile-evaluation'
 
@@ -274,6 +275,7 @@ def evaluate(run_id, raw):
 
 
 def evaluate_edits(work, m, selected, proposal):
+    evaluation_started = time.monotonic()
     before = gate.read(work, 'sources.json')
     after = apply(before, proposal['edits'])
     candidate_sha = candidate_commit(work, m['entry']['head_sha'], after)
@@ -293,7 +295,7 @@ def evaluate_edits(work, m, selected, proposal):
     charged = gate.read(work, 'budget.json')['machine_seconds']
     require(type(charged) in (int, float) and 0 < charged < 1200, 'PROFILE_BUDGET')
     box = gate.sandbox(work)
-    box.deadline = time.monotonic() + 1200 - charged
+    box.deadline = evaluation_started + 1200 - charged
     public, hidden = gate.read(work, 'public.json'), gate.read(work, 'hidden.json')
     records = {label: [[] for _ in public + hidden] for label in programs}
     for index, case in enumerate(public + hidden):
@@ -315,6 +317,7 @@ def evaluate_edits(work, m, selected, proposal):
         require(regular(programs[label], gate.RUNS, 65536) == launcher(files, selected), 'PROFILE_BUNDLE_CHANGED')
     gate.save(work, 'profile-metrics.private.json', records)
     report = {'state': state, 'decision': verdict, 'control': control,
+              'machine_seconds': charged + time.monotonic() - evaluation_started,
               'private_metrics_hash': digest(regular(work / 'profile-metrics.private.json', gate.RUNS)),
               'counts': {label: {'public_correct': sum(metric['correct'][:len(public)]),
                                   'hidden_correct': sum(metric['correct'][len(public):]),

@@ -10,6 +10,7 @@ from test_github_work_guide import ROOT, change, save_run, seal
 sys.path.insert(0, str(ROOT / 'scripts'))
 from extract_public_failure import Invalid, PREFIX, extract
 from intake_public_failure import intake
+from bind_public_reproduction import BINDING, bind
 from run_mock_improvement import EvaluationError, packet_refs
 
 
@@ -75,6 +76,35 @@ class PublicFailureTest(unittest.TestCase):
         self.routes[PREFIX, None]['private'] = True
         with self.assertRaises(Invalid):
             intake(self.run, 25, self)
+
+    def test_bind_requires_current_failure_and_matching_supervisor_record(self):
+        entry = intake(self.run, 25, self)
+        evidence = {'schema_version': 1, 'reproduction_sha256': 'a' * 64,
+                    'observed': 'FAIL', 'expected': 'PASS',
+                    **{field: entry[field] for field in BINDING}}
+        path = self.run.parent / 'reproduction.json'
+        self.assertEqual(bind(self.run, 25, None, self)['reason'], 'REPRODUCTION_EVIDENCE_REQUIRED')
+        path.write_text(json.dumps(evidence))
+        bound = bind(self.run, 25, path, self)
+        self.assertEqual(bound, {**entry, 'status': 'AWAITING_HUMAN_REVIEW',
+                                 'reproduction_sha256': 'a' * 64})
+        with self.assertRaises(EvaluationError):
+            packet_refs(bound)
+        for invalid in ({'event_id': '0' * 64}, {'head_sha': '0' * 40}, {'check_id': True},
+                        {'observed': 'PASS'}, {'log': 'SYNTHETIC_SECRET_MARKER'}):
+            with self.subTest(invalid=invalid):
+                path.write_text(json.dumps({**evidence, **invalid}))
+                with self.assertRaises(Invalid):
+                    bind(self.run, 25, path, self)
+        path.write_text(json.dumps(evidence) + ' ' * 2048)
+        with self.assertRaises(EvaluationError):
+            bind(self.run, 25, path, self)
+        path.write_text(json.dumps(evidence))
+        self.check['conclusion'] = 'success'
+        self.assertEqual(bind(self.run, 25, path, self)['status'], 'SKIP')
+        self.routes[PREFIX, None]['private'] = True
+        with self.assertRaises(Invalid):
+            bind(self.run, 25, path, self)
 
     def test_rejects_private_unknown_and_wrong_repository(self):
         metadata = self.routes[PREFIX, None]

@@ -28,6 +28,7 @@ def read(path):
 
 
 def configuration():
+    require(not any(path.is_symlink() for path in (STATE, *STATE.parents)), 'PATH_SYMLINK')
     path = STATE / 'config.json'
     if not os.path.lexists(path):
         return None

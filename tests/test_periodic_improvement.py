@@ -109,6 +109,13 @@ class PeriodicImprovementTests(unittest.TestCase):
         self.assertEqual(self.dispatch()['status'],'STOPPED')
         self.prepare.assert_not_called();self.auth.assert_not_called()
 
+    def test_symlink_ancestor_is_rejected_before_configuration_read(self):
+        runs=self.root/'runs';moved=self.root/'preserved-runs'
+        runs.rename(moved);runs.symlink_to(moved,target_is_directory=True)
+        with patch.object(runner.generation,'owner_file') as read_config:
+            self.assertEqual(self.dispatch()['reason'],'PATH_SYMLINK')
+        read_config.assert_not_called();self.auth.assert_not_called()
+
     def test_mapping_and_each_send_approval_are_required(self):
         self.register()
         (self.job/'generation-approval.json').unlink()

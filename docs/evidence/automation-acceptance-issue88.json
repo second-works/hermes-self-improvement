@@ -181,5 +181,11 @@
     "If needed, separate semantic approval bound to the generated candidate and nine trial hashes",
     "Separate approval for a bounded temporary launchd trial, then user acceptance and periodic activation decision"
   ],
-  "completion_rule": "Keep #88 and #83 open until the real scenario and human acceptance are verified; do not close from this documentation or synthetic tests"
+  "completion_rule": "Keep #88 and #83 open until the real scenario and human acceptance are verified; do not close from this documentation or synthetic tests",
+  "acceptance_driver_tests": {
+    "count": 4,
+    "result": "PASSED",
+    "suite": "test_unattended_stop_trial",
+    "scope": "Ambiguous create and known cleanup outcomes; created-worker cleanup failure with broken pipe; controller preserves pending and refuses stop-success/resume; no real Docker/auth/model"
+  }
 }

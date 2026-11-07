@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Stop a real fixed, network-none Hermes worker blocked before reading any auth/input."""
 import json
+from contextlib import suppress
 from pathlib import Path
 import subprocess
 import sys
@@ -17,6 +18,43 @@ from delegation.generated import git
 from evaluation.core import EvaluationError,canonical,digest,require
 from intake_public_failure import failure_event_id
 from run_semantic_budget_docker import OfflineSandbox,synthetic_auth
+
+
+
+def wait_until_stopped(box,root,name,entered,identities):
+    program=root/hermes_cloud.WORKER_PATH
+    process=None
+    created=False
+    try:
+        box.checked(*box.options(name,program),timeout=5)
+        created=True
+        info=box.inspect(name,timeout=5);box.verify_config(info,program)
+        identities.append(info['Id'])
+        # Keep stdin open and empty. The pinned worker blocks before parsing an auth object.
+        process=subprocess.Popen([box.binary,'--config',str(box.config),'--host',box.endpoint,
+                                  'start','--attach','--interactive',name],env=box.env,
+                                 stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        until=time.monotonic()+5
+        while not box.inspect(name,timeout=5)['State']['Running']:
+            require(time.monotonic()<until,'STOP_TEST_START_TIMEOUT');time.sleep(0.05)
+        entered.set()
+        require(process.wait(timeout=15)!=0,'STOP_TEST_WORKER_NOT_KILLED')
+        require(not box.inspect(name,timeout=5)['State']['Running'],'STOP_TEST_STILL_RUNNING')
+    finally:
+        try:
+            # A failed create may still have reached Docker; don't lose its pending receipt.
+            box.cleanup(name,ambiguous=not created)
+            if process is not None and process.poll() is None:process.wait(timeout=5)
+        except Exception:
+            error=EvaluationError('ISOLATION_CLEANUP_FAILED')
+            error.pending_container=name
+            raise error from None
+        finally:
+            if process is not None:
+                for stream in (process.stdin,process.stdout,process.stderr):
+                    if stream:
+                        # A broken local pipe must not replace a pending-container error.
+                        with suppress(OSError):stream.close()
 
 
 def main():
@@ -36,29 +74,7 @@ def main():
         'evidence_refs':['/reproduction_sha256']})})
 
     def stalled(root,data,work,deadline,name):
-        box=OfflineSandbox(root,work,hermes_cloud.IMAGE)
-        program=root/hermes_cloud.WORKER_PATH
-        box.checked(*box.options(name,program),timeout=5)
-        process=None
-        try:
-            info=box.inspect(name,timeout=5);box.verify_config(info,program)
-            identities.append(info['Id'])
-            # Keep stdin open and empty. The pinned worker blocks before parsing an auth object.
-            process=subprocess.Popen([box.binary,'--config',str(box.config),'--host',box.endpoint,
-                                      'start','--attach','--interactive',name],env=box.env,
-                                     stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-            until=time.monotonic()+5
-            while not box.inspect(name,timeout=5)['State']['Running']:
-                require(time.monotonic()<until,'STOP_TEST_START_TIMEOUT');time.sleep(0.05)
-            entered.set()
-            require(process.wait(timeout=15)!=0,'STOP_TEST_WORKER_NOT_KILLED')
-            require(not box.inspect(name,timeout=5)['State']['Running'],'STOP_TEST_STILL_RUNNING')
-        finally:
-            if process is not None:
-                for stream in (process.stdin,process.stdout,process.stderr):
-                    if stream:stream.close()
-            box.cleanup(name)
-            if process is not None and process.poll() is None:process.wait(timeout=5)
+        wait_until_stopped(OfflineSandbox(root,work,hermes_cloud.IMAGE),root,name,entered,identities)
         return answer
 
     def execute():

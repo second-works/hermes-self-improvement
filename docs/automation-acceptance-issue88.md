@@ -40,6 +40,7 @@ python3 -I -B tests/run_unattended_stop_docker.py
 後者は保存合成点検から実dispatcherへ渡し、コード＋Skill文候補、意味的評価の別承認、9つの独立Hermes profile、上限、監査、停止/再開、記録保全を確認する。
 固定のoffline応答は意味的な正解ではないため、期待結果はHOLD。これを実モデルの改善品質の証拠にしない。
 最後の停止試験は、固定ワーカーへ入力も認証も渡さずstdinで待機させ、通常の停止入口から検査済みIDだけを停止する。コンテナ削除、pending解消、停止記録、明示再開後の再送拒否まで確認する。
+Docker作成結果が不明な場合も後始末を試み、確認できなければpendingを保持する。
 送信中の実HTTP要求の中断やサーバー側の利用量確定を検証した試験ではない。
 
 実公開状態の調査では、改善設定がない新規checkoutで `python3 -I -B scripts/periodic_check.py` を実行する。
@@ -73,7 +74,7 @@ Plus契約はAPI残高ではなく、利用枠や請求条件を自動照会し�
 
 今回のRequirement / Risk / Test / Result / Evidenceは要約証跡を正本とし、試験原本のrun IDとhashへ結び付ける。
 2026-11-08 JSTの実点検はCOMPLETE（95件、GitHub API読取238回、112秒）、改善はDISABLED。点検時のOPEN PRは0件で、選定結果は `NO_ELIGIBLE_PUBLIC_FAILURE` だった。この時点の調査であり、将来の公開状態を保証しない。
-登録2profileは合成候補で承認待ち、9つの独立Hermes profileを通す経路は期待どおりHOLD。稼働中ワーカーの停止試験と61件の制御テストも成功した。いずれも実推論・実認証読取は0回。
+登録2profileは合成候補で承認待ち、9つの独立Hermes profileを通す経路は期待どおりHOLD。稼働中ワーカーの停止試験、61件の制御テスト、検収用ドライバーの後始末異常系4件も成功した。いずれも実推論・実認証読取は0回。
 
 - Verified: 要約証跡にVERIFIEDと記録した有限の合成検証だけ。
 - Not Verified: 公開実障害の候補の有用性、現在の認証・利用枠・費用条件、現headの実機無人実行。

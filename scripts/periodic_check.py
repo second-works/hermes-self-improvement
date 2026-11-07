@@ -11,6 +11,7 @@ and writes runs/periodic-summaries/<YYYYMMDD-HHMM>.md. Exit 0 when the check fin
 import argparse
 from datetime import datetime, timedelta, timezone
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -147,7 +148,7 @@ def runs_size(runs):
 
 
 def render(stamp, result, previous, ci, ci_error, setting, size, stop=None):
-    lines = [f'# 定期点検 {stamp}', '', '読み取りと報告だけ（#59）。GitHubへの書き込み・削除・モデルの使用はしていない。', '']
+    lines = [f'# 定期点検 {stamp}', '', '点検部分は読み取りと報告だけ（#59）。GitHubへの書き込み・削除・モデルの使用はしていない。', '']
     if stop:
         lines += ['## 停止', '', f'- {stop}', '']
     if result:
@@ -195,6 +196,15 @@ def notify(text):
              '-e', 'end run', '--', text], timeout=30)
 
 
+def improvement_handoff(run_path, completed):
+    # The inspection is already durable. Improvement errors never discard its report.
+    try:
+        from periodic_improvement import dispatch
+        return dispatch(run_path, inspection_complete=completed)
+    except Exception:
+        return {'status': 'STOPPED', 'reason': 'PERIODIC_HANDOFF_FAILED'}
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--update', action='store_true', help='move this detached check checkout to origin/main first')
@@ -238,7 +248,14 @@ def main(argv=None):
     text = render(stamp, result, previous, ci, ci_error, review_setting(), runs_size(runs), stop)
     with summary_path.open('x', encoding='utf-8') as stream:
         stream.write(text)
+        stream.flush()
+        os.fsync(stream.fileno())
     print(f'summary={summary_path}')
+    improvement = improvement_handoff(runs / f'periodic-{stamp}', not stop)
+    with summary_path.open('a', encoding='utf-8') as stream:
+        stream.write('\n## 改善処理（点検後・別承認）\n\n')
+        stream.write('点検部分はモデルを使いません。改善処理の結果は次の通りです。\n\n')
+        stream.write('```json\n' + json.dumps(improvement, sort_keys=True, ensure_ascii=False) + '\n```\n')
     if args.notify:
         attention = 0 if not result else len(result['acceptance']) + len(result['completion']) + len(result['stale']) + len(result['warnings'])
         notify(f'停止: {stop}' if stop else f'完了。要対応の候補 {attention}件。{summary_path.name}')

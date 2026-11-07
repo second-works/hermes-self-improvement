@@ -14,6 +14,10 @@ SOURCE_KIND = 'public-github-check'
 PUBLIC_FIELDS = ('pr_url', 'pr_number', 'head_sha', 'check_id', 'conclusion', 'snapshot_hash')
 
 
+def failure_event_id(pr_number, head_sha, check_id):
+    return digest([SOURCE_KIND, REPO, pr_number, head_sha, check_id])
+
+
 def intake(run, pr_number, transport):
     failure = extract(run, pr_number, transport)
     if failure is None:
@@ -24,7 +28,7 @@ def intake(run, pr_number, transport):
         'classification': 'PUBLIC',
         'source_kind': SOURCE_KIND,
         'repo': REPO,
-        'event_id': digest([SOURCE_KIND, REPO, failure['pr_number'], failure['head_sha'], failure['check_id']]),
+        'event_id': failure_event_id(failure['pr_number'], failure['head_sha'], failure['check_id']),
         **{field: failure[field] for field in PUBLIC_FIELDS},
     }
 

@@ -110,7 +110,7 @@
     {
       "requirement": "Complete inspection precedes improvement; default disabled",
       "risk": "Unapproved inference or incomplete evidence accepted",
-      "test": "Real periodic_check.py with missing improvement config; verified saved inspection and disabled dispatcher",
+      "test": "Original foreground periodic_check.py with missing improvement config; read actual CLI summary separately from the direct dispatcher probe",
       "result": "FAILED",
       "evidence": "public_inspection",
       "reason": "Inspection was COMPLETE, but actual isolated CLI handoff returned PERIODIC_HANDOFF_FAILED; the DISABLED claim came from a different direct probe"
@@ -170,6 +170,14 @@
       "result": "FAILED",
       "evidence": "one_shot_launchd_trial",
       "reason": "Exit 1 with INCOMPLETE collection and isolated sibling import failure; job removed. No retry or activation authorized"
+    },
+    {
+      "requirement": "Correct isolated CLI handoff after #97 with unchanged inspection limits",
+      "risk": "Sibling import still fails or direct probe is mistaken for actual CLI output",
+      "test": "Real foreground python3 -I -B scripts/periodic_check.py; parse the actual summary JSON block and validate the saved snapshot",
+      "result": "VERIFIED",
+      "evidence": "fixed_foreground_inspection",
+      "reason": "Runtime 0348aaa; actual CLI DISABLED and COMPLETE within the existing 180-second budget. Not a LaunchAgent retry or real inference"
     }
   ],
   "remaining_risks": [
@@ -244,6 +252,32 @@
     "after": "2 PASSED",
     "network_requests": 0,
     "hermes_auth_reads": 0,
-    "periodic_check_sha256": "3ee2ebb5d6146574d473b9cd79e340d8e35ca5cd30e98679d5416e22ae5a643f"
+    "periodic_check_sha256": "3ee2ebb5d6146574d473b9cd79e340d8e35ca5cd30e98679d5416e22ae5a643f",
+    "related_test_count": 194,
+    "standard_test_count": 30
+  },
+  "fixed_foreground_inspection": {
+    "runtime_sha": "0348aaa9f5db85a00266d13746d82a7f52d27dea",
+    "periodic_check_sha256": "3ee2ebb5d6146574d473b9cd79e340d8e35ca5cd30e98679d5416e22ae5a643f",
+    "command": "python3 -I -B scripts/periodic_check.py",
+    "result": "VERIFIED",
+    "mode": "FOREGROUND_READ_ONLY",
+    "run_id": "periodic-20261108-0826",
+    "snapshot_hash": "c84fd9f3d1e0fa46fc5121e5323a441baf106e9af41496f4eb61b6c7b5749ebf",
+    "coverage": "COMPLETE",
+    "api_calls": 243,
+    "item_count": 97,
+    "open_pr_count": 0,
+    "finished_at_utc": "2026-11-07T23:28:55.919066+00:00",
+    "actual_cli_handoff": {
+      "status": "DISABLED"
+    },
+    "summary_sha256": "fb09a10d9163eff62bfc862ea8722216b8008f77f76b074b086ce798506baa4b",
+    "model_requests": 0,
+    "hermes_auth_reads": 0,
+    "launchd_registration": false,
+    "summary_observations": [
+      "- coverage: COMPLETE / 97件 / API呼出 243回 / 116秒（上限 180秒・500回）"
+    ]
   }
 }

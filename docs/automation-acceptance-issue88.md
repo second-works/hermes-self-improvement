@@ -87,8 +87,10 @@ Plus契約はAPI残高ではなく、利用枠や請求条件を自動照会し�
 独立したfreshな `python -I` で `ModuleNotFoundError: periodic_improvement` を再現した。既存テストは先にscriptsをsys.pathへ追加しており、この失敗を隠していた。
 #97でrepo内の信頼済みscripts経路を明示し、不完全点検のSKIP・無効時のDISABLED・cwd/PYTHONPATHを使わないことを独立subprocessで回帰確認する。
 修正前2件FAIL→修正後2件PASSは入口の検証であり、実機試験を成功へ読み替えない。単発承認は使用済み。追加のLaunchAgent試験は新しい具体的承認が必要。
+修正commit `0348aaa9f5db85a00266d13746d82a7f52d27dea` のCLIをforegroundで1回確認したところ、COMPLETE（97件・243 calls・116秒）で、実際のsummaryのJSONはDISABLEDだった。設定と実行状態の未作成も確認した。
+これはLaunchAgentの再試行ではない。実行時刻・環境が異なるため、116秒と実機試験の181秒の差からnetwork/QoSの原因や容量問題の解決を断定しない。
 
-- Verified: 要約証跡にVERIFIEDと記録した有限の合成検証だけ。
+- Verified: 要約証跡にVERIFIEDと記録した有限の合成検証と、#97修正後のforeground CLI確認。そのartifact・実行形態の範囲に限定する。
 - Failed: 初回CLIの改善hookと、一時LaunchAgent試験の点検完了。#97へ読込不具合と証拠訂正を分離し、収集上限の問題は#88へ残す。
 - Not Verified: 公開実障害の候補の有用性、現在の認証・利用枠・費用条件、修正後runtimeの実機点検成功。
 - Blocked / Skipped: 未承認の実通信、追加のLaunchAgent試験、定期有効化、候補採用は実施しない。

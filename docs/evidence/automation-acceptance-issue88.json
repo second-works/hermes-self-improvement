@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "issue": 88,
+  "classification": "PUBLIC",
+  "recorded_date_jst": "2026-11-08",
+  "runtime_sha": "f78c3fc322d8ee67b76606c08f8601371c5ee0e8",
+  "runtime_sources_sha256": "9efa20bca155e61ee921619691d2ca0de1a8af7d37f558230a72fd722d95196b",
+  "product_acceptance": "Not run",
+  "issue_completion": "OPEN",
+  "parent_completion": "OPEN",
+  "live_model_calls_this_issue": 0,
+  "real_auth_reads_this_issue": 0,
+  "additional_model_cost_yen": 0,
+  "real_auth_current_validity": "NOT_VERIFIED",
+  "current_plus_quota_and_credits": "NOT_VERIFIED",
+  "launchd_registration": "NOT_PERFORMED",
+  "periodic_activation": "NOT_ENABLED",
+  "candidate_adoption": "NOT_REQUESTED",
+  "public_inspection": {
+    "run_id": "periodic-20261108-0713",
+    "snapshot_hash": "d0ec84c96f11e38e95bf9e7730520c40c82196fe18cda8fa03a385288ffc58e8",
+    "coverage_status": "COMPLETE",
+    "api_calls": 238,
+    "finished_at_utc": "2026-11-07T22:15:36.616980+00:00",
+    "item_count": 95,
+    "open_pr_count": 0,
+    "selector": {
+      "status": "SKIP",
+      "reason": "NO_ELIGIBLE_PUBLIC_FAILURE",
+      "skipped": {}
+    },
+    "improvement": "DISABLED",
+    "summary_sha256": "7aed2689a10736ddc6f3547042a2c3c822cadc3280f239450ab6fd7caee11d2e",
+    "summary_observations": [
+      "- coverage: COMPLETE / 95件 / API呼出 238回 / 112秒（上限 180秒・500回）"
+    ]
+  },
+  "synthetic_profiles": [
+    {
+      "profile": "review-multiline-shell-v1",
+      "run_id": "evaluation-20261107T221352Z-4c87ab8dc101",
+      "state": "AWAITING_HUMAN_APPROVAL",
+      "report_hash": "93a47892d7254db5e2b8e8b499363353135d04c82642335c55184fe9548f47bf",
+      "audit": "VERIFIED",
+      "memory_approval": "PENDING",
+      "adoption": "NOT_REQUESTED"
+    },
+    {
+      "profile": "event-status-counts-v1",
+      "run_id": "evaluation-20261107T221555Z-3d86304b595f",
+      "state": "AWAITING_HUMAN_APPROVAL",
+      "report_hash": "331b15711a4dd4fbae54e9720e756267fcc0925f39c3050c478c512a1f81a3c6",
+      "audit": "VERIFIED",
+      "memory_approval": "PENDING",
+      "adoption": "NOT_REQUESTED"
+    }
+  ],
+  "synthetic_periodic": {
+    "status": "VERIFIED",
+    "runtime_sha": "f78c3fc322d8ee67b76606c08f8601371c5ee0e8",
+    "source_hashes_sha256": "9efa20bca155e61ee921619691d2ca0de1a8af7d37f558230a72fd722d95196b",
+    "model_calls": 0,
+    "real_auth_reads": 0,
+    "network": "none",
+    "distinct_profiles": 9,
+    "requests_reserved": 10,
+    "final": {
+      "context_run": "evaluation-20261107T221738Z-50ed117730cd",
+      "event_id": "b28871ce061c04aeab535d3c02fbc2b7fe7fb67ed40c0a2a40882aec4eef58d2",
+      "report_hash": "058a933954bf2d6d605110c076a7f5071da07c0c3f8bf56a14e35f56f41e9567",
+      "status": "HOLD"
+    },
+    "inspection_preserved": true,
+    "restart_stop_resume_no_resend": true,
+    "adoption": "NOT_REQUESTED",
+    "hermes_image": "sha256:35fa8b0f5e93fa2471bcf11fe2ba45893512cbef2e6b5f4cbd2f7fe8b60b94ea"
+  },
+  "synthetic_active_stop": {
+    "status": "VERIFIED",
+    "command": "python3 -I -B tests/run_unattended_stop_docker.py",
+    "event_id": "5c0777c3c5ffbd585fb01b82cd1f7ff37b180382b15cf385fa0028a2fe53f5e5",
+    "network": "none",
+    "model_calls": 0,
+    "real_auth_reads": 0,
+    "auth_delivered": 0,
+    "worker_stopped": true,
+    "container_removed": true,
+    "pending_cleared": true,
+    "resume_did_not_resend": true,
+    "inspected_container_id": "a0ef19f7b05bcf5a9ee49ba6dc610a522ca1afb5fd5e641c3b242e8bbb63aa32",
+    "finished_receipt_sha256": "70e9ecacb86f649a1ee5234475b2779a5e9b00d887a9ee51ab0b4b24176e5884"
+  },
+  "control_tests": {
+    "count": 61,
+    "result": "PASSED",
+    "suites": [
+      "test_periodic_improvement",
+      "test_semantic_budget",
+      "test_public_hermes",
+      "test_mock_improvement"
+    ],
+    "scope": "PUBLIC synthetic fixtures and simulated transport; no real auth or inference"
+  },
+  "verification_matrix": [
+    {
+      "requirement": "Complete inspection precedes improvement; default disabled",
+      "risk": "Unapproved inference or incomplete evidence accepted",
+      "test": "Real periodic_check.py with missing improvement config; verified saved inspection and disabled dispatcher",
+      "result": "VERIFIED",
+      "evidence": "public_inspection",
+      "reason": "GitHub read-only inspection; no model path enabled"
+    },
+    {
+      "requirement": "Finite registered code contracts reach human approval pending without adoption",
+      "risk": "Structure-only or invalid control treated as success",
+      "test": "run_skill_profiles_docker.py, two registered profiles, baseline/candidate/degraded comparisons",
+      "result": "VERIFIED",
+      "evidence": "synthetic_profiles",
+      "reason": "Synthetic fixed repairs; not evidence of real model repair quality"
+    },
+    {
+      "requirement": "Semantic evaluation remains independent and bounded by original event",
+      "risk": "Self-grading, more than ten reservations, or fixed mock answer promoted",
+      "test": "run_periodic_improvement_docker.py; nine cold network-none profiles and host audit",
+      "result": "VERIFIED",
+      "evidence": "synthetic_periodic",
+      "reason": "Expected HOLD for the fixed offline marker; generation transport simulated"
+    },
+    {
+      "requirement": "Stop active worker; preserve receipts; resume never resends original event",
+      "risk": "False stop success or killing an unrelated container",
+      "test": "run_unattended_stop_docker.py through existing control_intake; fixed worker blocked on empty stdin",
+      "result": "VERIFIED",
+      "evidence": "synthetic_active_stop",
+      "reason": "Verified configuration and inspected ID; no auth/input delivered"
+    },
+    {
+      "requirement": "Approval, failure, pending cleanup and concurrency fail closed",
+      "risk": "Auth rejection retried, pending reset or duplicate requests",
+      "test": "61 control tests with synthetic auth/transport and corruption/interruption cases",
+      "result": "VERIFIED",
+      "evidence": "control_tests",
+      "reason": "Transport simulations complement the real isolated stop test"
+    },
+    {
+      "requirement": "One real public failure is improved usefully and accepted by the user",
+      "risk": "Synthetic fixture success misreported as real benefit",
+      "test": "Current public inspection and existing selector with no supplied reproduction artifacts",
+      "result": "NOT_VERIFIED",
+      "evidence": "public_inspection.selector",
+      "reason": "No OPEN PR at inspection time; no eligible real failure, candidate or live send approval"
+    },
+    {
+      "requirement": "Current trial auth, Plus quota and zero-cost route support unattended inference",
+      "risk": "Expired token, quota exhaustion or unintended billing",
+      "test": "Not attempted; prior one-shot approval is consumed",
+      "result": "SKIPPED",
+      "evidence": "real_auth_current_validity",
+      "reason": "Requires a concrete event/input/manifest/budget approval; no real auth read"
+    },
+    {
+      "requirement": "Actual launchd job works with final artifact and periodic activation is accepted",
+      "risk": "OS scheduling or locked-screen behavior differs from direct invocation",
+      "test": "No actual LaunchAgent registration or activation",
+      "result": "SKIPPED",
+      "evidence": "launchd_registration",
+      "reason": "Separate approval required; prior #85 test is historical, not this artifact acceptance"
+    }
+  ],
+  "remaining_risks": [
+    "No evidence yet that the current model improves an eligible real failure",
+    "Unsupported profiles and tasks requiring tools remain outside the initial adapters",
+    "Server-side auth validity, current plan quota and billing conditions have not been checked",
+    "Per-event generation and per-candidate semantic approvals remain necessary; enabling config does not broaden consent",
+    "Actual periodic scheduling and activation remain untested and disabled",
+    "The active-stop test blocks before input delivery; cancellation of an in-flight live HTTP request and server-side usage settlement are not verified"
+  ],
+  "next_conditions": [
+    "A current public failure with matching registered profile and independently retained reproduction evidence",
+    "Concrete generation send plan, owner consent, current Plus quota and credits-OFF confirmation",
+    "If needed, separate semantic approval bound to the generated candidate and nine trial hashes",
+    "Separate approval for a bounded temporary launchd trial, then user acceptance and periodic activation decision"
+  ],
+  "completion_rule": "Keep #88 and #83 open until the real scenario and human acceptance are verified; do not close from this documentation or synthetic tests",
+  "acceptance_driver_tests": {
+    "count": 4,
+    "result": "PASSED",
+    "suite": "test_unattended_stop_trial",
+    "scope": "Ambiguous create and known cleanup outcomes; created-worker cleanup failure with broken pipe; controller preserves pending and refuses stop-success/resume; no real Docker/auth/model"
+  }
+}

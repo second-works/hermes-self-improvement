@@ -63,6 +63,7 @@ def mapping_plan(entry, name):
 
 def stopped():
     reject_stopped(ROOT / 'runs/public-hermes/intake-stop.json')
+    require(not os.path.lexists(ROOT / 'runs/public-hermes/isolation-pending.json'), 'ISOLATION_PENDING')
 
 
 def events(work):
@@ -246,13 +247,14 @@ def evaluate(run_id, raw):
                 report = {'state': proposal['decision'], 'reason': 'MODEL_' + proposal['decision']}
             else:
                 report = evaluate_edits(work, m, selected, proposal)
+            stopped()
         except EvaluationError as error:
             if getattr(error, 'pending_container', None):
                 gate.save(work, 'profile-stopped.json', {'state': 'RECOVERY_REQUIRED', 'reason': str(error),
                           'pending_container': error.pending_container})
                 raise
             state = 'STOPPED' if str(error) in ('INTAKE_STOPPED', 'PROFILE_BUDGET', 'CASE_DEADLINE',
-                                               'SANDBOX_STOPPED', 'TIMEOUT') else 'REJECTED'
+                                               'SANDBOX_STOPPED', 'TIMEOUT', 'ISOLATION_PENDING') else 'REJECTED'
             report = {'state': state, 'reason': str(error)}
         except Exception:
             gate.save(work, 'profile-stopped.json', {'state': 'RECOVERY_REQUIRED', 'reason': 'PROFILE_CONTROLLER_FAILED'})
@@ -301,6 +303,7 @@ def evaluate_edits(work, m, selected, proposal):
                 stopped()
                 outcome = box.run(programs[label], case['stdin'].encode(), timeout=min(30, max(0, box.deadline-time.monotonic())))
                 records[label][index].append(observe(selected, outcome, case))
+    stopped()
     require(time.monotonic() < box.deadline, 'PROFILE_BUDGET')
     metrics, unstable = gate.compare_records(records)
     safety = all(not sample['safety_failure'] for rows in records.values() for row in rows for sample in row)

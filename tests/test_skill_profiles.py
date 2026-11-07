@@ -199,6 +199,39 @@ class ProfileHandoffTest(unittest.TestCase):
                 runner.execute(self.entry, 'PUBLIC', self.root / 'unused-approval', self.root / 'state')
             auth.assert_not_called()
 
+    def test_generation_cleanup_pending_blocks_both_profile_entries(self):
+        pending = self.root/'runs/public-hermes/isolation-pending.json'
+        pending.write_text('{}')
+        with patch.object(controller, 'mapping_plan', return_value={'schema_version':1}), \
+             patch.object(controller, 'prepare_claimed') as prepare:
+            with self.assertRaisesRegex(EvaluationError, 'ISOLATION_PENDING'):
+                controller.prepare(self.entry, self.selected.id, {'schema_version':1})
+            prepare.assert_not_called()
+        with patch.object(controller, 'manifest') as read_manifest:
+            with self.assertRaisesRegex(EvaluationError, 'ISOLATION_PENDING'):
+                controller.evaluate(self.work.name, canonical(self.value))
+            read_manifest.assert_not_called()
+        self.assertTrue(pending.exists())
+        self.assertFalse((self.work/'profile-evaluation-lock.json').exists())
+
+    def test_stop_during_last_execution_cannot_publish_approval_pending(self):
+        value = {**self.value, 'decision':'PROPOSE',
+                 'edits':[{'path':self.selected.entrypoint,'before':'old','after':'new'}]}
+        self.receipt(value)
+        def last_execution(*_):
+            (self.root/'runs/public-hermes/intake-stop.json').write_bytes(canonical({'status':'STOP_REQUESTED'}))
+            return {'state':'AWAITING_HUMAN_APPROVAL','candidate_sha':'f'*40,
+                    'artifact_hashes':{'candidate':{'file.py':'a'*64}},
+                    'decision':{'status':'PASS','reasons':[]}}
+        with patch.object(controller, 'manifest', return_value=self.m), \
+             patch.object(controller, 'evaluate_edits', side_effect=last_execution):
+            result = controller.evaluate(self.work.name, canonical(value))
+        self.assertEqual(result['state'], 'STOPPED')
+        self.assertEqual(result['reason'], 'INTAKE_STOPPED')
+        memory = json.loads((self.work/'profile-memory.json').read_text())
+        self.assertEqual(memory['approval']['status'], 'NOT_REQUESTED')
+        self.assertIsNone(memory['candidate'])
+
     def test_unknown_cleanup_blocks_further_evaluation(self):
         value = {**self.value, 'decision': 'PROPOSE', 'edits': [{'path': self.selected.entrypoint, 'before': 'a', 'after': 'b'}]}
         self.receipt(value)

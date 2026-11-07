@@ -4,7 +4,7 @@ import difflib
 import re
 import secrets
 
-from .core import EvaluationError, canonical, digest, findings, load_json, require
+from .core import EvaluationError, canonical, digest, findings, judge, load_json, require
 from delegation.generated import git
 
 
@@ -32,6 +32,15 @@ PROFILES = {
 }
 
 
+def public_text(value):
+    # Same known-key families as Security Preflight, checked before forming a prompt.
+    pattern = (r'ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9-]{20,}|'
+               r'AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{20,}|'
+               r'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----')
+    require(not re.search(pattern, value, re.IGNORECASE), 'PROFILE_SENSITIVE_SOURCE')
+    return value
+
+
 def profile(name):
     require(type(name) is str and name in PROFILES, 'NEEDS_PROFILE')
     return PROFILES[name]
@@ -46,7 +55,7 @@ def artifacts(repo, sha, selected):
         require(len(tree) == 4 and tree[:2] == [b'100644', b'blob'], 'SOURCE_TYPE')
         size = git(repo, 'cat-file', '-s', sha + ':' + path).strip()
         require(size.isdigit() and 0 < int(size) <= 65536, 'SOURCE_SIZE')
-        result[path] = git(repo, 'show', sha + ':' + path).decode('utf-8')
+        result[path] = public_text(git(repo, 'show', sha + ':' + path).decode('utf-8'))
     require(sum(len(s.encode()) for s in result.values()) <= 65536, 'SOURCE_SIZE')
     return result
 
@@ -119,6 +128,7 @@ def response(value, selected):
             require(type(path) is str and path in selected.artifacts and path not in paths, 'PROFILE_EDIT_PATH')
             require(type(before) is str and bool(before.strip()) and type(after) is str
                     and before != after and '\x00' not in before + after, 'PROFILE_EDIT_TEXT')
+            public_text(before + after)
             total += len(before.encode()) + len(after.encode())
             require(total <= 16384, 'PROFILE_EDIT_SIZE')
             paths.add(path)
@@ -139,6 +149,22 @@ def apply(files, edits):
 def diff(before, after):
     return ''.join(''.join(difflib.unified_diff(before[p].splitlines(True), after[p].splitlines(True),
                    fromfile='a/' + p, tofile='b/' + p)) for p in sorted(before) if before[p] != after[p])
+
+
+def decision(metrics, *, safety, unstable, public_count, hidden_count, edits):
+    kwargs = {'safety': safety, 'contaminated': unstable,
+              'public_count': public_count, 'hidden_count': hidden_count}
+    result = judge(metrics['baseline'], metrics['candidate'], **kwargs)
+    control = judge(metrics['baseline'], metrics['degraded'], **kwargs)
+    state = 'REJECTED' if result['status'] == 'FAIL' else 'HOLD'
+    if result['status'] == 'PASS' and control['status'] == 'FAIL' and all(metrics['candidate']['correct']):
+        state = 'AWAITING_HUMAN_APPROVAL'
+    elif result['status'] == 'PASS':
+        result = {'status': 'HOLD', 'reasons': ['PROFILE_REQUIRED_CASES_OR_CONTROL_INVALID']}
+    if any(edit['path'].endswith('.md') for edit in edits):
+        state = 'HOLD'
+        result = {'status': 'HOLD', 'reasons': ['STRUCTURE_ONLY_SEMANTIC_EVALUATION_REQUIRED']}
+    return state, result, control
 
 
 def launcher(files, selected):

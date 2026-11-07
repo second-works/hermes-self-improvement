@@ -140,7 +140,7 @@ Memoryは既存schemaを再利用し、監査原本や成功判定の代わり�
 
 B案の実装単位と依存は、次のとおり確定した。
 
-1. [#86](https://github.com/second-works/hermes-self-improvement/issues/86): 複数Skills・CI契約の共通プロファイル、決定的評価、監査と承認待ち。実装はこのPRへ追加する。
+1. [#86](https://github.com/second-works/hermes-self-improvement/issues/86): 複数Skills・CI契約の共通プロファイル、決定的評価、監査と承認待ち。実装は設計PR #91に続く実装PRで行う。
 2. [#92](https://github.com/second-works/hermes-self-improvement/issues/92): 意味的な独立3試行評価と、元観測につき最大10回の耐久予算。
 3. [#87](https://github.com/second-works/hermes-self-improvement/issues/87): #92完了後に週次点検との接続と緊急停止。
 4. [#88](https://github.com/second-works/hermes-self-improvement/issues/88): #87完了後に通し検収。実通信と定期有効化は別承認。
@@ -156,3 +156,24 @@ B案の実装単位と依存は、次のとおり確定した。
 主な失敗条件は、CI観測とSkillの対応不明、評価器への過学習、構造検査だけの誤判定、再起動/結果不明時の予算再利用である。再現とsourceの固定、独立ケースの分離、assurance区別、送信前の耐久消費で対処する。
 より単純なreview単一対象案と推論1回案は利用者が採用しなかった。既存 #65 が単一の合成契約専用であることと、#85の成功も公開合成入力の実機試験であることを制約として明記し、汎用・実障害での成功は先取りしない。
 #88の実障害検収と運転有効化、意味的評価の実送信は未実施のままである。
+
+## 実装の利用手順
+
+1. 保存済み点検から #84 の選定で得たPUBLIC entryと、登録profileを指定して `scripts/evaluate_skill_candidate.py mapping-plan --entry <entry.json> --profile <profile-id>` を実行する。
+2. 監督者が元イベントと公開再現の対応、出力されたsource hashを確認し、owner-only（600）のmappingファイルへ保存する。このファイルの存在だけを人間の同意の証明とは扱わない。
+3. `prepare --entry <entry.json> --profile <profile-id> --mapping <mapping.json>` で固定イメージの既存隔離プローブとbaseline再現を実施する。成功時だけcontext runを返す。
+4. 通常入口 `scripts/run_public_hermes.py` に既存の `--run` / `--evidence-dir` と `--context-run <context-run>` を指定する。最新の公開観測とcontextを照合し、既定は送信計画だけを返す。入力hashに固定した別の送信承認が必要。
+5. 許可された送信の出力を保存し、`evaluate --run <context-run> --proposal <saved-output.json>` で評価する。モデル応答だけでは受け付けず、#85の耐久的な完了receiptのhashも照合する。
+6. `audit --run <context-run>` でsource・manifest・差分・候補SHA・private metricsとMemory参照を照合する。出力は承認待ちまたは理由付き終了であり、採用・本番変更は呼び出さない。
+
+対応記録は既存の再現証跡hashへ結び付けるが、これだけでCI障害全体の原因確定とは扱わない。baseline再現とCI障害の因果の限界をhandoffに残す。
+候補のファイル群は単一の読み取り専用プログラムとしてDockerへ渡し、コンテナの一時領域だけに展開する。hostで候補をimportしない。
+生成と評価は#85のcontroller lockを共用する。未完了の評価記録があれば送信とresumeも停止し、自動回復しない。stopは引き続き受け付ける。
+公開ソースと置換テキストの既知の秘密値パターンを拒否する。これは全種類の機密検出の保証ではなく、PUBLIC分類と監督者の対応確認も必要である。
+
+## 検証入口と限界
+
+- `python3 -I -B -m unittest discover -s tests -p 'test_skill_profiles.py'` で候補、source、receipt、監査、停止・予算・構造だけの候補を検査する。
+- `python3 -I -B tests/run_skill_profiles_docker.py` は、別の検証用checkoutで実行する明示的な通信遮断試験。PUBLIC合成観測と模擬生成結果だけを使い、認証読取0・モデル通信0で2系統を実Docker評価する。試験用の観測は実GitHub障害ではない。
+- 標準 `./scripts/verify.sh` とSecurityの固定CI資産は維持し、新規制御テストとDocker検証は別途実行した証拠として記録する。
+- 自然言語Skillsの意味的評価、実障害の通し検収、定期運転の有効化は未実施。#92 / #88と操作ごとの別承認に残る。

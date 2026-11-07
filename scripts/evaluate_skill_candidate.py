@@ -15,8 +15,8 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 from adoption.core import save, syncdir, utc
 from delegation.core import IMAGE
 from delegation.generated import git
-from evaluation.core import EvaluationError, canonical, digest, judge, load_json, regular, require, write_new
-from evaluation.profiles import (PROFILES, apply, artifacts, cases, diff, hashes, launcher,
+from evaluation.core import EvaluationError, canonical, digest, load_json, regular, require, write_new
+from evaluation.profiles import (PROFILES, apply, artifacts, cases, decision, diff, hashes, launcher,
                                  observe, profile, response)
 from evaluation.sandbox import capture
 from github_work_guide.core import REPO
@@ -27,7 +27,10 @@ spec = importlib.util.spec_from_file_location('profile_evaluation_gate', ROOT / 
 gate = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(gate)
 gate.SOURCES += ['src/evaluation/profiles.py', 'scripts/evaluate_skill_candidate.py',
-                 'scripts/run_public_hermes.py', 'fixtures/generated_skills/event-counts-task/contract.json']
+                 'scripts/run_public_hermes.py', 'scripts/run_mock_improvement.py',
+                 'scripts/intake_public_failure.py', 'src/github_work_guide/core.py',
+                 'src/delegation/generated.py', 'src/delegation/core.py', 'src/adoption/core.py',
+                 'fixtures/generated_skills/event-counts-task/contract.json']
 STATE = ROOT / 'runs/profile-evaluation'
 
 
@@ -86,7 +89,7 @@ def manifest(work):
     selected = profile(m['profile_id'])
     check_entry(m['entry'])
     require(m['profile_hash'] == selected.hash and m['sources'] == gate.source_hashes(), 'PROFILE_STALE')
-    require(m['mapping'] == mapping_plan(m['entry'], selected.id), 'PROFILE_MAPPING_CHANGED')
+    require(canonical(m['mapping']) == canonical(mapping_plan(m['entry'], selected.id)), 'PROFILE_MAPPING_CHANGED')
     for label in ('public', 'hidden', 'sources', 'environment', 'gate', 'budget'):
         file = 'sources.json' if label == 'sources' else label + '.json'
         require(digest(regular(work / file, gate.RUNS)) == m['hashes'][label], 'PROFILE_FROZEN_CHANGED')
@@ -121,7 +124,7 @@ def context(run_id, entry):
 def prepare(entry, name, mapping):
     check_entry(entry)
     selected = profile(name)
-    require(mapping == mapping_plan(entry, name), 'PROFILE_MAPPING')
+    require(canonical(mapping) == canonical(mapping_plan(entry, name)), 'PROFILE_MAPPING')
     prepare_state(STATE)
     prepare_state(ROOT / 'runs/public-hermes')
     stopped()
@@ -295,26 +298,17 @@ def evaluate_edits(work, m, selected, proposal):
                 stopped()
                 outcome = box.run(programs[label], case['stdin'].encode(), timeout=min(30, max(0, box.deadline-time.monotonic())))
                 records[label][index].append(observe(selected, outcome, case))
+    require(time.monotonic() < box.deadline, 'PROFILE_BUDGET')
     metrics, unstable = gate.compare_records(records)
     safety = all(not sample['safety_failure'] for rows in records.values() for row in rows for sample in row)
-    kwargs = {'safety': safety, 'contaminated': unstable, 'public_count': len(public), 'hidden_count': len(hidden)}
-    decision = judge(metrics['baseline'], metrics['candidate'], **kwargs)
-    control = judge(metrics['baseline'], metrics['degraded'], **kwargs)
-    # Expected invalid-input exits may be baseline defects, not isolation failures.
-    state = 'REJECTED' if decision['status'] == 'FAIL' else 'HOLD'
-    if decision['status'] == 'PASS' and control['status'] == 'FAIL' and all(metrics['candidate']['correct']):
-        state = 'AWAITING_HUMAN_APPROVAL'
-    elif decision['status'] == 'PASS':
-        decision = {'status': 'HOLD', 'reasons': ['PROFILE_REQUIRED_CASES_OR_CONTROL_INVALID']}
-    if any(edit['path'].endswith('.md') for edit in proposal['edits']):
-        state = 'HOLD'
-        decision = {'status': 'HOLD', 'reasons': ['STRUCTURE_ONLY_SEMANTIC_EVALUATION_REQUIRED']}
+    state, verdict, control = decision(metrics, safety=safety, unstable=unstable,
+                                       public_count=len(public), hidden_count=len(hidden), edits=proposal['edits'])
     manifest(work)
     require(artifacts(ROOT, candidate_sha, selected) == after, 'PROFILE_CANDIDATE_CHANGED')
     for label, files in [('baseline', before), ('candidate', after), ('degraded', degraded)]:
         require(regular(programs[label], gate.RUNS, 65536) == launcher(files, selected), 'PROFILE_BUNDLE_CHANGED')
     gate.save(work, 'profile-metrics.private.json', records)
-    report = {'state': state, 'decision': decision, 'control': control,
+    report = {'state': state, 'decision': verdict, 'control': control,
               'private_metrics_hash': digest(regular(work / 'profile-metrics.private.json', gate.RUNS)),
               'counts': {label: {'public_correct': sum(metric['correct'][:len(public)]),
                                   'hidden_correct': sum(metric['correct'][len(public):]),

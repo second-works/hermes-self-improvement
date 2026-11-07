@@ -11,8 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
 sys.path.insert(0, str(ROOT / 'scripts'))
 from evaluation.core import EvaluationError, canonical, digest
-from evaluation.profiles import (COUNTS, PROFILES, apply, artifacts, count_cases, hashes,
-                                 launcher, observe, profile, response)
+from evaluation.profiles import (COUNTS, PROFILES, apply, artifacts, count_cases, decision, hashes,
+                                 launcher, observe, profile, public_text, response)
 from delegation.generated import git
 import evaluate_skill_candidate as controller
 import run_public_hermes as runner
@@ -76,6 +76,13 @@ class ProfileContractsTest(unittest.TestCase):
         with self.assertRaisesRegex(EvaluationError, 'PROFILE_PROMPT_LIMIT'):
             runner.request_prompt(entry(), {'artifacts': {'p': 'x' * 8192}})
 
+    def test_known_secret_patterns_are_refused_without_echoing_value(self):
+        value = 'sk-' + 'z' * 24
+        with self.assertRaisesRegex(EvaluationError, '^PROFILE_SENSITIVE_SOURCE$'):
+            public_text(value)
+        with self.assertRaisesRegex(EvaluationError, '^PROFILE_SENSITIVE_SOURCE$'):
+            response({**self.proposal, 'edits':[{**self.edit,'after':value}]}, self.selected)
+
     def test_launcher_packages_only_public_files_without_host_execution(self):
         with patch('runpy.run_path', side_effect=AssertionError('host execution')):
             code = launcher(self.files, self.selected)
@@ -100,6 +107,19 @@ class ProfileContractsTest(unittest.TestCase):
         self.assertTrue(observe(self.selected, result, case)['correct'])
         result['error'] = 'TIMEOUT'
         self.assertTrue(observe(self.selected, result, case)['safety_failure'])
+
+    def test_structure_only_never_becomes_semantic_acceptance(self):
+        def metric(correct):
+            return {'correct':correct,'failures':0,'latency':1,'cost_usd':0}
+        metrics = {'baseline':metric([True,True,True,False]), 'candidate':metric([True]*4),
+                   'degraded':metric([False]*4)}
+        kwargs = {'safety':True,'unstable':False,'public_count':2,'hidden_count':2,'edits':[self.edit]}
+        self.assertEqual(decision(metrics,**kwargs)[0], 'AWAITING_HUMAN_APPROVAL')
+        self.assertEqual(decision(metrics,**{**kwargs,'edits':[{'path':COUNTS+'SKILL.md'}]})[0], 'HOLD')
+        self.assertEqual(decision(metrics,**{**kwargs,'unstable':True})[0], 'HOLD')
+        self.assertEqual(decision(metrics,**{**kwargs,'safety':False})[0], 'REJECTED')
+        metrics['candidate'] = metric([False,True,True,True])
+        self.assertEqual(decision(metrics,**kwargs)[0], 'REJECTED')
 
     def test_git_freezes_commit_blobs_and_rejects_symlink(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -188,6 +208,24 @@ class ProfileHandoffTest(unittest.TestCase):
             self.assertTrue((controller.STATE / 'pending.json').exists())
             with self.assertRaisesRegex(EvaluationError, 'PROFILE_RECOVERY_REQUIRED'):
                 controller.evaluate(self.work.name, canonical(value))
+
+    def test_budget_expiry_is_stopped_without_reusing_attempt(self):
+        value = {**self.value, 'decision': 'PROPOSE', 'edits': [{'path': self.selected.entrypoint, 'before':'a','after':'b'}]}
+        self.receipt(value)
+        with patch.object(controller, 'manifest', return_value=self.m), \
+             patch.object(controller, 'evaluate_edits', side_effect=EvaluationError('PROFILE_BUDGET')):
+            result = controller.evaluate(self.work.name, canonical(value))
+            self.assertEqual(result['state'], 'STOPPED')
+            with self.assertRaisesRegex(EvaluationError, 'PROFILE_RUN_USED'):
+                controller.evaluate(self.work.name, canonical(value))
+
+    def test_shared_generation_lock_refuses_evaluation_before_claim(self):
+        from run_mock_improvement import prepare_state, state_lock
+        state = self.root/'runs/public-hermes'; prepare_state(state)
+        with state_lock(state,'controller.lock'):
+            with self.assertRaisesRegex(EvaluationError, 'CONCURRENT_RUN'):
+                controller.evaluate(self.work.name, canonical(self.value))
+        self.assertFalse((self.work/'profile-evaluation-lock.json').exists())
 
     def test_cloud_profile_response_is_bound_to_context_and_actual_receipt(self):
         event = {**self.entry, 'check_id': 101}

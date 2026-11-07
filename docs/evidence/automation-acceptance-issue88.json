@@ -13,7 +13,7 @@
   "additional_model_cost_yen": 0,
   "real_auth_current_validity": "NOT_VERIFIED",
   "current_plus_quota_and_credits": "NOT_VERIFIED",
-  "launchd_registration": "NOT_PERFORMED",
+  "launchd_registration": "ONE_SHOT_TRIAL_FAILED_AND_REMOVED",
   "periodic_activation": "NOT_ENABLED",
   "candidate_adoption": "NOT_REQUESTED",
   "public_inspection": {
@@ -29,11 +29,16 @@
       "reason": "NO_ELIGIBLE_PUBLIC_FAILURE",
       "skipped": {}
     },
-    "improvement": "DISABLED",
+    "improvement": "STOPPED",
     "summary_sha256": "7aed2689a10736ddc6f3547042a2c3c822cadc3280f239450ab6fd7caee11d2e",
     "summary_observations": [
       "- coverage: COMPLETE / 95件 / API呼出 238回 / 112秒（上限 180秒・500回）"
-    ]
+    ],
+    "improvement_reason": "PERIODIC_HANDOFF_FAILED",
+    "separate_direct_dispatch_probe": {
+      "status": "DISABLED",
+      "scope": "Separate process with scripts explicitly on sys.path; not the actual CLI handoff outcome"
+    }
   },
   "synthetic_profiles": [
     {
@@ -106,9 +111,9 @@
       "requirement": "Complete inspection precedes improvement; default disabled",
       "risk": "Unapproved inference or incomplete evidence accepted",
       "test": "Real periodic_check.py with missing improvement config; verified saved inspection and disabled dispatcher",
-      "result": "VERIFIED",
+      "result": "FAILED",
       "evidence": "public_inspection",
-      "reason": "GitHub read-only inspection; no model path enabled"
+      "reason": "Inspection was COMPLETE, but actual isolated CLI handoff returned PERIODIC_HANDOFF_FAILED; the DISABLED claim came from a different direct probe"
     },
     {
       "requirement": "Finite registered code contracts reach human approval pending without adoption",
@@ -161,10 +166,10 @@
     {
       "requirement": "Actual launchd job works with final artifact and periodic activation is accepted",
       "risk": "OS scheduling or locked-screen behavior differs from direct invocation",
-      "test": "No actual LaunchAgent registration or activation",
-      "result": "SKIPPED",
-      "evidence": "launchd_registration",
-      "reason": "Separate approval required; prior #85 test is historical, not this artifact acceptance"
+      "test": "One approved temporary LaunchAgent, max one run / 300 seconds, initial disabled setting",
+      "result": "FAILED",
+      "evidence": "one_shot_launchd_trial",
+      "reason": "Exit 1 with INCOMPLETE collection and isolated sibling import failure; job removed. No retry or activation authorized"
     }
   ],
   "remaining_risks": [
@@ -173,9 +178,11 @@
     "Server-side auth validity, current plan quota and billing conditions have not been checked",
     "Per-event generation and per-candidate semantic approvals remain necessary; enabling config does not broaden consent",
     "Actual periodic scheduling and activation remain untested and disabled",
-    "The active-stop test blocks before input delivery; cancellation of an in-flight live HTTP request and server-side usage settlement are not verified"
+    "The active-stop test blocks before input delivery; cancellation of an in-flight live HTTP request and server-side usage settlement are not verified",
+    "The one-shot real LaunchAgent trial failed; the import fix needs acceptance on a newly approved trial, and collection capacity remains unresolved"
   ],
   "next_conditions": [
+    "Merge #97 import/provenance correction; then separately approve any additional bounded real LaunchAgent trial; do not reuse the consumed one-shot approval",
     "A current public failure with matching registered profile and independently retained reproduction evidence",
     "Concrete generation send plan, owner consent, current Plus quota and credits-OFF confirmation",
     "If needed, separate semantic approval bound to the generated candidate and nine trial hashes",
@@ -187,5 +194,56 @@
     "result": "PASSED",
     "suite": "test_unattended_stop_trial",
     "scope": "Ambiguous create and known cleanup outcomes; created-worker cleanup failure with broken pipe; controller preserves pending and refuses stop-success/resume; no real Docker/auth/model"
+  },
+  "evidence_correction": {
+    "issue": 97,
+    "previous_claim": "Real CLI improvement DISABLED",
+    "actual_cli_result": {
+      "status": "STOPPED",
+      "reason": "PERIODIC_HANDOFF_FAILED"
+    },
+    "cause": "The direct dispatcher probe result was incorrectly attributed to periodic_check.py; the real summary retained STOPPED",
+    "original_summary_hash_preserved": true,
+    "raw_snapshots_and_summaries_modified": false
+  },
+  "one_shot_launchd_trial": {
+    "result": "FAILED",
+    "runtime_sha": "4e113c8906ae964cd4e87edb048ce3b6852e4098",
+    "started_at_utc": "2026-11-07T23:12:28.432413+00:00",
+    "finished_at_utc": "2026-11-07T23:15:32.629483+00:00",
+    "runtime_files_verified": 154,
+    "runs": 1,
+    "exit_code": 1,
+    "bootstrap_exit": 0,
+    "bootout_exit": 0,
+    "service_removed": true,
+    "supervisor_elapsed_seconds": 184.2,
+    "run_id": "periodic-20261108-0812",
+    "snapshot_hash": "e4c7ccd62f9668c5ff98cfb1820511b634f3012e24b491e547717f3d6d0faf6a",
+    "coverage_status": "INCOMPLETE",
+    "api_calls": 241,
+    "collection_seconds_from_summary": 181,
+    "collection_limit_seconds": 180,
+    "collection_root_cause": "NOT_DETERMINED: normalized error only; time-budget/network/schema/inventory effects not fully distinguished",
+    "summary_sha256": "d7fcc9846f80a9a133f6daf02d20d824f3b849e8211fd03322cb2e686b51ca0e",
+    "trial_receipt_sha256": "8bb48c05a09f41813558ff54dd565e2b6eedb76736f3eadcaef4df9bab0e54c4",
+    "improvement_handoff": {
+      "status": "STOPPED",
+      "reason": "PERIODIC_HANDOFF_FAILED"
+    },
+    "improvement_config_exists": false,
+    "model_requests": 0,
+    "hermes_auth_reads": 0,
+    "approval_state": "CONSUMED_ONE_SHOT; no further LaunchAgent run authorized"
+  },
+  "fixed_entry_checks": {
+    "issue": 97,
+    "test_suite": "test_periodic_check.IsolatedEntryTests",
+    "method": "Fresh python -I subprocess; incomplete inspection; disabled config; poisoned cwd/PYTHONPATH",
+    "before": "2 FAILED",
+    "after": "2 PASSED",
+    "network_requests": 0,
+    "hermes_auth_reads": 0,
+    "periodic_check_sha256": "3ee2ebb5d6146574d473b9cd79e340d8e35ca5cd30e98679d5416e22ae5a643f"
   }
 }

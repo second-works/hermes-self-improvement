@@ -1,12 +1,13 @@
 # 自動運転の検収手順と実施記録（#88）
 
 **判定は未検収（Not run）。** モデルなしの試験と、公開実障害を使う実通信の検収を分ける。
-#84〜#87 / #92の実装はマージ済みだが、実通信・実機での定期有効化・候補採用は今回実施しない。
+#84〜#87 / #92の実装はマージ済み。別承認の一時LaunchAgent試験は失敗し、サービスを解除した。実通信・定期有効化・候補採用は未実施。
 Risk Tier: HIGH（実利用検収、認証・費用・停止・人間承認の境界）。親 #83、前提PR #95。
 
 ## 検収対象と成功条件
 
-対象runtimeは `f78c3fc322d8ee67b76606c08f8601371c5ee0e8`。今回の変更は手順・検収用テスト・PUBLICの要約記録で、runtime・CI・認証設定を変更しない。
+初回の合成検証runtimeは `f78c3fc322d8ee67b76606c08f8601371c5ee0e8`、一時LaunchAgent試験は `4e113c8906ae964cd4e87edb048ce3b6852e4098`。各試験はそのartifactの証跡として保持する。
+後続 #97 はisolated Pythonの信頼済みrepo内import経路を修正し、検収記録を訂正する。推論・承認・再送・収集上限、CI、認証設定は変更しない。旧artifactの成功を新しいruntimeの検収へ転用しない。
 利用者は、既存の週次点検で見つかった公開障害から最大1件の候補を作り、独立した隔離評価の結果を人間確認待ちで受け取る。
 候補の自動採用とGitHubへの自動書込は成功条件に含めない。
 UIはないためVisual / UI Acceptanceは対象外。実機登録や有効化を伴わないため、Production / Deploy判定は今回の対象外。
@@ -28,7 +29,7 @@ UIはないためVisual / UI Acceptanceは対象外。実機登録や有効化�
 ## 承認前に実施する検証
 
 新規の隔離checkoutを用い、既存のテストを再利用する。実認証を読み取らず、モデル輸送は模擬、候補とHermesの実行コンテナはnetwork-noneにする。
-実機のLaunchAgentは登録・変更せず、点検入口・dispatcher・停止/再開を検証する。OSの定期起動そのものの現head検収とは区別する。
+承認前は実機のLaunchAgentを登録・変更せず、点検入口・dispatcher・停止/再開を検証する。別承認で実施した1回の実機試験の結果は後述し、OS試験と合成検証を区別する。
 
 ```sh
 python3 -I -B tests/run_skill_profiles_docker.py
@@ -73,12 +74,24 @@ Plus契約はAPI残高ではなく、利用枠や請求条件を自動照会し�
 ## 検収記録と残る作業
 
 今回のRequirement / Risk / Test / Result / Evidenceは要約証跡を正本とし、試験原本のrun IDとhashへ結び付ける。
-2026-11-08 JSTの実点検はCOMPLETE（95件、GitHub API読取238回、112秒）、改善はDISABLED。点検時のOPEN PRは0件で、選定結果は `NO_ELIGIBLE_PUBLIC_FAILURE` だった。この時点の調査であり、将来の公開状態を保証しない。
+2026-11-08 JSTの初回実点検はCOMPLETE（95件、GitHub API読取238回、112秒）。ただし実CLIの改善hookはSTOPPED / PERIODIC_HANDOFF_FAILEDだった。
+前版の「改善DISABLED」は、別プロセスから直接呼んだdispatcherの結果をCLIの結果として誤記したもの。保存済みsummaryとそのhashは変更せず訂正する。
+その時点のOPEN PRは0件で、別途実行した選定結果は `NO_ELIGIBLE_PUBLIC_FAILURE`。この時点の調査であり、将来の公開状態を保証しない。
 登録2profileは合成候補で承認待ち、9つの独立Hermes profileを通す経路は期待どおりHOLD。稼働中ワーカーの停止試験、61件の制御テスト、検収用ドライバーの後始末異常系4件も成功した。いずれも実推論・実認証読取は0回。
 
+### 一時LaunchAgent試験と #97 の訂正
+
+本人の別承認後、初期無効の点検を一時LaunchAgentから1回だけ起動した。実推論・Hermes認証読取・Docker起動は0回。
+実機試験は終了コード1。点検は241 calls / 約181秒でINCOMPLETEとなり、改善hookもPERIODIC_HANDOFF_FAILEDだった。専用サービスの解除（bootout=0、サービス消失）を確認し、原本を保全した。再試行していない。
+収集上限は180秒。正規化済みの汎用エラーしか残していないため、時間上限・通信・schema・収集中変化の厳密な原因切り分けは未完了。上限を延ばしたり、network/QoSが原因と断定したりしない。
+独立したfreshな `python -I` で `ModuleNotFoundError: periodic_improvement` を再現した。既存テストは先にscriptsをsys.pathへ追加しており、この失敗を隠していた。
+#97でrepo内の信頼済みscripts経路を明示し、不完全点検のSKIP・無効時のDISABLED・cwd/PYTHONPATHを使わないことを独立subprocessで回帰確認する。
+修正前2件FAIL→修正後2件PASSは入口の検証であり、実機試験を成功へ読み替えない。単発承認は使用済み。追加のLaunchAgent試験は新しい具体的承認が必要。
+
 - Verified: 要約証跡にVERIFIEDと記録した有限の合成検証だけ。
-- Not Verified: 公開実障害の候補の有用性、現在の認証・利用枠・費用条件、現headの実機無人実行。
-- Blocked / Skipped: 未承認の実通信、LaunchAgent登録、定期有効化、候補採用は実施しない。
+- Failed: 初回CLIの改善hookと、一時LaunchAgent試験の点検完了。#97へ読込不具合と証拠訂正を分離し、収集上限の問題は#88へ残す。
+- Not Verified: 公開実障害の候補の有用性、現在の認証・利用枠・費用条件、修正後runtimeの実機点検成功。
+- Blocked / Skipped: 未承認の実通信、追加のLaunchAgent試験、定期有効化、候補採用は実施しない。
 - Known Remaining Risk: 合成ケースと実障害の差、初期adapter外のタスク、実モデルの不安定性、認証のサーバー側失効、承認待ちによる運用負担。
 - Human Decision Required: 適格な障害と具体的承認票、実試行の結果の検収、実機試験・有効化・採用の各判断。
 
@@ -86,6 +99,6 @@ Plus契約はAPI残高ではなく、利用枠や請求条件を自動照会し�
 実障害が存在しない、または根拠がそろわない場合は、その時点の点検hash・不足理由をIssueへ残し、再現根拠が整った時に再選定する。
 未承認の故障注入や、わざと失敗するPRを作って実障害の代わりにしない。
 
-Plan vs Reality: 無人で各段階を動かす機構は確認するが、実障害の有用性と実運用の負担はまだ検証できていない。
+Plan vs Reality: 合成検証は成功したが、実際のisolated入口では読込不具合があり、実機の点検完了も未達だった。実障害の有用性と実運用の負担はまだ検証できていない。
 今回の判定はNot runであり、Product Accepted / 継続運転可能とは報告しない。
 問題が起きた場合は新規受付を停止し、pending・予算・点検・評価原本を保全する。人の判断なく再送や候補採用を行わない。

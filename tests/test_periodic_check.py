@@ -1,6 +1,7 @@
 """#59: scripts/periodic_check.py analysis and safety guards. No network/model; uses a temporary git repo."""
 from datetime import datetime, timedelta, timezone
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -106,6 +107,42 @@ class RunTests(unittest.TestCase):
         script = ' '.join(args[:args.index('--')])
         self.assertNotIn('do shell script', script)
         self.assertEqual(args[-1], '停止: "x" & do shell script "id"')
+
+
+class IsolatedEntryTests(unittest.TestCase):
+    def invoke(self, completed, poison=False):
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp).resolve()
+            if poison:
+                (work / 'periodic_improvement.py').write_text(
+                    'from pathlib import Path\nPath("untrusted-imported").write_text("wrong")\n'
+                    'raise RuntimeError("untrusted cwd module")\n')
+            program = (
+                'import importlib.util,json\nfrom pathlib import Path\n'
+                f'spec=importlib.util.spec_from_file_location("entry",{str(ROOT / "scripts/periodic_check.py")!r})\n'
+                'entry=importlib.util.module_from_spec(spec);spec.loader.exec_module(entry)\n'
+            )
+            if completed:
+                program += (
+                    'import periodic_improvement as improvement\n'
+                    f'improvement.ROOT=Path({str(work)!r})\n'
+                    'improvement.STATE=improvement.ROOT/"runs/periodic-improvement"\n'
+                    'def forbidden(*args,**kwargs):raise RuntimeError("unexpected runtime access")\n'
+                    'improvement.GhReadOnly=forbidden\nimprovement.generation.read_auth=forbidden\n'
+                )
+            program += f'print(json.dumps(entry.improvement_handoff(Path({str(work)!r})/"runs/missing",{completed!r})))\n'
+            child = subprocess.run([sys.executable, '-I', '-B', '-c', program], cwd=work,
+                                   env={**os.environ, 'PYTHONPATH': str(work)},
+                                   capture_output=True, text=True, timeout=20)
+            self.assertEqual(child.returncode, 0, child.stderr)
+            self.assertFalse((work / 'untrusted-imported').exists())
+            return json.loads(child.stdout)
+
+    def test_incomplete_handoff_works_in_fresh_isolated_python(self):
+        self.assertEqual(self.invoke(False), {'status': 'SKIP', 'reason': 'POINT_CHECK_INCOMPLETE'})
+
+    def test_disabled_handoff_uses_trusted_sibling_not_cwd_or_pythonpath(self):
+        self.assertEqual(self.invoke(True, poison=True), {'status': 'DISABLED'})
 
 
 class UpdateGuardTests(unittest.TestCase):

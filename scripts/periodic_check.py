@@ -21,6 +21,8 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
+# Python -I omits the script directory; use only this trusted checkout for siblings.
+sys.path.insert(0, str(ROOT / 'scripts'))
 from github_work_guide.core import load_run  # noqa: E402
 
 REPO = 'second-works/hermes-self-improvement'

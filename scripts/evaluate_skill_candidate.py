@@ -180,6 +180,8 @@ def prepare_claimed(entry, selected, mapping, claim, started):
     gate.save(work, 'profile-manifest.json', m)
     gate.event(work, 'PROFILE_FROZEN', digest(regular(work / 'profile-manifest.json', gate.RUNS)))
     stopped()
+    syncdir(work)
+    syncdir(gate.RUNS)
     (STATE / 'pending.json').unlink()
     syncdir(STATE)
     return context(run_id, entry)
@@ -235,7 +237,7 @@ def evaluate(run_id, raw):
         selected = profile(m['profile_id'])
         require(not (work / 'profile-evaluation-lock.json').exists(), 'PROFILE_RUN_USED')
         # Consume the attempt before parsing any model-controlled response.
-        gate.save(work, 'profile-evaluation-lock.json', {'proposal_hash': digest(raw),
+        save(work / 'profile-evaluation-lock.json', {'proposal_hash': digest(raw),
                   'manifest_hash': digest(regular(work / 'profile-manifest.json', gate.RUNS))})
         save(STATE / 'pending.json', {'run_id': run_id, 'phase': 'EVALUATING'})
         try:
@@ -263,6 +265,7 @@ def evaluate(run_id, raw):
         memory = memory_record(work, m, report)
         gate.save(work, 'profile-memory.json', memory)
         gate.event(work, 'PROFILE_MEMORY_RECORDED', digest(regular(work / 'profile-memory.json', gate.RUNS)))
+        syncdir(work)
         (STATE / 'pending.json').unlink()
         syncdir(STATE)
         return report

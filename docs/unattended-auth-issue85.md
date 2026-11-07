@@ -1,0 +1,43 @@
+# 無人実行の認証方式案
+
+#85 の初回運転では、隔離した試験専用プロファイルでHermes標準の認証保存を使う方式を推奨する。
+固定版の保存処理で、合成認証ファイルが600、親ディレクトリが700となり、別プロセスから再読込できることを通信遮断コンテナで確認した。
+保護境界はOS利用者単位。同じOS利用者の別プロセスも読めるため、アプリ限定の保護が必要な場合はこの方式を採用しない。
+正式採用と実OAuthの登録は人間判断を要する。
+
+| 方式 | 確認結果 | 必要な準備 | 更新時の扱い |
+|---|---|---|---|
+| Hermes標準の隔離プロファイル | 通信遮断Dockerで保存権限と別プロセス読取成功 | 試験専用の永続保存先と利用者権限 | 既存の排他・原子的保存を再利用 |
+| Data Protection Keychainのアクセスグループ | 合成項目の作成が -34018 で失敗 | ワーカー用entitlementと、それを許可するprovisioning profile | 同じ権限と署名条件を維持して更新 |
+| 従来型Keychainの専用アプリACL | 合成項目の直接読取・LaunchAgent読取成功、別識別子アプリは拒否 | 固定した署名済みワーカーと試験用の新規項目 | 更新後も署名と読取境界を再検証 |
+
+従来型のACL APIはdeprecated。アプリ限定の保護が必要な場合は、Data Protection Keychainの権限を整える案を再評価する。
+署名証明書が利用可能なだけではData Protection Keychainの前提は満たせない。
+この比較は合成試験に基づく。画面ロック中のLaunchAgent実行は未検証。
+
+## 初回試行の境界
+
+- 利用者がログイン中のユーザーLaunchAgentを対象とする。ログアウト中とMacの再起動後にログインする前は起動対象外とする。
+- 標準プロファイル方式では、ホストの試験専用領域の所有者と700/600権限を確認する。通常のHermes本番プロファイルと分離し、リポジトリ外に置く。隔離ワーカーに渡す認証は一時領域だけに展開する。
+- 合成試験で画面ロック中の読取、欠落、拒否、期限不足を確認してから、実OAuthの扱いを判断する。ワーカーは許可画面を出さず、認証不能を状態として返す。
+- 実OAuthを使う場合は、承認された試験専用の保存先を使い、既存の試験項目と本番認証を保全する。秘密の出力は専用プロセスから隔離ワーカーへのパイプに限定する。標準出力ログ・引数・環境変数へ置かない。
+- OAuth更新を行う場合は所有者を1つに固定し、更新結果の保存を確認するまで次の実行を許可しない。更新応答の途絶や保存失敗では停止し、同じ更新トークンを自動で再使用しない。
+- 認証更新の通信許可と回数は推論とは別に確認する。更新未承認または期限不足なら AUTH_FAILED で停止する。
+- 緊急停止は新規受付と実行中のワーカーを停止させ、一時認証を破棄する。永続保存先の認証を削除する操作は、再開と区別して監督者が判断する。
+
+## 検収手順
+
+1. 選定方式の試験専用領域に合成認証を保存する。
+2. 一時LaunchAgentを起動し、ロック前とロック中の読取を確認する。標準プロファイル方式では利用者権限、アプリ限定方式では別アプリの拒否を確認する。
+3. 合成の有効期限切れと欠落を模擬し、実行前に停止することを確認する。
+4. 一時登録と合成項目を削除し、消失を照合する。
+5. 実OAuthの試験専用領域への登録、単発の実推論、更新許可を個別に判断する。
+
+## 根拠
+
+- [Apple TN3137](https://developer.apple.com/documentation/technotes/tn3137-on-mac-keychains)
+- [AppleのACL API](https://developer.apple.com/documentation/security/access-control-lists)
+- [権限不足の説明](https://developer.apple.com/documentation/security/errsecmissingentitlement)
+- [macOSコード署名](https://developer.apple.com/documentation/xcode/creating-distribution-signed-code-for-the-mac/)
+
+固定版の実装根拠は [Hermes auth.py](https://github.com/NousResearch/hermes-agent/blob/b200f5bc60e31588ba2cb60e288029c4a54ba5fa/hermes_cli/auth.py) の _save_auth_store と [auth_codex.py](https://github.com/NousResearch/hermes-agent/blob/b200f5bc60e31588ba2cb60e288029c4a54ba5fa/hermes_cli/auth_codex.py) の保存・読込経路。

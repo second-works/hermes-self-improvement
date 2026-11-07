@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 from build_improvement_packet import build_packet
 from handoff_improvement import HandoffAdoption, digest, evaluator
 from run_mock_improvement import EvaluationError, canonical, control_intake, run
+from rehearse_public_execution import rehearse
 
 
 class MockImprovementTest(unittest.TestCase):
@@ -140,6 +141,33 @@ class MockImprovementTest(unittest.TestCase):
         self.assertEqual(errors, ['INTAKE_STOPPED'])
         receipt = json.loads((self.receipt / 'finished.json').read_text())
         self.assertEqual(receipt['status'], 'STOPPED')
+
+    def test_public_rehearsal_claims_snapshot_and_preserves_stop(self):
+        selected = {'status': 'SELECTED', 'candidate': self.packet}
+        with patch('rehearse_public_execution.select', return_value=selected) as select, \
+                patch('run_mock_improvement.isolated_response', side_effect=lambda data, *_a, **_k: data) as worker:
+            self.assertEqual(rehearse(None, None, self.state, None)['decision'], 'HOLD')
+            selected['candidate'] = {**self.packet, 'event_id': 'a' * 64}
+            with self.assertRaisesRegex(EvaluationError, 'SNAPSHOT_ALREADY_CLAIMED'):
+                rehearse(None, None, self.state, None)
+            self.assertEqual(select.call_args.args[2], {self.packet['event_id']})
+            self.assertEqual(worker.call_count, 1)
+            control_intake(self.state, 'stop')
+            with self.assertRaisesRegex(EvaluationError, 'INTAKE_STOPPED'):
+                rehearse(None, None, self.state, None)
+            self.assertEqual(select.call_count, 2)
+
+    def test_public_rehearsal_stops_before_worker_when_preconditions_fail(self):
+        selected = {'status': 'SELECTED', 'candidate': self.packet}
+        for reason in ('AUTH_FAILED', 'QUOTA_EXHAUSTED', 'COST_UNVERIFIED'):
+            with self.subTest(reason=reason), patch('rehearse_public_execution.select', return_value=selected), \
+                    patch('run_mock_improvement.isolated_response') as worker:
+                state = self.state / reason
+                with self.assertRaisesRegex(EvaluationError, reason):
+                    rehearse(None, None, state, None, reason)
+                worker.assert_not_called()
+                receipt = json.loads((state / self.packet['event_id'] / 'finished.json').read_text())
+                self.assertEqual((receipt['status'], receipt['reason']), ('STOPPED', reason))
 
     def test_non_proposal_decisions(self):
         for decision in ('REUSE', 'NO_CHANGE', 'HOLD'):

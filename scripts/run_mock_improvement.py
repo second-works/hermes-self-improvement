@@ -158,7 +158,8 @@ def interrupt_worker(state_dir, pending):
     except FileNotFoundError:
         # The worker may have removed the receipt while completing normally.
         return
-    fields(record, 'event_id packet_hash container', 'PENDING_SCHEMA')
+    cloud = record.get('worker_kind') == 'hermes-cloud-v1' if isinstance(record, dict) else False
+    fields(record, 'event_id packet_hash container' + (' worker_kind' if cloud else ''), 'PENDING_SCHEMA')
     name = record['container']
     require(hex_id(record['event_id'], 64) and hex_id(record['packet_hash'], 64)
             and isinstance(name, str) and re.fullmatch(r'hermes-eval-[0-9a-f]{32}', name),
@@ -166,17 +167,24 @@ def interrupt_worker(state_dir, pending):
     event_dir = state_dir / record['event_id']
     started = load_json(regular(event_dir / 'started.json', state_dir, 1024))
     require(started == {'event_id': record['event_id'], 'packet_hash': record['packet_hash'],
-                        'status': 'STARTED', 'mock_attempts': 1}, 'PENDING_BINDING')
-    box = Sandbox(ROOT, event_dir)
+                        'status': 'STARTED', ('model_attempt_budget' if cloud else 'mock_attempts'): 1}, 'PENDING_BINDING')
+    if cloud:
+        from delegation.hermes_cloud import CloudSandbox, IMAGE, WORKER_PATH
+        box = CloudSandbox(ROOT, event_dir, IMAGE)
+        program = ROOT / WORKER_PATH
+    else:
+        box = Sandbox(ROOT, event_dir)
+        program = MOCK_PROGRAM
     if not box.container_exists(name):
         return
     try:
         info = box.inspect(name, timeout=5)
         if not info['State']['Running']:
             return
-        image = load_json(box.checked('image', 'inspect', MOCK_IMAGE, timeout=5))[0]
-        box.image = image['Id']
-        box.verify_config(info, MOCK_PROGRAM)
+        if not cloud:
+            image = load_json(box.checked('image', 'inspect', MOCK_IMAGE, timeout=5))[0]
+            box.image = image['Id']
+        box.verify_config(info, program)
         # Use the inspected container ID, so a name being reused cannot redirect the kill.
         require(hex_id(info['Id'], 64), 'CONTAINER_IDENTITY_UNKNOWN')
         box.checked('kill', info['Id'], timeout=5)
@@ -230,7 +238,8 @@ def run(packet, read_mock, state_dir, clock=time.monotonic, *, isolated=False, s
 
 
 def execute_trial(packet, read_mock, state_dir, build_result, clock=time.monotonic,
-                  *, isolated=False, stall=False, one_per_snapshot=False):
+                  *, isolated=False, stall=False, one_per_snapshot=False, cloud=False):
+    require(not cloud or (isolated and not stall), 'CLOUD_MODE')
     require(hex_id(packet.get('event_id'), 64), 'EVENT_ID')
     prepare_state(state_dir)
     marker = state_dir / 'intake-stop.json'
@@ -255,7 +264,8 @@ def execute_trial(packet, read_mock, state_dir, build_result, clock=time.monoton
             raise EvaluationError('EVENT_ALREADY_CLAIMED') from None
         syncdir(state_dir)
         receipt = {'event_id': packet['event_id'], 'packet_hash': digest(canonical(packet))}
-        save(event_dir / 'started.json', {**receipt, 'status': 'STARTED', 'mock_attempts': 1})
+        save(event_dir / 'started.json', {**receipt, 'status': 'STARTED',
+                                         ('model_attempt_budget' if cloud else 'mock_attempts'): 1})
         deadline = clock() + (ISOLATED_DEADLINE_SECONDS if isolated else DEADLINE_SECONDS)
         try:
             data = read_mock()
@@ -264,9 +274,14 @@ def execute_trial(packet, read_mock, state_dir, build_result, clock=time.monoton
             require(len(data) <= MAX_RESPONSE_BYTES, 'RESPONSE_SIZE')
             if isolated:
                 name = 'hermes-eval-' + uuid.uuid4().hex
-                save(pending, {**receipt, 'container': name})
+                save(pending, {**receipt, 'container': name,
+                               **({'worker_kind': 'hermes-cloud-v1'} if cloud else {})})
                 try:
-                    data = isolated_response(data, event_dir, deadline, name, stall=stall)
+                    if cloud:
+                        from delegation.hermes_cloud import response
+                        data = response(ROOT, data, event_dir, deadline, name)
+                    else:
+                        data = isolated_response(data, event_dir, deadline, name, stall=stall)
                 except EvaluationError as error:
                     if getattr(error, 'pending_container', None) is None:
                         pending.unlink()

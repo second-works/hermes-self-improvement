@@ -161,9 +161,9 @@ def decision(metrics, *, safety, unstable, public_count, hidden_count, edits):
         state = 'AWAITING_HUMAN_APPROVAL'
     elif result['status'] == 'PASS':
         result = {'status': 'HOLD', 'reasons': ['PROFILE_REQUIRED_CASES_OR_CONTROL_INVALID']}
-    if any(edit['path'].endswith('.md') for edit in edits):
+    if result['status'] != 'FAIL' and any(edit['path'].endswith('.md') for edit in edits):
         state = 'HOLD'
-        result = {'status': 'HOLD', 'reasons': ['STRUCTURE_ONLY_SEMANTIC_EVALUATION_REQUIRED']}
+        result = {'status': 'HOLD', 'reasons': [*result['reasons'], 'STRUCTURE_ONLY_SEMANTIC_EVALUATION_REQUIRED']}
     return state, result, control
 
 

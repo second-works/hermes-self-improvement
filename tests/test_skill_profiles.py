@@ -118,6 +118,7 @@ class ProfileContractsTest(unittest.TestCase):
         self.assertEqual(decision(metrics,**{**kwargs,'edits':[{'path':COUNTS+'SKILL.md'}]})[0], 'HOLD')
         self.assertEqual(decision(metrics,**{**kwargs,'unstable':True})[0], 'HOLD')
         self.assertEqual(decision(metrics,**{**kwargs,'safety':False})[0], 'REJECTED')
+        self.assertEqual(decision(metrics,**{**kwargs,'safety':False,'edits':[{'path':COUNTS+'SKILL.md'}]})[0], 'REJECTED')
         metrics['candidate'] = metric([False,True,True,True])
         self.assertEqual(decision(metrics,**kwargs)[0], 'REJECTED')
 

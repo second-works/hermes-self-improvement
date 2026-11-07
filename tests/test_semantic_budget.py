@@ -155,6 +155,13 @@ class SemanticCampaignTests(unittest.TestCase):
                 semantic.run(self.event,self.approval,transport=self.transport)
             auth.assert_not_called()
 
+    def test_trusted_code_change_is_refused_before_credentials(self):
+        with patch.object(profiles.gate,'source_hashes',return_value={'public_source':'0'*64}), \
+             patch.object(generation,'read_auth') as auth:
+            with self.assertRaisesRegex(EvaluationError,'SEMANTIC_STALE'):
+                semantic.run(self.event,self.approval,transport=self.transport)
+            auth.assert_not_called()
+
     def test_event_copy_cannot_create_another_budget_for_same_generation(self):
         import shutil
         other='b'*64

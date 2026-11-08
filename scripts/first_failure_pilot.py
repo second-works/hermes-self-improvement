@@ -158,9 +158,12 @@ class Pilot:
     def runtime(self, expected):
         env = {k: os.environ[k] for k in ('PATH', 'LANG', 'LC_ALL') if k in os.environ}
         def git(*args, binary=False):
-            p = subprocess.run(['git', '--no-optional-locks', '-c', 'core.fsmonitor=false',
-                                '-c', 'core.hooksPath=/dev/null', '-C', str(self.root), *args],
-                               capture_output=True, timeout=10, env=env, check=False)
+            try:
+                p = subprocess.run(['git', '--no-optional-locks', '-c', 'core.fsmonitor=false',
+                                    '-c', 'core.hooksPath=/dev/null', '-C', str(self.root), *args],
+                                   capture_output=True, timeout=10, env=env, check=False)
+            except subprocess.TimeoutExpired:
+                raise EvaluationError('RUNTIME_TIMEOUT') from None
             require(p.returncode == 0, 'RUNTIME_UNVERIFIED')
             return p.stdout if binary else p.stdout.decode('ascii').strip()
         require(git('rev-parse', 'HEAD') == expected and not git('status', '--porcelain',

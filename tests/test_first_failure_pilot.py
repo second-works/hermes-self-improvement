@@ -296,6 +296,16 @@ class PilotTests(unittest.TestCase):
         self.assertEqual(self.pilot.tick(),failed)
         self.collect.assert_called_once()
 
+    def test_runtime_timeout_latches_before_cycle_and_never_resumes(self):
+        with patch.object(self.pilot, 'runtime', wraps=p.Pilot.runtime.__get__(self.pilot)), \
+             patch.object(p.subprocess, 'run', side_effect=subprocess.TimeoutExpired(['git'], 10)):
+            failed = self.pilot.tick()
+        self.assertEqual(failed['status'], 'STOPPED')
+        self.assertEqual(failed['reason'], 'RUNTIME_TIMEOUT')
+        self.assertEqual(self.pilot.tick(), failed)
+        self.collect.assert_not_called()
+        self.assertEqual(list((self.pilot.state/'cycles').iterdir()), [])
+
     def test_real_child_collects_public_fixture_then_freezes_first_report(self):
         root=self.root/'native';(root/'scripts').mkdir(parents=True)
         program=root/'scripts/report_github_work_guide.py'

@@ -457,6 +457,20 @@ class LedgerTest(unittest.TestCase):
         broken = self.run_cli('verify')
         self.assertEqual((broken.returncode, json.loads(broken.stderr)['error']), (2, 'LEDGER_CORRUPT'))
 
+    def test_errors_never_echo_secret_like_input(self):
+        leaked = 'synthetic-' + 'value-7f3a'
+        for ref in ('path:docs/' + 'pass' + 'word=' + leaked, 'path:outside/' + 'tok' + 'en=' + leaked,
+                    'nope' + 'API' + '_KEY=' + leaked):
+            experience = json.dumps(dict(CORRECTION, refs=[ref]), ensure_ascii=False)
+            done = self.run_cli('end', '--repository', 'demo-app', '--work-unit', 'wu-1', '--result',
+                                'CANDIDATE_FOUND', '--experience', experience)
+            self.assertEqual(done.returncode, 2)
+            self.assertNotIn(leaked, done.stderr + done.stdout)
+        done = self.run_cli('end', '--repository', 'demo-app', '--work-unit', 'pass' + 'word=' + leaked,
+                            '--result', 'NO_CANDIDATE')
+        self.assertEqual(done.returncode, 2)
+        self.assertNotIn(leaked, done.stderr + done.stdout)
+
     def test_concurrent_appends_are_serialised_and_all_kept(self):
         manifest_path = self.base / 'manifest.json'
         data = manifest_data()

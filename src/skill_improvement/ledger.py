@@ -46,6 +46,8 @@ CAUSE_INITIAL_STATE = {
 
 class LedgerError(Exception):
     def __init__(self, code, detail=''):
+        # Error text reaches stderr and logs, so it never carries secret-like input.
+        detail = '<redacted: secret-like input>' if SECRET_LIKE.search(str(detail)) else detail
         super().__init__(code if not detail else f'{code}: {detail}')
         self.code = code
         self.detail = detail
@@ -170,22 +172,24 @@ class Manifest:
                     'PUBLIC_FIXTUREの台帳にはPUBLICの記録だけを置く')
 
     def check_ref(self, repository_id, ref):
-        require(type(ref) is str and 1 <= len(ref) <= 200 and '\n' not in ref, 'REF_INVALID', repr(ref)[:40])
+        # Reference values are free text: errors name the rule, never echo the value.
+        require(type(ref) is str and 1 <= len(ref) <= 200 and '\n' not in ref, 'REF_INVALID', 'length or line break')
+        require(not SECRET_LIKE.search(ref), 'SECRET_LIKE_INPUT', '秘密値らしい文字列は記録しない')
         kind, sep, value = ref.partition(':')
-        require(sep and value and kind in REF_KINDS, 'REF_KIND_NOT_ALLOWED', kind)
+        require(sep and value and kind in REF_KINDS, 'REF_KIND_NOT_ALLOWED', 'kind must be one of ' + ', '.join(REF_KINDS))
         needed = REF_KINDS[kind]
         if needed:
             require(needed in self.repository(repository_id)['read_items'], 'REF_NOT_ALLOWED_BY_MANIFEST', kind)
         if kind == 'synthetic':
             require(self.data['ledger_location']['kind'] == 'PUBLIC_FIXTURE', 'REF_KIND_NOT_ALLOWED', kind)
         if kind == 'commit':
-            require(re.fullmatch(r'[0-9a-f]{7,40}', value), 'REF_INVALID', 'commit')
+            require(re.fullmatch(r'[0-9a-f]{7,40}', value), 'REF_INVALID', 'commit must be 7-40 hex digits')
         if kind == 'path':
             require(re.fullmatch(rf'{SEGMENT}(/{SEGMENT})*', value) and
-                    not any(part in ('.', '..') for part in value.split('/')), 'REF_PATH_OUTSIDE_ROOTS', value)
+                    not any(part in ('.', '..') for part in value.split('/')), 'REF_PATH_OUTSIDE_ROOTS', 'path must be under an allowed root')
             roots = self.repository(repository_id)['allowed_roots']
             require(any(value == root or value.startswith(root + '/') for root in roots),
-                    'REF_PATH_OUTSIDE_ROOTS', value)
+                    'REF_PATH_OUTSIDE_ROOTS', 'path must be under an allowed root')
 
 
 def check_text(value, code, limit, one_line=True):

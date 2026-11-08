@@ -54,7 +54,7 @@ python3 -I -B scripts/record_skill_experience.py --manifest M --ledger D end --r
 | `path:` | 許可rootの下の相対path（`.` `..` は不可） | `path:docs/guide.md` |
 | `synthetic:` | `PUBLIC_FIXTURE` の台帳だけ | `synthetic:demo-app/pr-1` |
 
-URLなどそれ以外の種類は `REF_KIND_NOT_ALLOWED` で拒否する。要約・理由・根拠に、よく知られたtoken形式（GitHub・GitLab・OpenAI/Anthropic系の `sk-`・AWS・Google・Slack・秘密鍵）や `password=` のような代入があれば `SECRET_LIKE_INPUT` で拒否する。検出は補助であり、秘密値を入れない運用が前提。`token: 期限切れ` のような説明文も拒否されるため、「tokenの期限切れ」のように `:` `=` を続けない書き方にする。
+URLなどそれ以外の種類は `REF_KIND_NOT_ALLOWED` で拒否する。要約・理由・根拠に、よく知られたtoken形式（GitHub・GitLab・OpenAI/Anthropic系の `sk-`・AWS・Google・Slack・秘密鍵）や `password=` のような代入があれば `SECRET_LIKE_INPUT` で拒否する。拒否時のエラーにも入力値をそのまま出さない（根拠参照の値は出さず、秘密値らしい内容を含む詳細は伏せる）。検出は補助であり、秘密値を入れない運用が前提。`token: 期限切れ` のような説明文も拒否されるため、「tokenの期限切れ」のように `:` `=` を続けない書き方にする。
 
 ## 5. 書込と破損
 

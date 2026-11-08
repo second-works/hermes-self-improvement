@@ -320,7 +320,6 @@ def replay(rows, transitions, manifest=None):
             if deployment.get(linked) not in needed or planned_for.get(linked) != record['candidate_id']:
                 illegal.append((row['event_id'], 'deployment', deployment.get(linked)))
         if record['kind'] == 'deployment_plan':
-            planned_for[record['deployment_id']] = record['candidate_id']
             key, new, table, store = record['deployment_id'], 'PLANNED', 'deployment', deployment
         elif record['kind'] == 'deployment_event':
             key, new, table, store = record['deployment_id'], record['state']['status'], 'deployment', deployment
@@ -357,6 +356,8 @@ def replay(rows, transitions, manifest=None):
         if len(illegal) == rejected_before:
             store[key] = new
             accepted.append(row)
+            if record['kind'] == 'deployment_plan':
+                planned_for[key] = record['candidate_id']
     return deployment, candidate, illegal
 
 
@@ -969,6 +970,17 @@ class SkillImprovementContract(unittest.TestCase):
         self.assertNotIn('d-unplanned', deployment)
         rejected = replay([confirmed, halted], self.transitions)[2]
         self.assertEqual(rejected, [('e-c', None, 'EFFECT_CONFIRMED'), ('e-h', None, 'HALTED')])
+        # A rejected re-plan for another candidate does not change which candidate the deployment serves.
+        rows = copy.deepcopy(self.ledger)
+        linked = next(row for row in rows if row['record']['kind'] == 'candidate' and
+                      row['record']['state']['status'] == 'DEPLOYED')
+        stray = copy.deepcopy(first(rows, 'deployment_plan'))
+        stray.update(event_id='e-stray', recorded_at=linked['recorded_at'])
+        stray['record']['candidate_id'] = 'c-other'
+        rows.insert(rows.index(linked), stray)
+        rejected = replay(rows, self.transitions, self.manifests['manifest.example.json'])[2]
+        self.assertIn('e-stray', [event for event, _, _ in rejected])
+        self.assertNotIn(linked['event_id'], [event for event, _, _ in rejected])
 
     def test_committed_examples_equal_the_builder_output(self):
         spec = importlib.util.spec_from_file_location('build_examples', FIXTURES / 'build_examples.py')

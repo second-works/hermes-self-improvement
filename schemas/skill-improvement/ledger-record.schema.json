@@ -1,0 +1,440 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hermes-self-improvement:skill-improvement:ledger-record:1",
+  "title": "Skill改善MVPのappend-only台帳の1行（状態変更も追記イベントで表す）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_id", "recorded_at", "work_date", "timezone", "repository_id", "work_unit_id", "classification", "record"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "event_id": {"$ref": "#/$defs/id"},
+    "recorded_at": {"$ref": "#/$defs/utc"},
+    "work_date": {"$ref": "#/$defs/date"},
+    "timezone": {"type": "string", "pattern": "^(UTC|[A-Z][A-Za-z_]+(/[A-Z][A-Za-z_]+)+)$"},
+    "repository_id": {"$ref": "#/$defs/id"},
+    "work_unit_id": {"$ref": "#/$defs/id"},
+    "classification": {"enum": ["PUBLIC", "INTERNAL", "CONFIDENTIAL"]},
+    "record": {
+      "oneOf": [
+        {"$ref": "#/$defs/end_candidate_found"},
+        {"$ref": "#/$defs/end_no_candidate"},
+        {"$ref": "#/$defs/end_undetermined"},
+        {"$ref": "#/$defs/experience"},
+        {"$ref": "#/$defs/candidate"},
+        {"$ref": "#/$defs/evaluation"},
+        {"$ref": "#/$defs/size_review"},
+        {"$ref": "#/$defs/deployment_plan"},
+        {"$ref": "#/$defs/deployment_event"},
+        {"$ref": "#/$defs/effect_observation"}
+      ]
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"},
+    "ids": {"type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+    "actor": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,39}$"},
+    "ref": {"type": "string", "minLength": 1, "maxLength": 200},
+    "reason": {"type": "string", "minLength": 1, "maxLength": 200},
+    "date": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+    "utc": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "count": {"type": "integer", "minimum": 0, "maximum": 10000},
+    "cause": {"enum": ["MISSING_PROCEDURE", "NOT_LOADED", "NOT_FOLLOWED", "TEMPORARY", "CONFLICT_OR_UNVERIFIED", "DUPLICATE"]},
+    "adverse_trigger": {"enum": ["SAFETY_VIOLATION", "MISAPPLICATION", "CLEAR_WORSENING", "USER_WITHDRAWAL"]},
+
+    "end_candidate_found": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "status", "experience_ids"],
+      "properties": {
+        "kind": {"const": "session_end"},
+        "status": {"const": "CANDIDATE_FOUND"},
+        "experience_ids": {"$ref": "#/$defs/ids"}
+      }
+    },
+    "end_no_candidate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "status"],
+      "properties": {
+        "kind": {"const": "session_end"},
+        "status": {"const": "NO_CANDIDATE"}
+      }
+    },
+    "end_undetermined": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "status", "reason"],
+      "properties": {
+        "kind": {"const": "session_end"},
+        "status": {"const": "UNDETERMINED"},
+        "reason": {"$ref": "#/$defs/reason"}
+      }
+    },
+
+    "experience": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "experience_id", "end_event_id", "experience_type", "summary", "evidence_refs", "cause"],
+      "properties": {
+        "kind": {"const": "experience"},
+        "experience_id": {"$ref": "#/$defs/id"},
+        "end_event_id": {"$ref": "#/$defs/id"},
+        "experience_type": {"enum": ["CORRECTION", "REWORK", "REPEATED_FEEDBACK", "BETTER_METHOD"]},
+        "summary": {"type": "string", "minLength": 1, "maxLength": 120},
+        "evidence_refs": {"type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true, "items": {"$ref": "#/$defs/ref"}},
+        "cause": {"oneOf": [{"$ref": "#/$defs/cause"}, {"const": "UNCLASSIFIED"}]}
+      }
+    },
+
+    "candidate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "candidate_id", "experience_ids", "target_skill_id", "cause", "scope", "state"],
+      "properties": {
+        "kind": {"const": "candidate"},
+        "candidate_id": {"$ref": "#/$defs/id"},
+        "experience_ids": {"$ref": "#/$defs/ids"},
+        "target_skill_id": {"$ref": "#/$defs/id"},
+        "cause": {"$ref": "#/$defs/cause"},
+        "scope": {
+          "oneOf": [
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["type"],
+              "properties": {"type": {"const": "REPOSITORY_LOCAL"}}
+            },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["type", "basis", "repository_ids", "decided_by"],
+              "properties": {
+                "type": {"const": "SHARED"},
+                "basis": {"const": "REPEATED_IN_REPOSITORIES"},
+                "repository_ids": {"type": "array", "minItems": 2, "maxItems": 16, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+                "decided_by": {"$ref": "#/$defs/actor"}
+              }
+            },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["type", "basis", "contract_ref", "decided_by"],
+              "properties": {
+                "type": {"const": "SHARED"},
+                "basis": {"const": "MISSING_COMMON_CONTRACT"},
+                "contract_ref": {"$ref": "#/$defs/ref"},
+                "decided_by": {"$ref": "#/$defs/actor"}
+              }
+            }
+          ]
+        },
+        "state": {
+          "oneOf": [
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["status"],
+              "properties": {"status": {"const": "OPEN"}}
+            },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["status", "reason"],
+              "properties": {"status": {"enum": ["HOLD", "DECLINED"]}, "reason": {"$ref": "#/$defs/reason"}}
+            },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["status", "duplicate_of", "reason"],
+              "properties": {"status": {"const": "DUPLICATE"}, "duplicate_of": {"$ref": "#/$defs/id"}, "reason": {"$ref": "#/$defs/reason"}}
+            },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["status", "deployment_id", "reason"],
+              "properties": {"status": {"enum": ["DEPLOYED", "ROLLED_BACK"]}, "deployment_id": {"$ref": "#/$defs/id"}, "reason": {"$ref": "#/$defs/reason"}}
+            }
+          ]
+        }
+      }
+    },
+
+    "evaluation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "evaluation_id", "candidate_id", "baseline_sha256", "candidate_sha256", "evaluation_sha256", "required_contract", "regression", "improvement", "verdict"],
+      "properties": {
+        "kind": {"const": "evaluation"},
+        "evaluation_id": {"$ref": "#/$defs/id"},
+        "candidate_id": {"$ref": "#/$defs/id"},
+        "baseline_sha256": {"$ref": "#/$defs/sha256"},
+        "candidate_sha256": {"$ref": "#/$defs/sha256"},
+        "evaluation_sha256": {"$ref": "#/$defs/sha256"},
+        "required_contract": {
+          "type": "object", "additionalProperties": false,
+          "required": ["cases", "candidate_passed"],
+          "properties": {"cases": {"type": "integer", "minimum": 1, "maximum": 10000}, "candidate_passed": {"$ref": "#/$defs/count"}}
+        },
+        "regression": {
+          "type": "object", "additionalProperties": false,
+          "required": ["baseline_passing_cases", "candidate_failed_among_them"],
+          "properties": {"baseline_passing_cases": {"$ref": "#/$defs/count"}, "candidate_failed_among_them": {"$ref": "#/$defs/count"}}
+        },
+        "improvement": {
+          "oneOf": [
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["method", "target_cases", "baseline_passed", "candidate_passed", "trials", "stable", "control_valid"],
+              "properties": {
+                "method": {"const": "DETERMINISTIC"},
+                "target_cases": {"$ref": "#/$defs/count"},
+                "baseline_passed": {"$ref": "#/$defs/count"},
+                "candidate_passed": {"$ref": "#/$defs/count"},
+                "trials": {"type": "integer", "minimum": 1, "maximum": 10},
+                "stable": {"type": "boolean"},
+                "control_valid": {"type": "boolean"}
+              }
+            },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["method", "reviewer", "not_deterministic_reason", "preferred"],
+              "properties": {
+                "method": {"const": "HUMAN_COMPARISON"},
+                "reviewer": {"$ref": "#/$defs/actor"},
+                "not_deterministic_reason": {"$ref": "#/$defs/reason"},
+                "preferred": {"enum": ["CANDIDATE", "BASELINE", "TIE", "INCOMPARABLE"]}
+              }
+            }
+          ]
+        },
+        "verdict": {"enum": ["IMPROVED", "IMPROVEMENT_UNCONFIRMED", "REGRESSED", "CONTRACT_FAILED"]}
+      }
+    },
+
+    "size_review": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "review_id", "candidate_id", "target_ref", "guide_lines", "lines_before", "lines_after", "net_added_lines", "moved_to", "responsibilities_before", "responsibilities", "exception_reason", "verdict"],
+      "properties": {
+        "kind": {"const": "size_review"},
+        "review_id": {"$ref": "#/$defs/id"},
+        "candidate_id": {"$ref": "#/$defs/id"},
+        "target_ref": {"$ref": "#/$defs/ref"},
+        "guide_lines": {"enum": [80, 120]},
+        "lines_before": {"$ref": "#/$defs/count"},
+        "lines_after": {"$ref": "#/$defs/count"},
+        "net_added_lines": {"type": "integer", "minimum": -10000, "maximum": 10000},
+        "moved_to": {"type": "array", "maxItems": 8, "uniqueItems": true, "items": {"$ref": "#/$defs/ref"}},
+        "responsibilities_before": {"type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "responsibilities": {
+          "type": "array", "maxItems": 32,
+          "items": {
+            "oneOf": [
+              {
+                "type": "object", "additionalProperties": false,
+                "required": ["id", "status", "location"],
+                "properties": {"id": {"$ref": "#/$defs/id"}, "status": {"enum": ["KEPT", "MOVED", "MERGED"]}, "location": {"$ref": "#/$defs/ref"}}
+              },
+              {
+                "type": "object", "additionalProperties": false,
+                "required": ["id", "status", "reason", "approved_by"],
+                "properties": {"id": {"$ref": "#/$defs/id"}, "status": {"const": "RETIRED"}, "reason": {"$ref": "#/$defs/reason"}, "approved_by": {"$ref": "#/$defs/actor"}}
+              }
+            ]
+          }
+        },
+        "exception_reason": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/reason"}]},
+        "verdict": {"enum": ["WITHIN_GUIDE", "EXCEPTION_RECORDED", "HOLD"]}
+      }
+    },
+
+    "deployment_plan": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "deployment_id", "candidate_id", "evaluation_id", "size_review_id", "target", "route", "hashes", "backup", "owner", "deadline", "applicability", "rollback_preapproval"],
+      "properties": {
+        "kind": {"const": "deployment_plan"},
+        "deployment_id": {"$ref": "#/$defs/id"},
+        "candidate_id": {"$ref": "#/$defs/id"},
+        "evaluation_id": {"$ref": "#/$defs/id"},
+        "size_review_id": {"$ref": "#/$defs/id"},
+        "target": {
+          "type": "object", "additionalProperties": false,
+          "required": ["skill_id", "canonical_ref", "deploy_ref"],
+          "properties": {"skill_id": {"$ref": "#/$defs/id"}, "canonical_ref": {"$ref": "#/$defs/ref"}, "deploy_ref": {"$ref": "#/$defs/ref"}}
+        },
+        "route": {
+          "oneOf": [
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["type"],
+              "properties": {"type": {"const": "LOCAL_MANUAL"}}
+            },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["type", "owner_repository_id", "issue_ref"],
+              "properties": {"type": {"const": "OWNER_REPOSITORY_PR"}, "owner_repository_id": {"$ref": "#/$defs/id"}, "issue_ref": {"$ref": "#/$defs/ref"}}
+            }
+          ]
+        },
+        "hashes": {
+          "type": "object", "additionalProperties": false,
+          "required": ["baseline", "candidate", "evaluation", "expected_before", "expected_after"],
+          "properties": {
+            "baseline": {"$ref": "#/$defs/sha256"},
+            "candidate": {"$ref": "#/$defs/sha256"},
+            "evaluation": {"$ref": "#/$defs/sha256"},
+            "expected_before": {"$ref": "#/$defs/sha256"},
+            "expected_after": {"$ref": "#/$defs/sha256"}
+          }
+        },
+        "backup": {
+          "type": "object", "additionalProperties": false,
+          "required": ["ref", "sha256"],
+          "properties": {"ref": {"$ref": "#/$defs/ref"}, "sha256": {"$ref": "#/$defs/sha256"}}
+        },
+        "owner": {"$ref": "#/$defs/actor"},
+        "deadline": {"$ref": "#/$defs/utc"},
+        "applicability": {
+          "type": "object", "additionalProperties": false,
+          "required": ["conditions", "skill_version"],
+          "properties": {
+            "conditions": {"type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true, "items": {"$ref": "#/$defs/reason"}},
+            "skill_version": {"$ref": "#/$defs/ref"}
+          }
+        },
+        "rollback_preapproval": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["approved_by", "executor", "conditions", "expires_at"],
+              "properties": {
+                "approved_by": {"$ref": "#/$defs/actor"},
+                "executor": {"$ref": "#/$defs/actor"},
+                "conditions": {"type": "array", "minItems": 1, "maxItems": 4, "uniqueItems": true, "items": {"$ref": "#/$defs/adverse_trigger"}},
+                "expires_at": {"$ref": "#/$defs/utc"}
+              }
+            }
+          ]
+        }
+      }
+    },
+
+    "deployment_event": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "deployment_id", "state"],
+      "properties": {
+        "kind": {"const": "deployment_event"},
+        "deployment_id": {"$ref": "#/$defs/id"},
+        "state": {
+          "oneOf": [
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["status", "approved_by", "approved_at", "expires_at", "plan_event_id", "plan_sha256"],
+              "properties": {
+                "status": {"const": "APPROVED"},
+                "approved_by": {"$ref": "#/$defs/actor"},
+                "approved_at": {"$ref": "#/$defs/utc"},
+                "expires_at": {"$ref": "#/$defs/utc"},
+                "plan_event_id": {"$ref": "#/$defs/id"},
+                "plan_sha256": {"$ref": "#/$defs/sha256"}
+              }
+            },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["status", "pr_ref", "merge_commit"],
+              "properties": {"status": {"const": "MERGED"}, "pr_ref": {"$ref": "#/$defs/ref"}, "merge_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}}
+            },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["status", "deployed_by", "deployed_at", "approval_event_id", "observed_before_sha256", "observed_after_sha256"],
+              "properties": {
+                "status": {"const": "DEPLOYED_EFFECT_UNCONFIRMED"},
+                "deployed_by": {"$ref": "#/$defs/actor"},
+                "deployed_at": {"$ref": "#/$defs/utc"},
+                "approval_event_id": {"$ref": "#/$defs/id"},
+                "observed_before_sha256": {"$ref": "#/$defs/sha256"},
+                "observed_after_sha256": {"$ref": "#/$defs/sha256"}
+              }
+            },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["status", "observation_ids"],
+              "properties": {"status": {"const": "EFFECT_CONFIRMED"}, "observation_ids": {"$ref": "#/$defs/ids"}}
+            },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["status", "observation_ids", "reason"],
+              "properties": {"status": {"const": "IMPROVEMENT_UNCONFIRMED"}, "observation_ids": {"$ref": "#/$defs/ids"}, "reason": {"$ref": "#/$defs/reason"}}
+            },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["status", "trigger", "observation_id"],
+              "properties": {"status": {"const": "HALTED"}, "trigger": {"$ref": "#/$defs/adverse_trigger"}, "observation_id": {"$ref": "#/$defs/id"}}
+            },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["status", "intent_id", "lock_ref", "executor", "trigger", "authority", "expected_current_sha256", "backup_sha256"],
+              "properties": {
+                "status": {"const": "ROLLING_BACK"},
+                "intent_id": {"$ref": "#/$defs/id"},
+                "lock_ref": {"$ref": "#/$defs/ref"},
+                "executor": {"$ref": "#/$defs/actor"},
+                "trigger": {"$ref": "#/$defs/adverse_trigger"},
+                "authority": {
+                  "oneOf": [
+                    {
+                      "type": "object", "additionalProperties": false,
+                      "required": ["type"],
+                      "properties": {"type": {"const": "PREAPPROVED"}}
+                    },
+                    {
+                      "type": "object", "additionalProperties": false,
+                      "required": ["type", "approved_by", "approved_at", "expires_at"],
+                      "properties": {
+                        "type": {"const": "SEPARATE_APPROVAL"},
+                        "approved_by": {"$ref": "#/$defs/actor"},
+                        "approved_at": {"$ref": "#/$defs/utc"},
+                        "expires_at": {"$ref": "#/$defs/utc"}
+                      }
+                    }
+                  ]
+                },
+                "expected_current_sha256": {"$ref": "#/$defs/sha256"},
+                "backup_sha256": {"$ref": "#/$defs/sha256"}
+              }
+            },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["status", "intent_id", "observed_current_sha256", "restored_sha256"],
+              "properties": {
+                "status": {"const": "ROLLED_BACK"},
+                "intent_id": {"$ref": "#/$defs/id"},
+                "observed_current_sha256": {"$ref": "#/$defs/sha256"},
+                "restored_sha256": {"$ref": "#/$defs/sha256"}
+              }
+            },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["status", "intent_id", "reason", "observed_current_sha256"],
+              "properties": {
+                "status": {"const": "RECOVERY_REQUIRED"},
+                "intent_id": {"$ref": "#/$defs/id"},
+                "reason": {"enum": ["CURRENT_HASH_MISMATCH", "PARTIAL_WRITE", "UNKNOWN_RESULT", "RESTORED_HASH_MISMATCH"]},
+                "observed_current_sha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]}
+              }
+            },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["status", "reason"],
+              "properties": {"status": {"const": "WITHDRAWN"}, "reason": {"$ref": "#/$defs/reason"}}
+            }
+          ]
+        }
+      }
+    },
+
+    "effect_observation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "observation_id", "deployment_id", "sequence", "applicable", "skill_applied", "task_result", "issue_recurred", "adverse"],
+      "properties": {
+        "kind": {"const": "effect_observation"},
+        "observation_id": {"$ref": "#/$defs/id"},
+        "deployment_id": {"$ref": "#/$defs/id"},
+        "sequence": {"type": "integer", "minimum": 1, "maximum": 10000},
+        "applicable": {"type": "boolean"},
+        "skill_applied": {"type": "boolean"},
+        "task_result": {"enum": ["COMPLETED", "FAILED", "UNFINISHED"]},
+        "issue_recurred": {"type": "boolean"},
+        "adverse": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/adverse_trigger"}]}
+      }
+    }
+  }
+}

@@ -7,11 +7,22 @@ Output is one JSON object on stdout; a refusal prints {"error": CODE} on stderr 
 import argparse
 import json
 from pathlib import Path
+import re
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from skill_improvement.ledger import (CAUSES, EXPERIENCE_TYPES, Ledger, LedgerError, Manifest,  # noqa: E402
                                       load_contract, summary, utc_now)
+
+
+class QuietParser(argparse.ArgumentParser):
+    """argparse errors normally repeat the offending value; this one never echoes input values."""
+
+    def error(self, message):
+        message = re.sub(r"'[^']*'", "'<value>'", message)
+        message = re.sub(r'(unrecognized arguments:).*', r'\1 <values>', message, flags=re.DOTALL)
+        print(json.dumps({'error': 'ARGUMENTS_INVALID', 'detail': message}, ensure_ascii=False), file=sys.stderr)
+        sys.exit(2)
 
 
 def experience(text):
@@ -25,7 +36,7 @@ def experience(text):
 
 
 def parser():
-    root = argparse.ArgumentParser(description=__doc__)
+    root = QuietParser(description=__doc__)
     root.add_argument('--manifest', required=True, help='approved repository manifest (JSON)')
     root.add_argument('--ledger', required=True, help='approved ledger directory (absolute, named by the manifest)')
     commands = root.add_subparsers(dest='command', required=True)

@@ -466,10 +466,15 @@ class LedgerTest(unittest.TestCase):
                                 'CANDIDATE_FOUND', '--experience', experience)
             self.assertEqual(done.returncode, 2)
             self.assertNotIn(leaked, done.stderr + done.stdout)
-        done = self.run_cli('end', '--repository', 'demo-app', '--work-unit', 'pass' + 'word=' + leaked,
-                            '--result', 'NO_CANDIDATE')
-        self.assertEqual(done.returncode, 2)
-        self.assertNotIn(leaked, done.stderr + done.stdout)
+        for args in (('end', '--repository', 'demo-app', '--work-unit', 'pass' + 'word=' + leaked,
+                      '--result', 'NO_CANDIDATE'),
+                     ('propose', '--repository', 'demo-app', '--work-unit', 'w', '--experience-id', 'x',
+                      '--target-skill', 's', '--cause', leaked),
+                     ('end', '--bogus', leaked),
+                     ('verify', '--bogus', leaked)):
+            done = self.run_cli(*args)
+            self.assertEqual(done.returncode, 2, args)
+            self.assertNotIn(leaked, done.stderr + done.stdout, args)
 
     def test_concurrent_appends_are_serialised_and_all_kept(self):
         manifest_path = self.base / 'manifest.json'

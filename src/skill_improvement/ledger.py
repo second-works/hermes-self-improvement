@@ -474,6 +474,10 @@ class Ledger:
                 same = (first['cause'], first['scope'], first['target_skill_id']) == (cause, scope, target_skill_id)
                 same = same and (duplicate_of is None or first['state'].get('duplicate_of') == duplicate_of)
                 require(same, 'CANDIDATE_CONFLICT', candidate_id)
+                # A retry may not silently drop a stricter classification than the one recorded.
+                recorded = candidates[candidate_id][-1]['classification']
+                require(LEVELS.index(requested_level) <= LEVELS.index(recorded), 'CANDIDATE_CONFLICT',
+                        f'{candidate_id} is recorded as {recorded}')
                 return [], {'status': 'ALREADY_RECORDED', 'candidate_id': candidate_id,
                             'state': candidates[candidate_id][-1]['record']['state']}
             refs = set().union(*(basis(item) for item in experience_ids))

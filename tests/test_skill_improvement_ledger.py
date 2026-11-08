@@ -176,6 +176,17 @@ class LedgerTest(unittest.TestCase):
         self.file().write_bytes(self.raw() + json.dumps(lowered).encode() + b'\n')
         self.refused('LEDGER_CORRUPT', local.read)
 
+    def test_retry_with_a_stricter_classification_is_a_conflict(self):
+        local = Ledger(self.directory, Manifest(manifest_data('APPROVED_LOCAL_DIRECTORY'), self.contract, NOW),
+                       self.contract, self.clock)
+        ids = local.record_end('demo-app', 'wu-1', 'CANDIDATE_FOUND', '2026-11-04',
+                               experiences=[CORRECTION])['experience_ids']
+        local.propose('demo-app', 'triage', ids, 'pr-review', 'MISSING_PROCEDURE')
+        self.assertEqual(local.propose('demo-app', 'triage', ids, 'pr-review', 'MISSING_PROCEDURE',
+                                       classification='PUBLIC')['status'], 'ALREADY_RECORDED')
+        self.refused('CANDIDATE_CONFLICT', local.propose, 'demo-app', 'triage', ids, 'pr-review',
+                     'MISSING_PROCEDURE', classification='CONFIDENTIAL')
+
     def test_cause_sets_the_initial_state_and_state_changes_follow_the_table(self):
         ids = self.ledger.record_end('demo-app', 'wu-1', 'CANDIDATE_FOUND', '2026-11-04', experiences=[
             dict(CORRECTION, refs=[f'input:例{index}']) for index in range(3)])['experience_ids']

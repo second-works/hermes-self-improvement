@@ -306,7 +306,7 @@ class ProcessTests(unittest.TestCase):
             child.wait.return_value=143
             with patch.object(p.subprocess,'Popen',return_value=child) as popen, \
                  patch.object(pilot,'stop_requested',return_value=True), \
-                 patch.object(p.os,'getpgid',return_value=123),patch.object(p.os,'killpg',side_effect=[None,ProcessLookupError()]) as kill:
+                 patch.object(p.os,'getpgid',return_value=123),patch.object(p.os,'killpg') as kill:
                 with self.assertRaisesRegex(EvaluationError,'STOP_REQUESTED'):
                     pilot.collect(root/'runs/pilot-test',cycle)
             args=popen.call_args.args[0]
@@ -316,17 +316,19 @@ class ProcessTests(unittest.TestCase):
             self.assertTrue(popen.call_args.kwargs['start_new_session'])
             self.assertFalse(popen.call_args.kwargs.get('shell',False))
             self.assertEqual(kill.call_args_list[0].args,(123,signal.SIGTERM))
-            self.assertEqual(kill.call_args_list[1].args,(123,0))
+            self.assertEqual(kill.call_args_list[1].args,(123,signal.SIGKILL))
             child.wait.assert_called_once_with(timeout=5)
 
 
-    def test_group_reconciliation_kills_orphan_even_after_collector_exits(self):
+    def test_group_kill_precedes_reaping_so_pid_cannot_be_reused(self):
         pilot=p.Pilot(ROOT);child=Mock(pid=123)
         with patch.object(p.os,'getpgid',return_value=123), \
-             patch.object(p.os,'killpg',side_effect=[None,None,None,ProcessLookupError()]) as kill, \
+             patch.object(p.os,'killpg') as kill, \
              patch.object(p.time,'sleep'):
+            child.wait.side_effect=lambda **_: self.assertEqual(kill.call_args_list[-1].args,(123,signal.SIGKILL))
             pilot.terminate(child)
-        self.assertEqual([c.args[1] for c in kill.call_args_list],[signal.SIGTERM,0,signal.SIGKILL,0])
+        self.assertEqual([c.args[1] for c in kill.call_args_list],[signal.SIGTERM,signal.SIGKILL])
+        child.wait.assert_called_once_with(timeout=5)
 
     def test_unknown_process_group_is_never_signalled(self):
         pilot=p.Pilot(ROOT);child=Mock(pid=123)

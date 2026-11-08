@@ -247,21 +247,13 @@ class Pilot:
         try:
             require(os.getpgid(child.pid) == child.pid, 'CHILD_IDENTITY_UNCONFIRMED')
             os.killpg(child.pid, signal.SIGTERM)
+            # Keep the leader unreaped until the final group signal: its PID cannot be reused.
+            time.sleep(0.25)
             try:
-                child.wait(timeout=5)
-            except subprocess.TimeoutExpired:
                 os.killpg(child.pid, signal.SIGKILL)
-                child.wait(timeout=5)
-            # The collector may exit before its gh child. Reconcile the entire owned group.
-            deadline = time.monotonic() + 5
-            while True:
-                try:
-                    os.killpg(child.pid, 0)
-                except ProcessLookupError:
-                    return
-                os.killpg(child.pid, signal.SIGKILL)
-                require(time.monotonic() < deadline, 'CHILD_CLEANUP_UNCONFIRMED')
-                time.sleep(0.05)
+            except ProcessLookupError:
+                pass
+            child.wait(timeout=5)
         except (OSError, subprocess.TimeoutExpired):
             raise EvaluationError('CHILD_CLEANUP_UNCONFIRMED') from None
 
@@ -369,6 +361,7 @@ def main(argv=None):
     parser.add_argument('--runtime-sha')
     args = parser.parse_args(argv)
     pilot = Pilot()
+    signal.signal(signal.SIGCHLD, signal.SIG_DFL)
     for kind in (signal.SIGTERM, signal.SIGINT):
         signal.signal(kind, lambda *_: globals().__setitem__('SIGNALLED', True))
     try:

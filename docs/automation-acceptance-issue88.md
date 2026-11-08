@@ -39,7 +39,7 @@ python3 -I -B tests/run_unattended_stop_docker.py
 
 前者は登録済みreviewとevent countsの2profileをbaseline/candidate/劣化対照で比較し、有限のコード契約について承認待ちになることを確認する。
 後者は保存合成点検から実dispatcherへ渡し、コード＋Skill文候補、意味的評価の別承認、9つの独立Hermes profile、上限、監査、停止/再開、記録保全を確認する。
-固定のoffline応答は意味的な正解ではないため、期待結果はHOLD。これを実モデルの改善品質の証拠にしない。
+固定のoffline応答は意味的な正解ではない。9試行完了・全roleの正解数0・control_valid=trueを照合し、INSUFFICIENT_GAINによるHOLD、またはLATENCY_LIMITを併発したREJECTEDを通常の非採用結果として検証する。STOPPED/TIMEOUT、試行欠落、正解数や制御の矛盾、承認待ちへの昇格は成功扱いしない。これを実モデルの改善品質の証拠にしない。
 最後の停止試験は、固定ワーカーへ入力も認証も渡さずstdinで待機させ、通常の停止入口から検査済みIDだけを停止する。コンテナ削除、pending解消、停止記録、明示再開後の再送拒否まで確認する。
 Docker作成結果が不明な場合も後始末を試み、確認できなければpendingを保持する。
 送信中の実HTTP要求の中断やサーバー側の利用量確定を検証した試験ではない。
@@ -104,3 +104,13 @@ Plus契約はAPI残高ではなく、利用枠や請求条件を自動照会し�
 Plan vs Reality: 合成検証は成功したが、実際のisolated入口では読込不具合があり、実機の点検完了も未達だった。実障害の有用性と実運用の負担はまだ検証できていない。
 今回の判定はNot runであり、Product Accepted / 継続運転可能とは報告しない。
 問題が起きた場合は新規受付を停止し、pending・予算・点検・評価原本を保全する。人の判断なく再送や候補採用を行わない。
+
+## #101: 合法な不採用判定と検収側の誤検知（2026-11-08）
+
+main `470abb455b1fd261400e74015a7e1ed8b8933de3` の再確認で、初回の合成eventは独立評価1回目のTIMEOUTでSTOPPEDとなった。後始末と非再送の記録を保全し、そのeventを再実行していない。別の新しい合成eventでは9つの独立profileが完了し、正本の評価器がLATENCY_LIMIT / INSUFFICIENT_GAINによりREJECTEDを返した。3roleの正解数はすべて0、control_valid=trueだった。
+
+検収driverがHOLDだけを許容していたため、合法なREJECTEDでも停止/再開・監査の後続確認へ進めなかった。#101で検収側の期待だけを正本へ合わせる。本体の評価器、30秒期限、1200秒予算、承認や送信上限は変更しない。新しい単体テストでHOLDとこの限定したREJECTEDを確認し、STOPPED・承認待ち・欠落・矛盾や別理由のREJECTEDを拒否する。9独立profile、予約10、監査、点検保全、停止/再開と非再送の確認は保持する。
+
+初回TIMEOUTは解消扱いにしない。独立したnetwork-none診断は23.863秒で完了し、うち実行部分は22.499秒だったが、時間変動の原因は未確定。実推論・実認証読取は全試験で0回。最終的な実障害の有用性と、現在の認証・利用枠の検収は別途必要。
+
+修正後の新しい合成event `14966743838de2035c8147426e8d58c20889edfe4615e56d9f0c4b855837218f` はnetwork-none通し検証に成功した。独立profile 9、予約10、監査、点検保全、再起動/停止/再開の非再送を確認。最終状態はREJECTED（LATENCY_LIMIT / INSUFFICIENT_GAIN）であり、候補の採用や改善品質の成功ではない。report hash: `4d30650d232dca31c367d62c5d639fc1817ddeb554e0017d0c29239061504812`。本体runtimeは470abb45、検収driver SHA-256は`6b2dac10d4272a088795b0ea22679e6d792ba6d15ae741f18b6f6f556038ec9e`。追加の回帰を含む単体72件・標準30件・Securityが成功。実推論・実認証読取は0回。初回TIMEOUTと旧driverの誤検知記録は保全する。

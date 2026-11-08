@@ -16,7 +16,8 @@ from run_semantic_budget_docker import OfflineSandbox,synthetic_auth
 from test_github_work_guide import change
 from delegation import hermes_cloud
 from delegation.generated import git
-from evaluation.core import canonical,digest,require
+from evaluation.core import canonical,digest,require,load_json,regular
+from evaluation.semantic import ROLES
 from github_work_guide.core import save_run,REPO
 from extract_public_failure import PREFIX
 from intake_public_failure import intake
@@ -37,6 +38,24 @@ class SyntheticGitHub:
                 'UNEXPECTED_SYNTHETIC_ROUTE')
         checks=self.item['raw']['checks']
         return {'total_count':len(checks),'check_runs':checks}
+
+
+def verify_offline_verdict(final, report):
+    """The fixed marker may be held or rejected for latency, never semantically accepted."""
+    require(type(final) is dict and type(report) is dict, 'SYNTHETIC_RESULT_SCHEMA')
+    state = final.get('status')
+    require(state in ('HOLD', 'REJECTED') and report.get('state') == state,
+            'SYNTHETIC_MARKER_MUST_NOT_PASS')
+    require(type(report.get('evaluation_attempts')) is int and report['evaluation_attempts'] == 9
+            and type(report.get('generation_requests_consumed')) is int
+            and report['generation_requests_consumed'] == 1, 'NINE_COMPLETED_TRIALS_REQUIRED')
+    counts = report.get('counts')
+    require(type(counts) is dict and set(counts) == set(ROLES)
+            and all(type(counts[r]) is int and counts[r] == 0 for r in ROLES)
+            and report.get('control_valid') is True, 'SYNTHETIC_MARKER_COUNTS_OR_CONTROL')
+    expected = ({'status': 'HOLD', 'reasons': ['INSUFFICIENT_GAIN']} if state == 'HOLD' else
+                {'status': 'FAIL', 'reasons': ['LATENCY_LIMIT', 'INSUFFICIENT_GAIN']})
+    require(report.get('decision') == expected, 'UNEXPECTED_SYNTHETIC_VERDICT')
 
 
 def main():
@@ -90,7 +109,8 @@ def main():
     with patch.object(runner.generation,'read_auth',return_value=synthetic_auth()), \
          patch.object(hermes_cloud,'CloudSandbox',OfflineSandbox),patch.object(hermes_cloud,'response',side_effect=offline):
         final=dispatch()
-    require(final['status']=='HOLD','SYNTHETIC_MARKER_MUST_NOT_PASS')
+    report=load_json(regular(runner.semantic.area(entry['event_id'])/'report.json',runner.semantic.STATE))
+    verify_offline_verdict(final,report)
     require(len(OfflineSandbox.ids)==len(set(OfflineSandbox.ids))==9,'NINE_INDEPENDENT_PROFILES')
     with patch.object(runner.generation,'read_auth',side_effect=AssertionError('must not resend')):
         require(dispatch()==final,'RESTART_MUST_NOT_RESEND')
@@ -104,6 +124,7 @@ def main():
     print(json.dumps({'status':'VERIFIED','mode':'PUBLIC_SYNTHETIC_OFFLINE','model_calls':0,'auth_reads':0,
         'network':'none','distinct_profiles':9,'requests_reserved':10,'final':final,
         'inspection_preserved':True,'restart_stop_resume_no_resend':True,'head':head,
+        'semantic_state':report['state'],'semantic_decision':report['decision'],
         'adoption':'NOT_REQUESTED'}),flush=True)
 
 

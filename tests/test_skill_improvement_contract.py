@@ -306,10 +306,19 @@ def replay(rows, transitions, manifest=None):
         elif new == 'DEPLOYED_EFFECT_UNCONFIRMED' and manifest is not None and deploy_guard(manifest, rows, index):
             illegal.append((row['event_id'], 'gate', deploy_guard(manifest, rows, index)))
         elif new in ('ROLLED_BACK', 'RECOVERY_REQUIRED') and current == 'ROLLING_BACK':
-            # The recorded end of a rollback has to be the outcome its observed hashes imply.
-            judged = judge_rollback(rows[:index + 1], key)
-            if judged != (new, record['state'].get('reason')):
-                illegal.append((row['event_id'], 'gate', judged[1] or judged[0]))
+            # The recorded end of a rollback must close the active intent with the outcome its hashes imply.
+            active = [item for item in deployment_states(rows[:index], key)
+                      if item['record']['state']['status'] == 'ROLLING_BACK'][-1]
+            if record['state']['intent_id'] != active['record']['state']['intent_id']:
+                illegal.append((row['event_id'], 'gate', 'INTENT_LINK_MISMATCH'))
+            else:
+                judged = judge_rollback(rows[:index + 1], key)
+                if judged != (new, record['state'].get('reason')):
+                    illegal.append((row['event_id'], 'gate', judged[1] or judged[0]))
+        elif new in ('EFFECT_CONFIRMED', 'IMPROVEMENT_UNCONFIRMED', 'HALTED'):
+            refused = effect_state_mismatch(rows[:index], row)
+            if refused:
+                illegal.append((row['event_id'], 'gate', refused))
         store[key] = new
     return deployment, candidate, illegal
 
@@ -341,6 +350,20 @@ def effect_window(rows, deployment_id):
     if len(window) < 3:
         return 'EFFECT_UNCONFIRMED', 'WINDOW_INCOMPLETE', ids
     return 'EFFECT_CONFIRMED', None, ids
+
+
+def effect_state_mismatch(prefix, row):
+    """An effect state may only be recorded when the observations already appended support it."""
+    state = row['record']['state']
+    deployment_id = row['record']['deployment_id']
+    if state['status'] == 'HALTED':
+        supporting = [item['record'] for item in records(prefix, 'effect_observation', deployment_id=deployment_id)
+                      if item['record']['observation_id'] == state['observation_id']]
+        return None if supporting and supporting[-1]['adverse'] == state['trigger'] else 'EFFECT_STATE_MISMATCH'
+    verdict, _, window = effect_window(prefix, deployment_id)
+    if verdict != state['status'] or window != state['observation_ids']:
+        return 'EFFECT_STATE_MISMATCH'
+    return None
 
 
 def judge_rollback(rows, deployment_id):
@@ -791,6 +814,27 @@ class SkillImprovementContract(unittest.TestCase):
         later = copy.deepcopy(manifest)
         later['approval']['approved_at'] = '2026-11-10T00:00:00Z'
         self.assertEqual(judge_deploy_gate(later, allowed['records'], allowed['at']), ('HOLD', 'MANIFEST_NOT_APPROVED'))
+
+    def test_completion_and_effect_states_must_match_their_evidence(self):
+        manifest = self.manifests['manifest.example.json']
+        # A completion pointing at another intent does not close the active rollback.
+        unlinked = copy.deepcopy(self.scenarios['rollback-success']['records'])
+        unlinked[-1]['record']['state'] = {'status': 'RECOVERY_REQUIRED', 'intent_id': 'nonexistent-intent',
+                                           'reason': 'PARTIAL_WRITE', 'observed_current_sha256': None,
+                                           'restored_sha256': None}
+        self.assertIn((unlinked[-1]['event_id'], 'gate', 'INTENT_LINK_MISMATCH'),
+                      replay(unlinked, self.transitions, manifest)[2])
+        # EFFECT_CONFIRMED needs the full three-observation window that was already recorded.
+        short = copy.deepcopy(self.scenarios['effect-window-short']['records'])
+        claim = copy.deepcopy(first(short, 'deployment_event', 'DEPLOYED_EFFECT_UNCONFIRMED'))
+        claim.update(event_id='e-claim', recorded_at='2026-11-07T00:00:00Z')
+        claim['record']['state'] = {'status': 'EFFECT_CONFIRMED', 'observation_ids': ['o-1', 'o-2']}
+        self.assertIn(('e-claim', 'gate', 'EFFECT_STATE_MISMATCH'), replay(short + [claim], self.transitions, manifest)[2])
+        # HALTED needs an appended observation with the same adverse trigger.
+        halted = copy.deepcopy(self.scenarios['rollback-success']['records'])
+        first(halted, 'deployment_event', 'HALTED')['record']['state']['trigger'] = 'SAFETY_VIOLATION'
+        rejected = replay(halted, self.transitions, manifest)[2]
+        self.assertIn((first(halted, 'deployment_event', 'HALTED')['event_id'], 'gate', 'EFFECT_STATE_MISMATCH'), rejected)
 
     def test_committed_examples_equal_the_builder_output(self):
         spec = importlib.util.spec_from_file_location('build_examples', FIXTURES / 'build_examples.py')

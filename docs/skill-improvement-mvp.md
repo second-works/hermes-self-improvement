@@ -138,6 +138,8 @@ MergeとSkillの反映は別の記録にする。Mergeしただけでは配備�
 5. 窓が3件に満たなければ効果未確認（`WINDOW_INCOMPLETE`、配備は `DEPLOYED_EFFECT_UNCONFIRMED` のまま）。
 6. それ以外は `EFFECT_CONFIRMED`。失敗した作業も、同じ問題が再発していなければ窓に数える。
 
+効果の状態（`EFFECT_CONFIRMED` / `IMPROVEMENT_UNCONFIRMED` / `HALTED`）は、すでに追記した観測から上の順で導いた結果と、根拠にした観測IDが一致するときだけ記録できる。一致しない行は不正な行として拒否する。
+
 ## 9. rollbackと復旧待ち
 
 即時rollbackは、計画に固定した事前承認の範囲（対象・発動条件・実行者・期限）でだけ行う。範囲外は別の承認（`SEPARATE_APPROVAL`）を記録してから行う。
@@ -152,7 +154,7 @@ intentの発動条件は、直前に停止（`HALTED`）させた条件と一致
 5. 復元後のhashを反映前の期待hashと照合する。
 6. `ROLLED_BACK` を記録する。
 
-終了の記録（`ROLLED_BACK` / `RECOVERY_REQUIRED`）は、まず観測したhashから結果を導き、記録した状態と理由がそれと一致しなければ不正な行として拒否する。現在hashと復元後hashがどちらも期待どおりなら、結果は `ROLLED_BACK` であり、`RECOVERY_REQUIRED` と記録することはできない。
+終了の記録（`ROLLED_BACK` / `RECOVERY_REQUIRED`）は、実行中のintentと同じ `intent_id` を持たなければならない。そのうえで観測したhashから結果を導き、記録した状態と理由がそれと一致しなければ不正な行として拒否する。現在hashと復元後hashがどちらも期待どおりなら、結果は `ROLLED_BACK` であり、`RECOVERY_REQUIRED` と記録することはできない。
 
 次の場合は上書きせず `RECOVERY_REQUIRED` にし、人の確認なしに再試行しない。
 

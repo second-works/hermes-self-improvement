@@ -34,7 +34,7 @@ CAUSES = ('MISSING_PROCEDURE', 'NOT_LOADED', 'NOT_FOLLOWED', 'TEMPORARY', 'CONFL
 REF_KINDS = {'input': 'EXPLICIT_INPUT', 'end': 'END_RECORD', 'pr-review': 'PR_REVIEW_COMMENT',
              'commit': 'COMMIT_MESSAGE', 'path': None, 'synthetic': None}
 SEGMENT = r'[A-Za-z0-9._-]+'
-SECRET_LIKE = re.compile(r'(gh[pousr]_[A-Za-z0-9]|github_pat_|glpat-|sk-[A-Za-z0-9_-]{8}|AKIA[0-9A-Z]{16}'
+SECRET_LIKE = re.compile(r'(gh[pousr]_[A-Za-z0-9]|github_pat_|glpat-|(?<![A-Za-z0-9])sk-[A-Za-z0-9_-]{16}|AKIA[0-9A-Z]{16}'
                          r'|AIza[0-9A-Za-z_-]{20}|xox[abprs]-|-----BEGIN [A-Z ]*PRIVATE KEY'
                          r'|(password|passwd|secret|token|api[_-]?key|access[_-]?key)\s*[:=])', re.IGNORECASE)
 # Initial candidate state follows the cause table in docs/skill-improvement-mvp.md section 4.
@@ -199,6 +199,9 @@ def ledger_directory(path, manifest):
     location = manifest.data['ledger_location']
     directory = Path(path)
     require(directory.is_absolute(), 'LEDGER_PATH_INVALID', 'absolute path required')
+    # macOS firmlinks make /System/Volumes/Data/<path> another name for /<path>; only the short form is accepted.
+    require(not inside(directory, '/System/Volumes/Data'), 'LEDGER_PATH_INVALID',
+            'use the path without /System/Volumes/Data')
     # Path comparison only, before anything touches the file system: the Hermes home is never opened,
     # listed or resolved. Case is folded because the default macOS file system ignores it.
     require(not inside(directory, Path.home() / '.hermes'), 'LEDGER_IN_HERMES_HOME')
@@ -575,6 +578,9 @@ def check_rows(rows, contract, manifest):
         seen.add(row['event_id'])
         require(row['repository_id'] in manifest.repositories, 'LEDGER_CORRUPT',
                 f'{where}: repository not in manifest')
+        require(LEVELS.index(row['classification']) >=
+                LEVELS.index(manifest.repositories[row['repository_id']]['classification']), 'LEDGER_CORRUPT',
+                f'{where}: classification weaker than the manifest')
         require(row['timezone'] == manifest.data['timezone'], 'LEDGER_CORRUPT', f'{where}: timezone differs from manifest')
         require(manifest.data['ledger_location']['kind'] != 'PUBLIC_FIXTURE' or row['classification'] == 'PUBLIC',
                 'LEDGER_CORRUPT', f'{where}: non-PUBLIC row in a PUBLIC_FIXTURE ledger')

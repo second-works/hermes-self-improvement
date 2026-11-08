@@ -9,7 +9,7 @@
 
 | 条件 | 拒否コード |
 | --- | --- |
-| 台帳ディレクトリは絶対pathで、symlinkや `..` を含まない | `LEDGER_PATH_INVALID` |
+| 台帳ディレクトリは絶対pathで、symlinkや `..` を含まず、macOSの別名（`/System/Volumes/Data/...`）でもない | `LEDGER_PATH_INVALID` |
 | ディレクトリ名はmanifestの `ledger_location.label` と一致する | `LEDGER_LABEL_MISMATCH` |
 | 実データ（`APPROVED_LOCAL_DIRECTORY`）は本repoを含むどのgit checkout（祖先に `.git` がある場所）の外にも置く | `LEDGER_INSIDE_REPOSITORY` |
 | `~/.hermes` の下には置かない（大文字小文字を区別しないpathの比較だけで、中身もメタデータも読まない） | `LEDGER_IN_HERMES_HOME` |
@@ -38,7 +38,7 @@ python3 -I -B scripts/record_skill_experience.py --manifest M --ledger D end --r
 
 - IDは入力から決まる。終了記録はrepoと作業単位から、経験はさらに順番から、候補は対象Skillと経験IDの組から作る。
 - 同じ入力の再送は何も追記せず `ALREADY_RECORDED` を返す。同じ作業単位へ違う内容を送ると `WORK_UNIT_ALREADY_ENDED` で拒否する。再送では作業日も同じ値を渡す。
-- 同じ対象Skillについて、経験IDまたは根拠参照が既存の候補（`DUPLICATE` の候補を含む）と重なる候補は、新しい `OPEN` にせず、元候補への `DUPLICATE` として記録する。経験IDには元候補と重なった経験を含める。
+- 同じ対象Skillについて、経験IDまたは根拠参照が既存の候補（`DUPLICATE` の候補を含む）と重なる候補は、新しい `OPEN` にせず、元候補への `DUPLICATE` として記録する。経験IDには元候補と重なった経験を含める。重なった相手が `DUPLICATE` の候補なら、その候補を元候補として連鎖させる（大元の候補とは経験が重ならない場合があるため）。
 - 原因の初期状態は第4節の表に従う。`TEMPORARY` は `DECLINED`、`CONFLICT_OR_UNVERIFIED` は `HOLD`、それ以外は `OPEN`。
 
 ## 4. 根拠参照

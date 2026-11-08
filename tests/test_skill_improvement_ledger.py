@@ -329,11 +329,18 @@ class LedgerTest(unittest.TestCase):
         for path, manifest, code in (
                 (Path.home() / '.HERMES' / 'skill-ledger', self.manifest, 'LEDGER_IN_HERMES_HOME'),
                 (Path(str(ROOT).upper()) / 'skill-ledger', local, 'LEDGER_INSIDE_REPOSITORY'),
-                (checkout / 'nested' / 'skill-ledger', local, 'LEDGER_INSIDE_REPOSITORY')):
+                (checkout / 'nested' / 'skill-ledger', local, 'LEDGER_INSIDE_REPOSITORY'),
+                (Path('/System/Volumes/Data') / str(Path.home() / '.hermes' / 'skill-ledger').lstrip('/'),
+                 self.manifest, 'LEDGER_PATH_INVALID')):
             with self.subTest(path=str(path)), self.assertRaises(LedgerError) as caught:
                 Ledger(path, manifest, self.contract)
             self.assertEqual(caught.exception.code, code)
-        for text in ('sk-ant-api03-abcdefgh', 'sk-proj-abcdefghij', 'glpat-abcdefghij', 'password=hunter2',
+        for text in ('risk-assessment desk-research ask-questions mask-sensitive-values', 'task-planning'):
+            accepted = self.ledger.record_end('demo-app', f'wu-{len(text)}', 'CANDIDATE_FOUND', '2026-11-04',
+                                              experiences=[dict(CORRECTION, summary=text,
+                                                                refs=[f'path:.claude/skills/{text.split()[0]}/SKILL.md'])])
+            self.assertEqual(accepted['status'], 'RECORDED')
+        for text in ('sk-ant-api03-abcdefghijkl', 'sk-proj-abcdefghijklmn', 'glpat-abcdefghij', 'password=hunter2',
                      'API_KEY: abc'):
             with self.subTest(text=text):
                 self.refused('SECRET_LIKE_INPUT', self.ledger.record_end, 'demo-app', 'wu-s', 'UNDETERMINED',

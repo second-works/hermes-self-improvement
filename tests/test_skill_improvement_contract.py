@@ -174,6 +174,8 @@ def judge_deploy_gate(manifest, rows, at, deployment_id=None):
         return 'HOLD', 'PLAN_MISSING'
     plan_row = plans[-1]
     plan = plan_row['record']
+    if plan['backup']['sha256'] != plan['hashes']['expected_before']:
+        return 'HOLD', 'PLAN_BACKUP_MISMATCH'
     listed = [item['repository_id'] for item in manifest['repositories']]
     if len(listed) != len(set(listed)):
         return 'HOLD', 'MANIFEST_DUPLICATE_REPOSITORY'
@@ -230,7 +232,10 @@ def judge_deploy_gate(manifest, rows, at, deployment_id=None):
 def rollback_authorization(rows, intent_row):
     """Checks that must pass before a ROLLING_BACK intent may be appended at all."""
     deployment_id = intent_row['record']['deployment_id']
-    plan = records(rows, 'deployment_plan', deployment_id=deployment_id)[-1]['record']
+    plans = records(rows, 'deployment_plan', deployment_id=deployment_id)
+    if not plans:
+        return 'PLAN_MISSING'
+    plan = plans[-1]['record']
     intent = intent_row['record']['state']
     at = intent_row['recorded_at']
     before = [row['record']['state'] for row in deployment_states(rows, deployment_id)
@@ -246,6 +251,9 @@ def rollback_authorization(rows, intent_row):
         authorized = authority['approved_at'] <= at < authority['expires_at']
     if not authorized:
         return 'ROLLBACK_NOT_AUTHORIZED'
+    # Restoring the backup must reproduce the pre-deployment content, so the plan's backup is bound to it.
+    if plan['backup']['sha256'] != plan['hashes']['expected_before']:
+        return 'PLAN_BACKUP_MISMATCH'
     if (intent['expected_current_sha256'], intent['backup_sha256']) != (
             plan['hashes']['expected_after'], plan['backup']['sha256']):
         return 'INTENT_MISMATCH'
@@ -283,13 +291,15 @@ def deploy_guard(manifest, rows, index):
 def replay(rows, transitions, manifest=None):
     """Return (deployment final states, candidate final states, rejected rows).
 
+    Later rows are judged only against rows accepted so far; a rejected row never takes effect.
     A row is rejected when its transition is not in the table, when a candidate claims a
     deployment state the deployment has not reached, or (with a manifest) when a deployment
     or rollback intent is appended without passing its gate.
     """
-    deployment, candidate, illegal, planned_for = {}, {}, [], {}
+    deployment, candidate, illegal, planned_for, accepted = {}, {}, [], {}, []
     for index, row in enumerate(rows):
         record = row['record']
+        rejected_before = len(illegal)
         if record['kind'] == 'evaluation' and record['verdict'] != judge_evaluation(record):
             illegal.append((row['event_id'], 'gate', 'VERDICT_MISMATCH'))
         if record['kind'] == 'size_review' and record['verdict'] != judge_size(record)[0]:
@@ -299,7 +309,7 @@ def replay(rows, transitions, manifest=None):
                  record['state']['duplicate_of'] == record['candidate_id']):
             illegal.append((row['event_id'], 'gate', 'DUPLICATE_TARGET_MISSING'))
         if record['kind'] == 'deployment_event' and record['state']['status'] == 'MERGED':
-            plans = records(rows[:index], 'deployment_plan', deployment_id=record['deployment_id'])
+            plans = records(accepted, 'deployment_plan', deployment_id=record['deployment_id'])
             if not plans:
                 illegal.append((row['event_id'], 'gate', 'PLAN_MISSING'))
             elif plans[-1]['record']['route']['type'] != 'OWNER_REPOSITORY_PR':
@@ -317,31 +327,36 @@ def replay(rows, transitions, manifest=None):
         elif record['kind'] == 'candidate':
             key, new, table, store = record['candidate_id'], record['state']['status'], 'candidate', candidate
         else:
+            if len(illegal) == rejected_before:
+                accepted.append(row)
             continue
         current = store.get(key)
         allowed = (transitions[table]['initial'] if current is None
                    else transitions[table]['transitions'][current])
         if new not in allowed:
             illegal.append((row['event_id'], current, new))
-        elif new == 'ROLLING_BACK' and rollback_authorization(rows[:index + 1], row):
-            illegal.append((row['event_id'], 'gate', rollback_authorization(rows[:index + 1], row)))
-        elif new == 'DEPLOYED_EFFECT_UNCONFIRMED' and manifest is not None and deploy_guard(manifest, rows, index):
-            illegal.append((row['event_id'], 'gate', deploy_guard(manifest, rows, index)))
+        elif new == 'ROLLING_BACK' and rollback_authorization(accepted + [row], row):
+            illegal.append((row['event_id'], 'gate', rollback_authorization(accepted + [row], row)))
+        elif new == 'DEPLOYED_EFFECT_UNCONFIRMED' and manifest is not None and deploy_guard(manifest, accepted + [row], len(accepted)):
+            illegal.append((row['event_id'], 'gate', deploy_guard(manifest, accepted + [row], len(accepted))))
         elif new in ('ROLLED_BACK', 'RECOVERY_REQUIRED') and current == 'ROLLING_BACK':
             # The recorded end of a rollback must close the active intent with the outcome its hashes imply.
-            active = [item for item in deployment_states(rows[:index], key)
+            active = [item for item in deployment_states(accepted, key)
                       if item['record']['state']['status'] == 'ROLLING_BACK'][-1]
             if record['state']['intent_id'] != active['record']['state']['intent_id']:
                 illegal.append((row['event_id'], 'gate', 'INTENT_LINK_MISMATCH'))
             else:
-                judged = judge_rollback(rows[:index + 1], key)
+                judged = judge_rollback(accepted + [row], key)
                 if judged != (new, record['state'].get('reason')):
                     illegal.append((row['event_id'], 'gate', judged[1] or judged[0]))
         elif new in ('EFFECT_CONFIRMED', 'IMPROVEMENT_UNCONFIRMED', 'HALTED'):
-            refused = effect_state_mismatch(rows[:index], row)
+            refused = effect_state_mismatch(accepted, row)
             if refused:
                 illegal.append((row['event_id'], 'gate', refused))
-        store[key] = new
+        # A rejected row never takes effect, so later rows are judged against the last accepted state.
+        if len(illegal) == rejected_before:
+            store[key] = new
+            accepted.append(row)
     return deployment, candidate, illegal
 
 
@@ -380,7 +395,10 @@ def effect_state_mismatch(prefix, row):
     deployment_id = row['record']['deployment_id']
     if state['status'] == 'HALTED':
         deployed = [item for item in deployment_states(prefix, deployment_id)
-                    if item['record']['state']['status'] == 'DEPLOYED_EFFECT_UNCONFIRMED'][-1]
+                    if item['record']['state']['status'] == 'DEPLOYED_EFFECT_UNCONFIRMED']
+        if not deployed:
+            return 'EFFECT_STATE_MISMATCH'
+        deployed = deployed[-1]
         supporting = [item['record'] for item in records(prefix, 'effect_observation', deployment_id=deployment_id)
                       if item['record']['observation_id'] == state['observation_id'] and
                       item['recorded_at'] > deployed['record']['state']['deployed_at']]
@@ -920,6 +938,37 @@ class SkillImprovementContract(unittest.TestCase):
                                   'reason': 'synthetic'}
         rows.insert(rows.index(first(rows, 'candidate')) + 1, own)
         self.assertIn(('e-self', 'gate', 'DUPLICATE_TARGET_MISSING'), replay(rows, self.transitions, manifest)[2])
+
+    def test_plan_backup_must_restore_the_pre_deployment_content(self):
+        manifest = self.manifests['manifest.example.json']
+        rows = copy.deepcopy(self.scenarios['rollback-success']['records'])
+        plan_row = first(rows, 'deployment_plan')
+        plan_row['record']['backup']['sha256'] = '5' * 64
+        first(rows, 'deployment_event', 'APPROVED')['record']['state']['plan_sha256'] = sha(plan_row['record'])
+        intent_row = first(rows, 'deployment_event', 'ROLLING_BACK')
+        intent_row['record']['state']['backup_sha256'] = '5' * 64
+        self.assertEqual(judge_deploy_gate(manifest, rows, '2026-11-04T02:00:00Z',
+                                           plan_row['record']['deployment_id']), ('HOLD', 'PLAN_BACKUP_MISMATCH'))
+        self.assertEqual(rollback_authorization(rows[:rows.index(intent_row) + 1], intent_row), 'PLAN_BACKUP_MISMATCH')
+        deployed = first(rows, 'deployment_event', 'DEPLOYED_EFFECT_UNCONFIRMED')
+        self.assertIn((deployed['event_id'], 'gate', 'DEPLOY_GATE_HOLD'), replay(rows, self.transitions, manifest)[2])
+        # Without the deploy gate, the rollback intent itself is still refused.
+        self.assertIn((intent_row['event_id'], 'gate', 'PLAN_BACKUP_MISMATCH'), replay(rows, self.transitions)[2])
+
+    def test_rejected_rows_do_not_advance_state(self):
+        source = self.scenarios['rollback-success']['records']
+        halted = copy.deepcopy(first(source, 'deployment_event', 'HALTED'))
+        intent = copy.deepcopy(first(source, 'deployment_event', 'ROLLING_BACK'))
+        confirmed = copy.deepcopy(halted)
+        confirmed['record']['state'] = {'status': 'EFFECT_CONFIRMED', 'observation_ids': ['o-1', 'o-2', 'o-3']}
+        for row, event_id in ((halted, 'e-h'), (intent, 'e-r'), (confirmed, 'e-c')):
+            row['event_id'] = event_id
+            row['record']['deployment_id'] = 'd-unplanned'
+        deployment, _, rejected = replay([halted, intent], self.transitions)
+        self.assertEqual(rejected, [('e-h', None, 'HALTED'), ('e-r', None, 'ROLLING_BACK')])
+        self.assertNotIn('d-unplanned', deployment)
+        rejected = replay([confirmed, halted], self.transitions)[2]
+        self.assertEqual(rejected, [('e-c', None, 'EFFECT_CONFIRMED'), ('e-h', None, 'HALTED')])
 
     def test_committed_examples_equal_the_builder_output(self):
         spec = importlib.util.spec_from_file_location('build_examples', FIXTURES / 'build_examples.py')

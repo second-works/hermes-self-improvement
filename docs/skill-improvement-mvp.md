@@ -54,7 +54,7 @@ manifestにないrepoを推測で追加しない。manifestが未承認なら記
 rollbackは `HALTED → ROLLING_BACK → ROLLED_BACK / RECOVERY_REQUIRED` だけを許可する。取り下げは `WITHDRAWN`。
 反映前（Merge後を含む）に計画を追記し直すと `PLANNED` へ戻り、以前の承認とMergeの記録は使えない。
 評価・分量レビューに記録した判定は、記録内容から判定し直した結果と一致させる。`DUPLICATE` は既に記録された候補だけを指し、`MERGED` は所有repoのPR経路の配備にだけ記録できる。
-承認を経ない反映など、[許可遷移](../schemas/skill-improvement/state-transitions.json) にない遷移は拒否する（例: `transition-deploy-without-approval`）。
+承認を経ない反映など、[許可遷移](../schemas/skill-improvement/state-transitions.json) にない遷移は拒否する（例: `transition-deploy-without-approval`）。拒否した行は状態を進めず、後続の行の確認の根拠にもしない。後続の行は、それまでに受理した行だけで判定する。
 
 ## 4. 原因の6分類と対処
 
@@ -99,6 +99,7 @@ rollbackは `HALTED → ROLLING_BACK → ROLLED_BACK / RECOVERY_REQUIRED` だけ
 | 確認 | 保留理由 |
 | --- | --- |
 | 判定時刻までにmanifestが承認され、反映計画が追記されている | `MANIFEST_NOT_APPROVED / PLAN_MISSING` |
+| 計画のbackupのhashが反映前の期待hashと一致する（復元すれば反映前に戻る） | `PLAN_BACKUP_MISMATCH` |
 | manifestのrepoが一意で、記録repo・所有repo・PR先repoがすべて登録済み、段階が手動改善で、期間内 | `MANIFEST_DUPLICATE_REPOSITORY / REPOSITORY_NOT_IN_MANIFEST / STAGE_RECORD_ONLY / OUTSIDE_PERIOD` |
 | 経路が所有repoと合う | `OWNER_REPOSITORY_PR_REQUIRED / OWNER_REPOSITORY_MISMATCH` |
 | 候補の最新状態が `OPEN` | `CANDIDATE_NOT_OPEN` |
@@ -147,7 +148,7 @@ MergeとSkillの反映は別の記録にする。Mergeしただけでは配備�
 intentの発動条件は、直前に停止（`HALTED`）させた条件と一致させる。別の条件を書いて事前承認を流用しようとした場合は保留する（`TRIGGER_MISMATCH`）。
 手順は次の順に固定する。
 
-0. 発動条件・承認・想定hashを確認する。満たさなければintentを記録せずに保留する。満たさないintentの行は不正な遷移として拒否する。
+0. 発動条件・承認・想定hashを確認する。計画のbackupのhashが反映前の期待hashと違えば、復元しても反映前に戻らないため始めない（`PLAN_BACKUP_MISMATCH`）。満たさなければintentを記録せずに保留する。満たさないintentの行は不正な遷移として拒否する。
 1. 排他lockを取る。
 2. intent（lock・実行者・発動条件・承認根拠・想定する現在hash・backupのhash）を `ROLLING_BACK` として先に永続化する。
 3. 現在hashを読み、想定した候補のhashと照合する。

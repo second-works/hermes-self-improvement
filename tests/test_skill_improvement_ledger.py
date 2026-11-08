@@ -130,7 +130,7 @@ class LedgerTest(unittest.TestCase):
     def test_same_basis_candidates_link_to_the_original(self):
         app = self.ledger.record_end('demo-app', 'wu-app', 'CANDIDATE_FOUND', '2026-11-04', experiences=[
             dict(CORRECTION, refs=['input:共通の指摘'])])['experience_ids']
-        cli = self.ledger.record_end('demo-cli', 'wu-cli', 'CANDIDATE_FOUND', '2026-11-04', experiences=[
+        cli = self.ledger.record_end('demo-app', 'wu-app-again', 'CANDIDATE_FOUND', '2026-11-04', experiences=[
             dict(CORRECTION, type='REPEATED_FEEDBACK', refs=['input:共通の指摘'])])['experience_ids']
         original = self.ledger.propose('demo-app', 'triage', app, 'pr-review', 'MISSING_PROCEDURE')
         self.assertEqual(original['state'], {'status': 'OPEN'})
@@ -148,6 +148,33 @@ class LedgerTest(unittest.TestCase):
         other = self.ledger.propose('demo-cli', 'triage', cli, 'ci-triage', 'MISSING_PROCEDURE')
         self.assertEqual(other['state'], {'status': 'OPEN'})
         self.refused('CANDIDATE_CONFLICT', self.ledger.propose, 'demo-app', 'triage', app, 'pr-review', 'NOT_LOADED')
+
+    def test_same_reference_in_another_repository_is_independent_evidence(self):
+        app = self.ledger.record_end('demo-app', 'wu-a', 'CANDIDATE_FOUND', '2026-11-04', experiences=[
+            dict(CORRECTION, refs=['input:7'])])['experience_ids']
+        cli = self.ledger.record_end('demo-cli', 'wu-c', 'CANDIDATE_FOUND', '2026-11-04', experiences=[
+            dict(CORRECTION, refs=['input:7'])])['experience_ids']
+        self.assertEqual(self.ledger.propose('demo-app', 'triage', app, 'pr-review', 'MISSING_PROCEDURE')['state'],
+                         {'status': 'OPEN'})
+        self.assertEqual(self.ledger.propose('demo-cli', 'triage', cli, 'pr-review', 'MISSING_PROCEDURE')['state'],
+                         {'status': 'OPEN'})
+
+    def test_linked_duplicate_evidence_raises_the_candidate_classification(self):
+        local = Ledger(self.directory, Manifest(manifest_data('APPROVED_LOCAL_DIRECTORY'), self.contract, NOW),
+                       self.contract, self.clock)
+        secret = local.record_end('demo-app', 'wu-c', 'CANDIDATE_FOUND', '2026-11-04', classification='CONFIDENTIAL',
+                                  experiences=[dict(CORRECTION, refs=['input:同じ指摘'])])['experience_ids']
+        public = local.record_end('demo-app', 'wu-p', 'CANDIDATE_FOUND', '2026-11-04',
+                                  experiences=[dict(CORRECTION, refs=['input:同じ指摘'])])['experience_ids']
+        local.propose('demo-app', 'triage', secret, 'pr-review', 'MISSING_PROCEDURE')
+        duplicate = local.propose('demo-app', 'triage', public, 'pr-review', 'MISSING_PROCEDURE')
+        self.assertEqual(duplicate['state']['status'], 'DUPLICATE')
+        row = [item for item in local.read() if item['record'].get('candidate_id') == duplicate['candidate_id']][0]
+        self.assertEqual(row['classification'], 'CONFIDENTIAL')
+        lowered = dict(row, event_id='e-lowered', classification='PUBLIC')
+        lowered['record'] = dict(row['record'], candidate_id='c-lowered')
+        self.file().write_bytes(self.raw() + json.dumps(lowered).encode() + b'\n')
+        self.refused('LEDGER_CORRUPT', local.read)
 
     def test_cause_sets_the_initial_state_and_state_changes_follow_the_table(self):
         ids = self.ledger.record_end('demo-app', 'wu-1', 'CANDIDATE_FOUND', '2026-11-04', experiences=[

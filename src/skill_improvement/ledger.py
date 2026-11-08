@@ -462,9 +462,12 @@ class Ledger:
                     self.manifest.repository(listed)
                 require(set(scope['repository_ids']) <= sources, 'SHARED_BASIS_NOT_SHOWN',
                         '共通化の根拠repoそれぞれに経験が必要')
-            levels = [self.manifest.classification(repository_id, classification)]
-            levels += [experiences[item]['classification'] for item in experience_ids]
-            level = max(levels, key=LEVELS.index)
+            requested_level = self.manifest.classification(repository_id, classification)
+
+            def basis(item):
+                # References are local to their repository: pr-review:7 in two repositories is two things.
+                row = experiences[item]
+                return {(row['repository_id'], ref) for ref in row['record']['evidence_refs']}
             candidates = candidate_rows(rows)
             if candidate_id in candidates:
                 first = candidates[candidate_id][0]['record']
@@ -473,7 +476,7 @@ class Ledger:
                 require(same, 'CANDIDATE_CONFLICT', candidate_id)
                 return [], {'status': 'ALREADY_RECORDED', 'candidate_id': candidate_id,
                             'state': candidates[candidate_id][-1]['record']['state']}
-            refs = {ref for item in experience_ids for ref in experiences[item]['record']['evidence_refs']}
+            refs = set().union(*(basis(item) for item in experience_ids))
             original, shared = None, []
             if duplicate_of is not None:
                 require(duplicate_of in candidates, 'DUPLICATE_TARGET_MISSING', duplicate_of)
@@ -485,20 +488,22 @@ class Ledger:
                     if head['target_skill_id'] != target_skill_id:
                         continue
                     overlap = [item for item in head['experience_ids'] if item in experience_ids or
-                               set(experiences[item]['record']['evidence_refs']) & refs]
+                               basis(item) & refs]
                     if overlap:
                         original = other
                         break
             if original is not None:
                 head = candidates[original][0]['record']
                 shared = [item for item in head['experience_ids'] if item in experience_ids or
-                          set(experiences[item]['record']['evidence_refs']) & refs]
+                          basis(item) & refs]
                 require(shared, 'DUPLICATE_BASIS_MISSING', '元候補と同じ経験または根拠が必要')
                 state = {'status': 'DUPLICATE', 'duplicate_of': original,
                          'reason': f'同じ根拠の候補{original}が既にある'}
             else:
                 state = dict(CAUSE_INITIAL_STATE.get(cause, {'status': 'OPEN'}))
             linked = sorted(set(experience_ids) | set(shared))
+            # The candidate is as strict as the strictest evidence it finally cites, including linked experiences.
+            level = max([requested_level] + [experiences[item]['classification'] for item in linked], key=LEVELS.index)
             require(len(linked) <= 16, 'EXPERIENCE_REQUIRED', 'too many experiences')
             record = {'kind': 'candidate', 'candidate_id': candidate_id, 'experience_ids': linked,
                       'target_skill_id': target_skill_id, 'cause': cause, 'scope': scope, 'state': state}
@@ -601,6 +606,10 @@ def check_rows(rows, contract, manifest):
         elif record['kind'] == 'candidate':
             missing = [item for item in record['experience_ids'] if item not in experiences]
             require(not missing, 'LEDGER_CORRUPT', f'{where}: unknown experience {missing[0] if missing else ""}')
+            strictest = max((experiences[item]['classification'] for item in record['experience_ids']),
+                            key=LEVELS.index)
+            require(LEVELS.index(row['classification']) >= LEVELS.index(strictest), 'LEDGER_CORRUPT',
+                    f'{where}: candidate weaker than its evidence classification')
             history = candidates.get(record['candidate_id'], [])
             status = record['state']['status']
             if history:

@@ -38,7 +38,7 @@ python3 -I -B scripts/record_skill_experience.py --manifest M --ledger D end --r
 
 - IDは入力から決まる。終了記録はrepoと作業単位から、経験はさらに順番から、候補は対象Skillと経験IDの組から作る。
 - 同じ入力の再送は何も追記せず `ALREADY_RECORDED` を返す。同じ作業単位へ違う内容を送ると `WORK_UNIT_ALREADY_ENDED` で拒否する。再送では作業日も同じ値を渡す。
-- 同じ対象Skillについて、経験IDまたは根拠参照が既存の候補（`DUPLICATE` の候補を含む）と重なる候補は、新しい `OPEN` にせず、元候補への `DUPLICATE` として記録する。経験IDには元候補と重なった経験を含める。重なった相手が `DUPLICATE` の候補なら、その候補を元候補として連鎖させる（大元の候補とは経験が重ならない場合があるため）。
+- 同じ対象Skillについて、経験IDまたは根拠参照が既存の候補（`DUPLICATE` の候補を含む）と重なる候補は、新しい `OPEN` にせず、元候補への `DUPLICATE` として記録する。根拠参照はrepoごとに別物として比べる（`pr-review:7` は repo が違えば別の根拠）。経験IDには元候補と重なった経験を含め、候補の分類は最終的に含めた経験のうち最も厳しい分類にする。重なった相手が `DUPLICATE` の候補なら、その候補を元候補として連鎖させる（大元の候補とは経験が重ならない場合があるため）。
 - 原因の初期状態は第4節の表に従う。`TEMPORARY` は `DECLINED`、`CONFLICT_OR_UNVERIFIED` は `HOLD`、それ以外は `OPEN`。
 
 ## 4. 根拠参照
@@ -54,13 +54,14 @@ python3 -I -B scripts/record_skill_experience.py --manifest M --ledger D end --r
 | `path:` | 許可rootの下の相対path（`.` `..` は不可） | `path:docs/guide.md` |
 | `synthetic:` | `PUBLIC_FIXTURE` の台帳だけ | `synthetic:demo-app/pr-1` |
 
-URLなどそれ以外の種類は `REF_KIND_NOT_ALLOWED` で拒否する。要約・理由・根拠に、よく知られたtoken形式（GitHub・GitLab・OpenAI/Anthropic系の `sk-`・AWS・Google・Slack・秘密鍵）や `password=` のような代入があれば `SECRET_LIKE_INPUT` で拒否する。検出は補助であり、秘密値を入れない運用が前提。
+URLなどそれ以外の種類は `REF_KIND_NOT_ALLOWED` で拒否する。要約・理由・根拠に、よく知られたtoken形式（GitHub・GitLab・OpenAI/Anthropic系の `sk-`・AWS・Google・Slack・秘密鍵）や `password=` のような代入があれば `SECRET_LIKE_INPUT` で拒否する。検出は補助であり、秘密値を入れない運用が前提。`token: 期限切れ` のような説明文も拒否されるため、「tokenの期限切れ」のように `:` `=` を続けない書き方にする。
 
 ## 5. 書込と破損
 
 - 台帳ディレクトリは `/` から1段ずつsymlinkを辿らずに開く。追記は排他lockの中で、読直し→検査→1回の書込→同期（macOSでは `F_FULLFSYNC`）の順に行う。lockを10秒待っても取れなければ `LOCK_TIMEOUT`。追記後に読込上限（32MB）を超える場合は `LEDGER_FULL` で拒否し、新しい承認済み台帳へ移る。
 - 書込が失敗・途中で終わった場合は、元の長さへ戻して `WRITE_FAILED` を返す。戻せなかった場合は `WRITE_FAILED_RECOVERY_REQUIRED` を返し、人が確認する。成功とは返さない。
 - 読込時に、通常ファイル以外（FIFOなど）、途中で切れた最終行、厳密でないJSON（重複キー・深すぎる入れ子など）、schema違反、manifestと異なるtimezone、`PUBLIC_FIXTURE` 台帳の非PUBLIC行、event_idの重複、経験と終了記録の不整合、遷移表にない候補の変化があれば `LEDGER_CORRUPT` で止まる。行を落としたり修復したりせず、その後の追記もしない。
+- manifestでrepoの分類を後から厳しくすると、それより弱い分類の既存行があるため台帳全体が `LEDGER_CORRUPT` で止まる。分類を変えるときは新しい承認済み台帳（別のlabel）へ移る。
 - `recorded_at` は後から追記する行ほど新しくする。時計が戻っていれば `CLOCK_REGRESSION` で拒否する（#106の合成例は時刻順ではないため、読込時には検査しない）。
 
 ## 6. 対象外

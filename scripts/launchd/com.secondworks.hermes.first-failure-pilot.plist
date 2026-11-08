@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.secondworks.hermes.first-failure-pilot</string>
+  <key>ProgramArguments</key><array>
+    <string>@PYTHON@</string><string>-I</string><string>-B</string>
+    <string>@CHECKOUT@/scripts/first_failure_pilot.py</string><string>tick</string>
+  </array>
+  <key>WorkingDirectory</key><string>@CHECKOUT@</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>LANG</key><string>C.UTF-8</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>StartInterval</key><integer>3600</integer>
+  <key>KeepAlive</key><false/>
+  <key>ProcessType</key><string>Background</string>
+  <key>StandardOutPath</key><string>@CHECKOUT@/runs/first-failure-pilot/launchd.stdout.log</string>
+  <key>StandardErrorPath</key><string>@CHECKOUT@/runs/first-failure-pilot/launchd.stderr.log</string>
+</dict></plist>

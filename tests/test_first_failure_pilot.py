@@ -286,6 +286,16 @@ class PilotTests(unittest.TestCase):
         self.collect.assert_not_called()
         self.assertEqual(p.Pilot(self.root/'unconfigured').stop()['status'],'NOT_CONFIGURED')
 
+
+    def test_missing_configuration_is_latched_and_restoration_does_not_resume(self):
+        self.pilot.tick();config=self.pilot.state/'config.json';before=config.read_bytes();config.unlink()
+        failed=self.pilot.tick()
+        self.assertEqual(failed['status'],'STOPPED')
+        self.assertEqual(failed['reason'],'CONFIG_MISSING')
+        config.write_bytes(before);config.chmod(0o600)
+        self.assertEqual(self.pilot.tick(),failed)
+        self.collect.assert_called_once()
+
     def test_real_child_collects_public_fixture_then_freezes_first_report(self):
         root=self.root/'native';(root/'scripts').mkdir(parents=True)
         program=root/'scripts/report_github_work_guide.py'
@@ -299,7 +309,7 @@ class PilotTests(unittest.TestCase):
         with patch.object(pilot,'runtime'),patch.object(pilot,'notify'):
             pilot.configure(SHA)
             result=pilot.tick()
-            self.assertEqual(result['status'],'AWAITING_REVIEW')
+            self.assertEqual(result['status'],'AWAITING_REVIEW',result)
             with patch.object(p.subprocess,'Popen',side_effect=AssertionError('no second child')):
                 self.assertEqual(pilot.tick(),result)
         self.assertEqual(pilot.read(pilot.state/'terminal.json'),result)
@@ -313,14 +323,16 @@ class ProcessTests(unittest.TestCase):
             child.poll.return_value=None
             child.wait.return_value=143
             with patch.object(p.subprocess,'Popen',return_value=child) as popen, \
-                 patch.object(pilot,'stop_requested',return_value=True), \
+                 patch.object(pilot,'stop_requested',return_value=True),patch.object(pilot,'observe',return_value=None), \
                  patch.object(p.os,'getpgid',return_value=123),patch.object(p.os,'killpg') as kill:
                 with self.assertRaisesRegex(EvaluationError,'STOP_REQUESTED'):
                     pilot.collect(root/'runs/pilot-test',cycle)
             args=popen.call_args.args[0]
             self.assertEqual(args[1:3],['-I','-B'])
-            self.assertEqual(args[3],str(root/'scripts/report_github_work_guide.py'))
-            self.assertEqual(args[4:6],['collect','--out'])
+            self.assertEqual(args[3:5],['-c',p.COLLECTOR_SUPERVISOR])
+            self.assertEqual(args[5],str(root))
+            self.assertEqual(args[6],str(root/'runs/pilot-test'))
+            self.assertIn("'collect', '--out'",p.COLLECTOR_SUPERVISOR)
             self.assertTrue(popen.call_args.kwargs['start_new_session'])
             self.assertFalse(popen.call_args.kwargs.get('shell',False))
             self.assertEqual(kill.call_args_list[0].args,(123,signal.SIGTERM))
@@ -330,7 +342,7 @@ class ProcessTests(unittest.TestCase):
 
     def test_group_kill_precedes_reaping_so_pid_cannot_be_reused(self):
         pilot=p.Pilot(ROOT);child=Mock(pid=123)
-        with patch.object(p.os,'getpgid',return_value=123), \
+        with patch.object(pilot,'observe',return_value=None),patch.object(p.os,'getpgid',return_value=123), \
              patch.object(p.os,'killpg') as kill, \
              patch.object(p.time,'sleep'):
             child.wait.side_effect=lambda **_: self.assertEqual(kill.call_args_list[-1].args,(123,signal.SIGKILL))
@@ -340,7 +352,7 @@ class ProcessTests(unittest.TestCase):
 
     def test_unknown_process_group_is_never_signalled(self):
         pilot=p.Pilot(ROOT);child=Mock(pid=123)
-        with patch.object(p.os,'getpgid',return_value=456),patch.object(p.os,'killpg') as kill:
+        with patch.object(pilot,'observe',return_value=None),patch.object(p.os,'getpgid',return_value=456),patch.object(p.os,'killpg') as kill:
             with self.assertRaisesRegex(EvaluationError,'CHILD_IDENTITY_UNCONFIRMED'):
                 pilot.terminate(child)
         kill.assert_not_called()
@@ -351,11 +363,36 @@ class ProcessTests(unittest.TestCase):
             root=Path(tmp).resolve();pilot=p.Pilot(root);cycle=root/'cycle';cycle.mkdir()
             child=Mock(pid=123,returncode=None);child.poll.return_value=None
             with patch.object(p.subprocess,'Popen',return_value=child), \
-                 patch.object(pilot,'stop_requested',return_value=False),patch.object(pilot,'capacity'), \
+                 patch.object(pilot,'stop_requested',return_value=False),patch.object(pilot,'capacity'),patch.object(pilot,'observe',return_value=None), \
                  patch.object(p.time,'monotonic',side_effect=[0,211]),patch.object(pilot,'terminate') as terminate:
                 with self.assertRaisesRegex(EvaluationError,'COLLECT_TIMEOUT'):
                     pilot.collect(root/'runs/pilot-test',cycle)
                 terminate.assert_called_once_with(child)
+
+
+    def test_exited_leader_does_not_leave_live_descendant(self):
+        import time
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp).resolve();(root/'scripts').mkdir();cycle=root/'cycle';cycle.mkdir()
+            ready=root/'ready';beat=root/'heartbeat';stop=root/'stop-child'
+            child_code=("import signal,time\nfrom pathlib import Path\n"
+                + "signal.signal(signal.SIGTERM,signal.SIG_IGN)\n"
+                + "ready=Path("+repr(str(ready))+");beat=Path("+repr(str(beat))+");stop=Path("+repr(str(stop))+")\n"
+                + "ready.write_text('ready');end=time.monotonic()+10\n"
+                + "while time.monotonic()<end and not stop.exists():\n beat.write_text(str(time.monotonic()));time.sleep(.01)\n")
+            program=("import subprocess,sys,time\nfrom pathlib import Path\n"
+                + "subprocess.Popen([sys.executable,'-I','-c',"+repr(child_code)+"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\n"
+                + "ready=Path("+repr(str(ready))+");end=time.monotonic()+5\n"
+                + "while not ready.exists():\n assert time.monotonic()<end;time.sleep(.01)\n")
+            (root/'scripts/report_github_work_guide.py').write_text(program)
+            pilot=p.Pilot(root)
+            try:
+                pilot.collect(root/'runs/pilot-test',cycle)
+                time.sleep(.1);before=beat.read_text();time.sleep(.2)
+                self.assertEqual(beat.read_text(),before,'descendant still runs after collector exited')
+            finally:
+                stop.write_text('stop')
+                time.sleep(.05)
 
     def test_fresh_isolated_cli_ignores_cwd_pythonpath_and_has_no_auth_or_model(self):
         with tempfile.TemporaryDirectory() as tmp:

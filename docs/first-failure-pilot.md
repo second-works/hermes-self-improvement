@@ -61,7 +61,7 @@ python3 -I -B scripts/first_failure_pilot.py stop
 停止要求は設定JSONの正常性に依存せず耐久保存し、実行中の固定collectorを確認済みの子process groupだけにTERM/KILLして待つ。
 SIGTERM/INTも同じ停止条件にする。強制終了等で結果不明なら、未完了cycleを見つけた次回起動がRECOVERY_REQUIREDで停止し、再取得しない。
 状態を安全に保存できない場合も取得しない。読取専用/満杯のfilesystemでは停止印の永続化ができないため、定期ジョブを解除してから復旧する。
-取得workerは既存の180秒制限、親の監督は210秒を上限とする。後始末には別途TERM後0.25秒の猶予と、最終group KILL後5秒の待機がある。leaderを回収する前にgroupへ最終signalを送り、PID再利用後のgroupを操作しない。
+取得workerは既存の180秒制限、親の監督は210秒を上限とする。後始末には別途TERM後0.25秒の猶予と、最終group KILL後5秒の待機がある。固定supervisorがgroup leaderを保持し、reporter終了後も残る子を停止する。TERMの猶予中もleaderを生存させ、groupへの最終signal後に回収するため、PID再利用後のgroupを操作しない。終了観測には回収しないwaitid/WNOWAITを使う（macOSではPython 3.13以上が必要。準備済み環境は3.14.5）。
 定期ジョブ自体も止める場合は、同じ利用者の `launchctl bootout gui/<uid>/com.secondworks.hermes.first-failure-pilot` で専用ラベルだけを解除し、消失を確認する。
 設定・ログ・点検・初回レポートを削除しない。
 

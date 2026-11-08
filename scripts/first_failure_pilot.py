@@ -25,6 +25,39 @@ FAILED = {'failure', 'timed_out', 'cancelled', 'action_required', 'startup_failu
 MAX_CHECKS, MAX_BYTES, INTERVAL = 168, 512 * 1024 * 1024, 3600
 CYCLE = re.compile(r'[0-9]{3}-[0-9a-f]{32}\Z')
 SIGNALLED = False
+# Fixed collector supervisor. It holds the process-group leader alive until the controller
+# has signalled the group, even if the reporter exits before a gh descendant.
+COLLECTOR_SUPERVISOR = r'''
+import json, os, signal, subprocess, sys
+from pathlib import Path
+root, output, receipt = map(Path, sys.argv[1:])
+# Stay alive through the TERM grace period; exec resets this handler in the reporter.
+signal.signal(signal.SIGTERM, lambda *_: None)
+try:
+    result = subprocess.run([sys.executable, '-I', '-B',
+        str(root / 'scripts/report_github_work_guide.py'), 'collect', '--out', str(output)],
+        cwd=root, timeout=200, check=False)
+    code = result.returncode
+except Exception:
+    code = -1
+try:
+    pending = receipt.with_suffix('.pending')
+    fd = os.open(pending, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, 'w') as stream:
+        json.dump({'returncode': code}, stream)
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.link(pending, receipt)
+    pending.unlink()
+    fd = os.open(receipt.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try: os.fsync(fd)
+    finally: os.close(fd)
+except Exception:
+    pass  # No receipt means the controller times out/stops, never a successful collect.
+sys.stdin.buffer.read(1)
+# If the controller disappears, close this owned group rather than leaving descendants.
+os.killpg(os.getpid(), signal.SIGKILL)
+'''
 
 
 def failures(snapshot):
@@ -243,10 +276,28 @@ class Pilot:
     def stop_requested(self):
         return SIGNALLED or os.path.lexists(self.state / 'stop.requested')
 
+    def observe(self, child):
+        """Observe an owned child without releasing its PID/process-group identity."""
+        require(child.returncode is None, 'CHILD_IDENTITY_UNCONFIRMED')
+        info = os.waitid(os.P_PID, child.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+        if info is None or info.si_pid == 0:
+            return None
+        require(info.si_pid == child.pid and info.si_code in
+                (os.CLD_EXITED, os.CLD_KILLED, os.CLD_DUMPED), 'CHILD_IDENTITY_UNCONFIRMED')
+        return info.si_status if info.si_code == os.CLD_EXITED else -info.si_status
+
     def terminate(self, child):
         try:
-            require(os.getpgid(child.pid) == child.pid, 'CHILD_IDENTITY_UNCONFIRMED')
-            os.killpg(child.pid, signal.SIGTERM)
+            self.observe(child)  # waitid also confirms this is still our unreaped child.
+            try:
+                require(os.getpgid(child.pid) == child.pid, 'CHILD_IDENTITY_UNCONFIRMED')
+            except ProcessLookupError:
+                # macOS may hide a zombie leader from getpgid; its wait record still holds the PID.
+                require(self.observe(child) is not None, 'CHILD_IDENTITY_UNCONFIRMED')
+            try:
+                os.killpg(child.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
             # Keep the leader unreaped until the final group signal: its PID cannot be reused.
             time.sleep(0.25)
             try:
@@ -258,25 +309,39 @@ class Pilot:
             raise EvaluationError('CHILD_CLEANUP_UNCONFIRMED') from None
 
     def collect(self, output, cycle):
+        require(all(hasattr(os, name) for name in ('waitid', 'WNOWAIT', 'WEXITED', 'WNOHANG', 'P_PID',
+                'CLD_EXITED', 'CLD_KILLED', 'CLD_DUMPED'))
+                and signal.getsignal(signal.SIGCHLD) == signal.SIG_DFL, 'CHILD_OBSERVATION_UNAVAILABLE')
         log = cycle / 'collect.log'
         fd = os.open(log, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
         child = None
+        receipt = cycle / 'collector-result.json'
         try:
             with os.fdopen(fd, 'wb') as stream:
-                child = subprocess.Popen([sys.executable, '-I', '-B', str(self.root / 'scripts/report_github_work_guide.py'),
-                                          'collect', '--out', str(output)], cwd=self.root,
-                                         stdout=stream, stderr=stream, start_new_session=True)
+                child = subprocess.Popen([sys.executable, '-I', '-B', '-c', COLLECTOR_SUPERVISOR,
+                                          str(self.root), str(output), str(receipt)], cwd=self.root,
+                                         stdin=subprocess.PIPE, stdout=stream, stderr=stream, start_new_session=True)
                 deadline = time.monotonic() + 210
                 try:
-                    while child.poll() is None:
+                    while True:
+                        require(self.observe(child) is None, 'COLLECTOR_SUPERVISOR_EXITED')
+                        if os.path.lexists(receipt):
+                            result = load_json(regular(receipt, cycle, 1024))
+                            require(type(result) is dict and set(result) == {'returncode'}
+                                    and type(result['returncode']) is int, 'COLLECTOR_RESULT_INVALID')
+                            code = result['returncode']
+                            break
                         require(not self.stop_requested(), 'STOP_REQUESTED')
                         self.capacity()
                         require(time.monotonic() < deadline, 'COLLECT_TIMEOUT')
                         time.sleep(0.25)
-                    require(child.returncode == 0, 'COLLECT_FAILED')
                 finally:
-                    if child.poll() is None:
+                    # Never poll()/wait() before the owned group has received its final signal.
+                    try:
                         self.terminate(child)
+                    finally:
+                        child.stdin.close()
+                require(code == 0, 'COLLECT_FAILED')
                 stream.flush()
                 os.fsync(stream.fileno())
         finally:
@@ -286,13 +351,14 @@ class Pilot:
         self.path_check()
         if os.path.lexists(self.state / 'unverified.stop'):
             return {'status': 'STOPPED', 'reason': 'PILOT_UNVERIFIED'}
-        if not os.path.lexists(self.state / 'config.json'):
+        if not self.state.exists():
             return {'status': 'NOT_CONFIGURED'}
         with self.lock():
             try:
                 if os.path.lexists(self.state / 'terminal.json'):
                     return self.terminal()
                 require(not os.path.lexists(self.state / 'first-report.md'), 'RECOVERY_REQUIRED')
+                require(os.path.lexists(self.state / 'config.json'), 'CONFIG_MISSING')
                 cfg = self.config()
                 if not cfg['enabled']:
                     return {'status': 'DISABLED'}
@@ -375,7 +441,7 @@ def main(argv=None):
         if isinstance(error, EvaluationError) and str(error) == 'CONCURRENT_RUN':
             value = {'status': 'RUNNING' if args.action == 'status' else 'BUSY', 'reason': 'CONCURRENT_RUN'}
         else:
-            if args.action == 'tick':
+            if args.action in ('tick', 'status'):
                 try:
                     pilot.block_unverified()
                 except OSError:

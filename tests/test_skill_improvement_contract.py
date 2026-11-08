@@ -24,6 +24,7 @@ SUPPORTED = {'$schema', '$id', 'title', 'description', '$defs', '$ref', 'type', 
              'uniqueItems', 'pattern', 'minLength', 'maxLength', 'minimum', 'maximum', 'oneOf'}
 DEPLOYED_STATES = {'DEPLOYED_EFFECT_UNCONFIRMED', 'EFFECT_CONFIRMED', 'IMPROVEMENT_UNCONFIRMED', 'HALTED',
                    'ROLLING_BACK', 'ROLLED_BACK', 'RECOVERY_REQUIRED'}
+MIN_TRIALS = 3
 TYPES = {'object': dict, 'array': list, 'string': str, 'integer': int, 'boolean': bool,
          'null': type(None)}
 
@@ -81,7 +82,7 @@ def schema_errors(value, schema, root, path='$'):
         for index, item in enumerate(value):
             errors += schema_errors(item, schema['items'], root, f'{path}[{index}]')
     if kind == 'string':
-        if 'pattern' in schema and not re.search(schema['pattern'], value):
+        if 'pattern' in schema and not re.fullmatch(schema['pattern'], value):
             errors.append(f'{path}: pattern')
         if not schema.get('minLength', 0) <= len(value) <= schema.get('maxLength', len(value)):
             errors.append(f'{path}: length')
@@ -103,6 +104,11 @@ def records(rows, kind, **match):
             all(row['record'].get(key) == value for key, value in match.items())]
 
 
+def first(rows, kind, status=None):
+    return next(row for row in rows if row['record']['kind'] == kind and
+                (status is None or row['record']['state']['status'] == status))
+
+
 def deployment_states(rows, deployment_id):
     return [row for row in rows if row['record'].get('deployment_id') == deployment_id and
             row['record']['kind'] == 'deployment_event']
@@ -111,17 +117,22 @@ def deployment_states(rows, deployment_id):
 # --- Judges: the decision tables of docs/skill-improvement-mvp.md as code ---
 
 def judge_evaluation(value):
-    contract = value['required_contract']
-    if contract['candidate_passed'] > contract['cases']:
-        raise AssertionError('more passes than required cases')
+    contract, regression = value['required_contract'], value['regression']
+    improvement = value['improvement']
+    counts_ok = contract['candidate_passed'] <= contract['cases'] and \
+        regression['candidate_failed_among_them'] <= regression['baseline_passing_cases']
+    if improvement['method'] == 'DETERMINISTIC':
+        counts_ok = counts_ok and improvement['target_cases'] >= 1 and \
+            max(improvement['baseline_passed'], improvement['candidate_passed']) <= improvement['target_cases']
+    if not counts_ok:
+        return 'INVALID_COUNTS'
     if contract['candidate_passed'] < contract['cases']:
         return 'CONTRACT_FAILED'
-    if value['regression']['candidate_failed_among_them'] > 0:
+    if regression['candidate_failed_among_them'] > 0:
         return 'REGRESSED'
-    improvement = value['improvement']
     if improvement['method'] == 'DETERMINISTIC':
         improved = (improvement['candidate_passed'] > improvement['baseline_passed'] and
-                    improvement['stable'] and improvement['control_valid'])
+                    improvement['trials'] >= MIN_TRIALS and improvement['stable'] and improvement['control_valid'])
     else:
         improved = improvement['preferred'] == 'CANDIDATE'
     return 'IMPROVED' if improved else 'IMPROVEMENT_UNCONFIRMED'
@@ -142,10 +153,123 @@ def judge_size(value):
     return 'WITHIN_GUIDE', None
 
 
-def replay(rows, transitions):
-    """Return (deployment final states, candidate final states, illegal transitions)."""
+def local_date(utc, timezone):
+    moment = datetime.strptime(utc, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=ZoneInfo('UTC'))
+    return moment.astimezone(ZoneInfo(timezone)).date().isoformat()
+
+
+def latest_candidate_state(rows, candidate_id):
+    states = [row['record']['state']['status'] for row in records(rows, 'candidate', candidate_id=candidate_id)]
+    return states[-1] if states else None
+
+
+def judge_deploy_gate(manifest, rows, at, deployment_id=None):
+    plans = [row for row in records(rows, 'deployment_plan')
+             if deployment_id is None or row['record']['deployment_id'] == deployment_id]
+    plan_row = plans[-1]
+    plan = plan_row['record']
+    listed = [item['repository_id'] for item in manifest['repositories']]
+    if len(listed) != len(set(listed)):
+        return 'HOLD', 'MANIFEST_DUPLICATE_REPOSITORY'
+    route = plan['route']
+    involved = {plan_row['repository_id'], plan['target']['repository_id']}
+    if route['type'] == 'OWNER_REPOSITORY_PR':
+        involved.add(route['owner_repository_id'])
+    if involved - set(listed):
+        return 'HOLD', 'REPOSITORY_NOT_IN_MANIFEST'
+    if manifest['stage'] != 'RECORD_AND_MANUAL_IMPROVEMENT':
+        return 'HOLD', 'STAGE_RECORD_ONLY'
+    if not manifest['period']['start_date'] <= local_date(at, manifest['timezone']) <= manifest['period']['end_date']:
+        return 'HOLD', 'OUTSIDE_PERIOD'
+    if route['type'] == 'LOCAL_MANUAL' and plan['target']['repository_id'] != plan_row['repository_id']:
+        return 'HOLD', 'OWNER_REPOSITORY_PR_REQUIRED'
+    if route['type'] == 'OWNER_REPOSITORY_PR' and route['owner_repository_id'] != plan['target']['repository_id']:
+        return 'HOLD', 'OWNER_REPOSITORY_MISMATCH'
+    if latest_candidate_state(rows, plan['candidate_id']) != 'OPEN':
+        return 'HOLD', 'CANDIDATE_NOT_OPEN'
+    evaluations = records(rows, 'evaluation', evaluation_id=plan['evaluation_id'])
+    if not evaluations or judge_evaluation(evaluations[-1]['record']) != 'IMPROVED':
+        return 'HOLD', 'EVALUATION_NOT_IMPROVED'
+    evaluation = evaluations[-1]['record']
+    if (evaluation['candidate_id'], evaluation['baseline_sha256'], evaluation['candidate_sha256'],
+            evaluation['evaluation_sha256']) != (plan['candidate_id'], plan['hashes']['baseline'],
+                                                 plan['hashes']['candidate'], plan['hashes']['evaluation']):
+        return 'HOLD', 'EVALUATION_MISMATCH'
+    reviews = records(rows, 'size_review', review_id=plan['size_review_id'])
+    if not reviews or judge_size(reviews[-1]['record'])[0] == 'HOLD':
+        return 'HOLD', 'SIZE_REVIEW_HOLD'
+    review = reviews[-1]['record']
+    if (review['candidate_id'], review['target_ref']) != (plan['candidate_id'], plan['target']['canonical_ref']):
+        return 'HOLD', 'SIZE_REVIEW_MISMATCH'
+    approvals = [row for row in deployment_states(rows, plan['deployment_id'])
+                 if row['record']['state']['status'] == 'APPROVED']
+    if not approvals:
+        return 'HOLD', 'APPROVAL_MISSING'
+    approval = approvals[-1]['record']['state']
+    if approval['plan_sha256'] != sha(plan) or approval['plan_event_id'] != plan_row['event_id'] or \
+            rows.index(approvals[-1]) < rows.index(plan_row):
+        return 'HOLD', 'APPROVAL_MISMATCH'
+    if not approval['approved_at'] <= at < approval['expires_at']:
+        return 'HOLD', 'APPROVAL_EXPIRED'
+    if at >= plan['deadline']:
+        return 'HOLD', 'DEADLINE_PASSED'
+    if route['type'] == 'OWNER_REPOSITORY_PR' and not any(
+            row['record']['state']['status'] == 'MERGED'
+            for row in deployment_states(rows, plan['deployment_id'])
+            if rows.index(row) > rows.index(approvals[-1])):
+        return 'HOLD', 'MERGE_MISSING'
+    return 'ALLOWED', None
+
+
+def rollback_authorization(rows, intent_row):
+    """Checks that must pass before a ROLLING_BACK intent may be appended at all."""
+    deployment_id = intent_row['record']['deployment_id']
+    plan = records(rows, 'deployment_plan', deployment_id=deployment_id)[-1]['record']
+    intent = intent_row['record']['state']
+    at = intent_row['recorded_at']
+    before = [row['record']['state'] for row in deployment_states(rows, deployment_id)
+              if rows.index(row) < rows.index(intent_row)]
+    if not before or before[-1]['status'] != 'HALTED' or before[-1]['trigger'] != intent['trigger']:
+        return 'TRIGGER_MISMATCH'
+    authority = intent['authority']
+    if authority['type'] == 'PREAPPROVED':
+        allowed = plan['rollback_preapproval']
+        authorized = bool(allowed) and intent['executor'] == allowed['executor'] and \
+            intent['trigger'] in allowed['conditions'] and at < allowed['expires_at']
+    else:
+        authorized = authority['approved_at'] <= at < authority['expires_at']
+    if not authorized:
+        return 'ROLLBACK_NOT_AUTHORIZED'
+    if (intent['expected_current_sha256'], intent['backup_sha256']) != (
+            plan['hashes']['expected_after'], plan['backup']['sha256']):
+        return 'INTENT_MISMATCH'
+    return None
+
+
+def deploy_guard(manifest, rows, index):
+    row = rows[index]
+    state = row['record']['state']
+    prefix = rows[:index]
+    if judge_deploy_gate(manifest, prefix, state['deployed_at'], row['record']['deployment_id']) != ('ALLOWED', None):
+        return 'DEPLOY_GATE_HOLD'
+    plan = records(prefix, 'deployment_plan', deployment_id=row['record']['deployment_id'])[-1]['record']
+    approvals = [item for item in deployment_states(prefix, row['record']['deployment_id'])
+                 if item['record']['state']['status'] == 'APPROVED']
+    if state['approval_event_id'] != approvals[-1]['event_id'] or \
+            state['observed_before_sha256'] != plan['hashes']['expected_before']:
+        return 'DEPLOY_RECORD_MISMATCH'
+    return None
+
+
+def replay(rows, transitions, manifest=None):
+    """Return (deployment final states, candidate final states, rejected rows).
+
+    A row is rejected when its transition is not in the table, when a candidate claims a
+    deployment state the deployment has not reached, or (with a manifest) when a deployment
+    or rollback intent is appended without passing its gate.
+    """
     deployment, candidate, illegal, planned_for = {}, {}, [], {}
-    for row in rows:
+    for index, row in enumerate(rows):
         record = row['record']
         if record['kind'] == 'candidate' and 'deployment_id' in record['state']:
             linked = record['state']['deployment_id']
@@ -166,57 +290,12 @@ def replay(rows, transitions):
                    else transitions[table]['transitions'][current])
         if new not in allowed:
             illegal.append((row['event_id'], current, new))
+        elif new == 'ROLLING_BACK' and rollback_authorization(rows[:index + 1], row):
+            illegal.append((row['event_id'], 'gate', rollback_authorization(rows[:index + 1], row)))
+        elif new == 'DEPLOYED_EFFECT_UNCONFIRMED' and manifest is not None and deploy_guard(manifest, rows, index):
+            illegal.append((row['event_id'], 'gate', deploy_guard(manifest, rows, index)))
         store[key] = new
     return deployment, candidate, illegal
-
-
-def local_date(utc, timezone):
-    moment = datetime.strptime(utc, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=ZoneInfo('UTC'))
-    return moment.astimezone(ZoneInfo(timezone)).date().isoformat()
-
-
-def judge_deploy_gate(manifest, rows, at):
-    plan_row = records(rows, 'deployment_plan')[-1]
-    plan = plan_row['record']
-    listed = [item['repository_id'] for item in manifest['repositories']]
-    if len(listed) != len(set(listed)):
-        return 'HOLD', 'MANIFEST_DUPLICATE_REPOSITORY'
-    repositories = set(listed)
-    if plan_row['repository_id'] not in repositories:
-        return 'HOLD', 'REPOSITORY_NOT_IN_MANIFEST'
-    if manifest['stage'] != 'RECORD_AND_MANUAL_IMPROVEMENT':
-        return 'HOLD', 'STAGE_RECORD_ONLY'
-    if not manifest['period']['start_date'] <= local_date(at, manifest['timezone']) <= manifest['period']['end_date']:
-        return 'HOLD', 'OUTSIDE_PERIOD'
-    evaluations = records(rows, 'evaluation', evaluation_id=plan['evaluation_id'])
-    if not evaluations or judge_evaluation(evaluations[-1]['record']) != 'IMPROVED':
-        return 'HOLD', 'EVALUATION_NOT_IMPROVED'
-    evaluation = evaluations[-1]['record']
-    if (evaluation['candidate_id'], evaluation['baseline_sha256'], evaluation['candidate_sha256'],
-            evaluation['evaluation_sha256']) != (plan['candidate_id'], plan['hashes']['baseline'],
-                                                 plan['hashes']['candidate'], plan['hashes']['evaluation']):
-        return 'HOLD', 'EVALUATION_MISMATCH'
-    reviews = records(rows, 'size_review', review_id=plan['size_review_id'])
-    if not reviews or judge_size(reviews[-1]['record'])[0] == 'HOLD':
-        return 'HOLD', 'SIZE_REVIEW_HOLD'
-    approvals = [row for row in deployment_states(rows, plan['deployment_id'])
-                 if row['record']['state']['status'] == 'APPROVED']
-    if not approvals:
-        return 'HOLD', 'APPROVAL_MISSING'
-    approval = approvals[-1]['record']['state']
-    if approval['plan_sha256'] != sha(plan) or approval['plan_event_id'] != plan_row['event_id'] or \
-            rows.index(approvals[-1]) < rows.index(plan_row):
-        return 'HOLD', 'APPROVAL_MISMATCH'
-    if not approval['approved_at'] <= at < approval['expires_at']:
-        return 'HOLD', 'APPROVAL_EXPIRED'
-    if at >= plan['deadline']:
-        return 'HOLD', 'DEADLINE_PASSED'
-    if plan['route']['type'] == 'OWNER_REPOSITORY_PR' and not any(
-            row['record']['state']['status'] == 'MERGED'
-            for row in deployment_states(rows, plan['deployment_id'])
-            if rows.index(row) > rows.index(approvals[-1])):
-        return 'HOLD', 'MERGE_MISSING'
-    return 'ALLOWED', None
 
 
 def effect_window(rows, deployment_id):
@@ -253,23 +332,9 @@ def judge_rollback(rows, deployment_id):
     states = deployment_states(rows, deployment_id)
     intent_row = [row for row in states if row['record']['state']['status'] == 'ROLLING_BACK'][-1]
     intent = intent_row['record']['state']
-    at = intent_row['recorded_at']
-    halts = [row['record']['state'] for row in states[:states.index(intent_row)]
-             if row['record']['state']['status'] == 'HALTED']
-    if not halts or halts[-1]['trigger'] != intent['trigger']:
-        return 'HOLD', 'TRIGGER_MISMATCH'
-    authority = intent['authority']
-    if authority['type'] == 'PREAPPROVED':
-        allowed = plan['rollback_preapproval']
-        authorized = bool(allowed) and intent['executor'] == allowed['executor'] and \
-            intent['trigger'] in allowed['conditions'] and at < allowed['expires_at']
-    else:
-        authorized = authority['approved_at'] <= at < authority['expires_at']
-    if not authorized:
-        return 'HOLD', 'ROLLBACK_NOT_AUTHORIZED'
-    if (intent['expected_current_sha256'], intent['backup_sha256']) != (
-            plan['hashes']['expected_after'], plan['backup']['sha256']):
-        return 'HOLD', 'INTENT_MISMATCH'
+    refused = rollback_authorization(rows, intent_row)
+    if refused:
+        return 'HOLD', refused
     finals = [row['record']['state'] for row in states[states.index(intent_row) + 1:]
               if row['record']['state'].get('intent_id') == intent['intent_id']]
     if not finals:
@@ -278,14 +343,18 @@ def judge_rollback(rows, deployment_id):
     observed = final['observed_current_sha256']
     if observed is not None and observed != intent['expected_current_sha256']:
         return 'RECOVERY_REQUIRED', 'CURRENT_HASH_MISMATCH'
-    if final['status'] == 'RECOVERY_REQUIRED':
-        # Without a mismatching hash the recorded cause must be one the facts allow.
-        allowed = {'PARTIAL_WRITE', 'UNKNOWN_RESULT'} if observed is None else \
-            {'PARTIAL_WRITE', 'UNKNOWN_RESULT', 'RESTORED_HASH_MISMATCH'}
-        return 'RECOVERY_REQUIRED', final['reason'] if final['reason'] in allowed else 'REASON_INCONSISTENT'
-    if final['restored_sha256'] != plan['hashes']['expected_before']:
-        return 'RECOVERY_REQUIRED', 'RESTORED_HASH_MISMATCH'
-    return 'ROLLED_BACK', None
+    restored = final['restored_sha256']
+    if final['status'] == 'ROLLED_BACK' or final['reason'] == 'RESTORED_HASH_MISMATCH':
+        if observed is None or restored is None:
+            return 'RECOVERY_REQUIRED', 'REASON_INCONSISTENT'
+        if restored != plan['hashes']['expected_before']:
+            return 'RECOVERY_REQUIRED', 'RESTORED_HASH_MISMATCH'
+        if final['status'] == 'RECOVERY_REQUIRED':
+            return 'RECOVERY_REQUIRED', 'REASON_INCONSISTENT'
+        return 'ROLLED_BACK', None
+    if final['reason'] == 'CURRENT_HASH_MISMATCH':
+        return 'RECOVERY_REQUIRED', 'REASON_INCONSISTENT'
+    return 'RECOVERY_REQUIRED', final['reason']
 
 
 class SkillImprovementContract(unittest.TestCase):
@@ -406,7 +475,7 @@ class SkillImprovementContract(unittest.TestCase):
         self.assertIn('c-review-steps', candidate_ids)
 
     def test_ledger_verdicts_and_states_follow_from_recorded_data(self):
-        deployment, candidate, illegal = replay(self.ledger, self.transitions)
+        deployment, candidate, illegal = replay(self.ledger, self.transitions, self.manifests['manifest.example.json'])
         self.assertEqual(illegal, [])
         self.assertEqual(deployment, {'d-review-steps': 'EFFECT_CONFIRMED'})
         self.assertEqual(candidate['c-review-steps'], 'DEPLOYED')
@@ -418,8 +487,10 @@ class SkillImprovementContract(unittest.TestCase):
         plan = records(self.ledger, 'deployment_plan')[-1]['record']
         states = {row['record']['state']['status']: row for row in deployment_states(self.ledger, 'd-review-steps')}
         deployed = states['DEPLOYED_EFFECT_UNCONFIRMED']
-        self.assertEqual(judge_deploy_gate(self.manifests['manifest.example.json'], self.ledger,
-                                           deployed['record']['state']['deployed_at']), ('ALLOWED', None))
+        before_deploy = self.ledger[:self.ledger.index(deployed)]
+        self.assertEqual(judge_deploy_gate(self.manifests['manifest.example.json'], before_deploy,
+                                           deployed['record']['state']['deployed_at'], 'd-review-steps'),
+                         ('ALLOWED', None))
         self.assertEqual(deployed['record']['state']['approval_event_id'], states['APPROVED']['event_id'])
         self.assertEqual((deployed['record']['state']['observed_before_sha256'],
                           deployed['record']['state']['observed_after_sha256']),
@@ -440,15 +511,20 @@ class SkillImprovementContract(unittest.TestCase):
             'effect_window': lambda item: effect_window(item['records'], 'd-review-steps')[:2],
             'rollback': lambda item: judge_rollback(item['records'], 'd-review-steps'),
             'transition': lambda item: ('REJECTED', 'ILLEGAL_TRANSITION')
-            if replay(item['records'], self.transitions)[2] else ('ACCEPTED', None),
+            if replay(item['records'], self.transitions, self.manifests[item['manifest']])[2] else ('ACCEPTED', None),
         }
         for name, item in self.scenarios.items():
             with self.subTest(scenario=name):
                 self.assertEqual(item['scenario_id'], name)
                 for row in item['records']:
                     self.assert_record_valid(row)
-                if item['check'] != 'transition':
-                    self.assertEqual(replay(item['records'], self.transitions)[2], [])
+                rejected = replay(item['records'], self.transitions, self.manifests[item['manifest']])[2]
+                if item['check'] == 'rollback' and item['expected']['decision'] == 'HOLD':
+                    # An intent that fails its gate must never have been appended.
+                    intent = first(item['records'], 'deployment_event', 'ROLLING_BACK')
+                    self.assertEqual(rejected, [(intent['event_id'], 'gate', item['expected']['reason'])])
+                elif item['check'] != 'transition':
+                    self.assertEqual(rejected, [])
                 outcome = checks[item['check']](item)
                 self.assertEqual(outcome, (item['expected']['decision'], item['expected']['reason']))
                 recorded = item['records'][-1]['record']
@@ -472,7 +548,7 @@ class SkillImprovementContract(unittest.TestCase):
         allowed = self.scenarios['deploy-allowed']
         manifest = self.manifests['manifest.example.json']
         tampered = copy.deepcopy(allowed['records'])
-        tampered[2]['record']['backup']['ref'] = 'another-backup'
+        first(tampered, 'deployment_plan')['record']['backup']['ref'] = 'another-backup'
         self.assertEqual(judge_deploy_gate(manifest, tampered, allowed['at']), ('HOLD', 'APPROVAL_MISMATCH'))
         outside = copy.deepcopy(manifest)
         outside['repositories'] = [item for item in outside['repositories'] if item['repository_id'] != 'demo-app']
@@ -480,12 +556,14 @@ class SkillImprovementContract(unittest.TestCase):
         self.assertEqual(judge_deploy_gate(outside, allowed['records'], allowed['at']),
                          ('HOLD', 'REPOSITORY_NOT_IN_MANIFEST'))
         unimproved = copy.deepcopy(allowed['records'])
-        unimproved[0]['record']['improvement']['candidate_passed'] = 1
+        first(unimproved, 'evaluation')['record']['improvement']['candidate_passed'] = 1
         self.assertEqual(judge_deploy_gate(manifest, unimproved, allowed['at']), ('HOLD', 'EVALUATION_NOT_IMPROVED'))
         owner_route = copy.deepcopy(allowed['records'])
-        owner_route[2]['record']['route'] = {'type': 'OWNER_REPOSITORY_PR', 'owner_repository_id': 'demo-cli',
-                                             'issue_ref': 'synthetic:demo-cli/issue-9'}
-        owner_route[3]['record']['state']['plan_sha256'] = sha(owner_route[2]['record'])
+        owner_plan = first(owner_route, 'deployment_plan')['record']
+        owner_plan['target']['repository_id'] = 'demo-cli'
+        owner_plan['route'] = {'type': 'OWNER_REPOSITORY_PR', 'owner_repository_id': 'demo-cli',
+                               'issue_ref': 'synthetic:demo-cli/issue-9'}
+        first(owner_route, 'deployment_event', 'APPROVED')['record']['state']['plan_sha256'] = sha(owner_plan)
         self.assertEqual(judge_deploy_gate(manifest, owner_route, allowed['at']), ('HOLD', 'MERGE_MISSING'))
 
         success = copy.deepcopy(self.scenarios['rollback-success']['records'])
@@ -532,7 +610,7 @@ class SkillImprovementContract(unittest.TestCase):
                          ('HOLD', 'OUTSIDE_PERIOD'))
         # The approval must name the plan event it approved.
         renamed = copy.deepcopy(allowed['records'])
-        renamed[3]['record']['state']['plan_event_id'] = 'e99'
+        first(renamed, 'deployment_event', 'APPROVED')['record']['state']['plan_event_id'] = 'e99'
         self.assertEqual(judge_deploy_gate(manifest, renamed, allowed['at']), ('HOLD', 'APPROVAL_MISMATCH'))
         # A recorded recovery cause has to fit the observed facts.
         mislabeled = copy.deepcopy(self.scenarios['rollback-hash-conflict']['records'])
@@ -553,6 +631,71 @@ class SkillImprovementContract(unittest.TestCase):
             changed['timezone'] = zone
             self.assertEqual(schema_errors(changed, self.manifest_schema, self.manifest_schema), [])
             ZoneInfo(zone)
+
+    def test_second_review_findings_are_rejected(self):
+        manifest = self.manifests['manifest.example.json']
+        allowed = self.scenarios['deploy-allowed']
+        at = allowed['at']
+        # An unauthorized intent followed by ROLLED_BACK is still a rejected row, not a legal rollback.
+        forged = copy.deepcopy(self.scenarios['rollback-other-executor']['records']) + \
+            [copy.deepcopy(self.scenarios['rollback-success']['records'][-1])]
+        intent = first(forged, 'deployment_event', 'ROLLING_BACK')
+        self.assertIn((intent['event_id'], 'gate', 'ROLLBACK_NOT_AUTHORIZED'),
+                      replay(forged, self.transitions, manifest)[2])
+        # A size review of another candidate or file does not clear the plan.
+        borrowed = copy.deepcopy(allowed['records'])
+        first(borrowed, 'size_review')['record']['candidate_id'] = 'c-other'
+        self.assertEqual(judge_deploy_gate(manifest, borrowed, at), ('HOLD', 'SIZE_REVIEW_MISMATCH'))
+        # The owning repository of an OWNER_REPOSITORY_PR route must be registered.
+        unregistered = copy.deepcopy(allowed['records'])
+        plan = first(unregistered, 'deployment_plan')['record']
+        plan['target']['repository_id'] = 'demo-unregistered'
+        plan['route'] = {'type': 'OWNER_REPOSITORY_PR', 'owner_repository_id': 'demo-unregistered',
+                         'issue_ref': 'synthetic:demo-unregistered/issue-1'}
+        first(unregistered, 'deployment_event', 'APPROVED')['record']['state']['plan_sha256'] = sha(plan)
+        self.assertEqual(judge_deploy_gate(manifest, unregistered, at), ('HOLD', 'REPOSITORY_NOT_IN_MANIFEST'))
+        # Allowed roots cannot leave the repository.
+        for root in ('../../.hermes', '..', 'docs/../..', './docs'):
+            changed = copy.deepcopy(manifest)
+            changed['repositories'][0]['allowed_roots'] = [root]
+            self.assertTrue(schema_errors(changed, self.manifest_schema, self.manifest_schema), root)
+        # Patterns match the whole value: a trailing newline is not a valid id.
+        newline = copy.deepcopy(self.ledger[0])
+        newline['event_id'] = 'e01\n'
+        self.assertTrue(schema_errors(newline, self.ledger_schema, self.ledger_schema))
+        # Evaluation counts must be consistent, and stability needs the initial three trials.
+        evaluation = first(allowed['records'], 'evaluation')['record']
+        for change in ({'target_cases': 0}, {'candidate_passed': 9}):
+            broken = copy.deepcopy(evaluation)
+            broken['improvement'].update(change)
+            self.assertEqual(judge_evaluation(broken), 'INVALID_COUNTS')
+        too_many = copy.deepcopy(evaluation)
+        too_many['regression']['candidate_failed_among_them'] = 9
+        self.assertEqual(judge_evaluation(too_many), 'INVALID_COUNTS')
+        one_trial = copy.deepcopy(evaluation)
+        one_trial['improvement']['trials'] = 1
+        self.assertEqual(judge_evaluation(one_trial), 'IMPROVEMENT_UNCONFIRMED')
+        # A declined candidate cannot be deployed, and the gate reads the named deployment's plan.
+        declined = copy.deepcopy(allowed['records'])
+        candidate = copy.deepcopy(first(declined, 'candidate'))
+        candidate.update(event_id='e10b', recorded_at='2026-11-04T00:40:00Z')
+        candidate['record']['state'] = {'status': 'DECLINED', 'reason': 'synthetic'}
+        declined.insert(declined.index(first(declined, 'deployment_plan')) + 1, candidate)
+        self.assertEqual(judge_deploy_gate(manifest, declined, at), ('HOLD', 'CANDIDATE_NOT_OPEN'))
+        other = copy.deepcopy(allowed['records'])
+        extra = copy.deepcopy(first(other, 'deployment_plan'))
+        extra['event_id'] = 'e16-other'
+        extra['record']['deployment_id'] = 'd-other'
+        other.append(extra)
+        self.assertEqual(judge_deploy_gate(manifest, other, at, 'd-review-steps'), ('ALLOWED', None))
+        # RESTORED_HASH_MISMATCH needs an observed restored hash that differs.
+        unproven = copy.deepcopy(self.scenarios['rollback-hash-conflict']['records'])
+        unproven[-1]['record']['state'].update(
+            observed_current_sha256=first(unproven, 'deployment_plan')['record']['hashes']['expected_after'],
+            reason='RESTORED_HASH_MISMATCH', restored_sha256=None)
+        self.assertEqual(judge_rollback(unproven, 'd-review-steps'), ('RECOVERY_REQUIRED', 'REASON_INCONSISTENT'))
+        unproven[-1]['record']['state']['restored_sha256'] = '2' * 64
+        self.assertEqual(judge_rollback(unproven, 'd-review-steps'), ('RECOVERY_REQUIRED', 'RESTORED_HASH_MISMATCH'))
 
     def test_committed_examples_equal_the_builder_output(self):
         spec = importlib.util.spec_from_file_location('build_examples', FIXTURES / 'build_examples.py')

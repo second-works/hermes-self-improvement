@@ -246,8 +246,8 @@
         "size_review_id": {"$ref": "#/$defs/id"},
         "target": {
           "type": "object", "additionalProperties": false,
-          "required": ["skill_id", "canonical_ref", "deploy_ref"],
-          "properties": {"skill_id": {"$ref": "#/$defs/id"}, "canonical_ref": {"$ref": "#/$defs/ref"}, "deploy_ref": {"$ref": "#/$defs/ref"}}
+          "required": ["repository_id", "skill_id", "canonical_ref", "deploy_ref"],
+          "properties": {"repository_id": {"$ref": "#/$defs/id"}, "skill_id": {"$ref": "#/$defs/id"}, "canonical_ref": {"$ref": "#/$defs/ref"}, "deploy_ref": {"$ref": "#/$defs/ref"}}
         },
         "route": {
           "oneOf": [
@@ -403,12 +403,13 @@
             },
             {
               "type": "object", "additionalProperties": false,
-              "required": ["status", "intent_id", "reason", "observed_current_sha256"],
+              "required": ["status", "intent_id", "reason", "observed_current_sha256", "restored_sha256"],
               "properties": {
                 "status": {"const": "RECOVERY_REQUIRED"},
                 "intent_id": {"$ref": "#/$defs/id"},
                 "reason": {"enum": ["CURRENT_HASH_MISMATCH", "PARTIAL_WRITE", "UNKNOWN_RESULT", "RESTORED_HASH_MISMATCH"]},
-                "observed_current_sha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]}
+                "observed_current_sha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+                "restored_sha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]}
               }
             },
             {

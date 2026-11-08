@@ -6,6 +6,38 @@
   "records": [
     {
       "schema_version": 1,
+      "event_id": "e10",
+      "recorded_at": "2026-11-03T06:00:00Z",
+      "work_date": "2026-11-03",
+      "timezone": "Asia/Tokyo",
+      "repository_id": "demo-app",
+      "work_unit_id": "wu-app-triage",
+      "classification": "PUBLIC",
+      "record": {
+        "kind": "candidate",
+        "candidate_id": "c-review-steps",
+        "experience_ids": [
+          "x-app-1",
+          "x-cli-1"
+        ],
+        "target_skill_id": "pr-review",
+        "cause": "MISSING_PROCEDURE",
+        "scope": {
+          "type": "SHARED",
+          "basis": "REPEATED_IN_REPOSITORIES",
+          "repository_ids": [
+            "demo-app",
+            "demo-cli"
+          ],
+          "decided_by": "example-owner"
+        },
+        "state": {
+          "status": "OPEN"
+        }
+      }
+    },
+    {
+      "schema_version": 1,
       "event_id": "e14",
       "recorded_at": "2026-11-03T09:00:00Z",
       "work_date": "2026-11-03",
@@ -101,6 +133,7 @@
         "evaluation_id": "ev-review-steps",
         "size_review_id": "sr-review-steps",
         "target": {
+          "repository_id": "demo-app",
           "skill_id": "pr-review",
           "canonical_ref": "demo-app:.claude/skills/pr-review/SKILL.md",
           "deploy_ref": "demo-app:.claude/skills/pr-review/SKILL.md"
@@ -159,7 +192,7 @@
           "approved_at": "2026-11-04T01:00:00Z",
           "expires_at": "2026-11-05T00:00:00Z",
           "plan_event_id": "e16",
-          "plan_sha256": "68c533f59f4bfa7fceae88bc4a8a93547143a62c414bd9700fc6d7a94d40fd42"
+          "plan_sha256": "0e52d99d1c834acbfadebc5e556fed245ce499e842e4cf24e03a970a45911eb5"
         }
       }
     }

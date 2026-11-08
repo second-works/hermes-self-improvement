@@ -32,7 +32,7 @@ PUBLIC例のhash・ID・repo・担当者はすべて合成値で、承認の記�
 
 manifestには、対象repo（2つ以上）の識別子・許可root・読取項目・情報分類・担当と、全体の期間・timezone・保存先・承認を書く。
 manifestにないrepoを推測で追加しない。manifestが未承認なら記録も始めない。
-`repository_id` はmanifest内で一意とする。schemaでは表せないため、台帳の実装と照合テストで検査する。期間はmanifestのtimezoneの日付で判定する。
+許可rootはrepo内の相対pathに限り、`.` や `..` の区間を含めない。`repository_id` はmanifest内で一意とする。schemaでは表せないため、台帳の実装と照合テストで検査する。期間はmanifestのtimezoneの日付で判定する。
 `RECORD_ONLY` のmanifestでは、承認票が揃っていても反映を保留にする（例: `deploy-record-only-stage`）。
 
 ## 3. 記録の種類と状態
@@ -86,26 +86,28 @@ rollbackは `HALTED → ROLLING_BACK → ROLLED_BACK / RECOVERY_REQUIRED` だけ
 
 配備計画（`deployment_plan`）に次を固定し、その後に個別承認を追記する。
 
-- 対象Skill、正本の参照、配備先の参照。
+- 対象Skillとそれを所有するrepo（`target.repository_id`）、正本の参照、配備先の参照。
 - baseline・candidate・評価のhash、反映前後の期待hash、backupの参照とhash。
 - 担当者、期限、適用条件、Skillのversion（効果窓の判定に使う）。
 - rollbackの事前承認（承認者・実行者・発動条件・期限）。なければ `null` とし、即時rollbackはできない。
-- 経路: 手元での手動反映（`LOCAL_MANUAL`）か、所有repoの専用Issue/PR（`OWNER_REPOSITORY_PR`）か。他repoのSkillは所有repoのIssue/PRでしか変更しない。
+- 経路: 手元での手動反映（`LOCAL_MANUAL`）か、所有repoの専用Issue/PR（`OWNER_REPOSITORY_PR`）か。他repoのSkillは所有repoのIssue/PRでしか変更しない。手元の手動反映は、所有repoと記録したrepoが同じ場合に限る。
 
 承認は計画イベントのID（`plan_event_id`）と、計画の `record` 部分を正規化JSON（キー順・区切り固定・UTF-8）にしたSHA-256（`plan_sha256`）に結び付ける。
 反映してよいのは次をすべて満たすときだけで、満たさなければ理由付きで保留する。
 
 | 確認 | 保留理由 |
 | --- | --- |
-| manifestのrepoが一意で、対象repoがあり、段階が手動改善で、期間内 | `MANIFEST_DUPLICATE_REPOSITORY / REPOSITORY_NOT_IN_MANIFEST / STAGE_RECORD_ONLY / OUTSIDE_PERIOD` |
+| manifestのrepoが一意で、記録repo・所有repo・PR先repoがすべて登録済み、段階が手動改善で、期間内 | `MANIFEST_DUPLICATE_REPOSITORY / REPOSITORY_NOT_IN_MANIFEST / STAGE_RECORD_ONLY / OUTSIDE_PERIOD` |
+| 経路が所有repoと合う | `OWNER_REPOSITORY_PR_REQUIRED / OWNER_REPOSITORY_MISMATCH` |
+| 候補の最新状態が `OPEN` | `CANDIDATE_NOT_OPEN` |
 | 評価が `IMPROVED` で、hashが計画と一致 | `EVALUATION_NOT_IMPROVED / EVALUATION_MISMATCH` |
-| 分量レビューが `HOLD` でない | `SIZE_REVIEW_HOLD` |
+| 分量レビューが `HOLD` でなく、同じ候補と正本を対象にしている | `SIZE_REVIEW_HOLD / SIZE_REVIEW_MISMATCH` |
 | 最新計画に対する承認があり、`plan_event_id` と `plan_sha256` が一致 | `APPROVAL_MISSING / APPROVAL_MISMATCH` |
 | 承認の期限内、計画の期限内 | `APPROVAL_EXPIRED / DEADLINE_PASSED` |
 | 他repo経路ではMergeの記録がある | `MERGE_MISSING` |
 
 MergeとSkillの反映は別の記録にする。Mergeしただけでは配備済みとしない。
-反映の記録には、反映前に観測したhashと反映後のhashを残し、計画の期待hashと照合する。
+反映の記録には、根拠にした最新の承認イベントと、反映前に観測したhash・反映後のhashを残し、計画の期待hashと照合する。この確認を通らない反映の記録は、台帳に追記できない不正な行として扱う。
 
 ## 7. 評価
 
@@ -115,7 +117,8 @@ MergeとSkillの反映は別の記録にする。Mergeしただけでは配備�
 2. 退行なし: baselineで合格していたケースを候補が落とさない。落とせば `REGRESSED`。
 3. 改善の確認: 改善対象のケースで候補がbaselineを上回り、試行が安定し、劣化対照が有効である。
 
-同点・不安定・対照不成立は `IMPROVEMENT_UNCONFIRMED`（例: `evaluation-tie`、`evaluation-unstable`）。
+安定の確認には3試行以上を必要とする。同点・不安定・試行不足・対照不成立は `IMPROVEMENT_UNCONFIRMED`（例: `evaluation-tie`、`evaluation-unstable`）。
+件数が矛盾する評価（合格数がケース数を超える、改善対象が0件など）は判定に使わない。
 決定的な検査で評価できない品質だけ、人間がbaselineと比べる（`HUMAN_COMPARISON`）。人間比較で差がない・比較できない場合も改善未確認とする。
 確認する内容は質問の有無だけでなく、必要事項・操作順序・本来のタスクの完了を含める。3試行は初期のスモークで、一般的な有効性の証明ではない。
 評価は候補の生成前に凍結し、hiddenの正解や個別結果を生成側へ渡さない。[#86](candidate-evaluation-issue86.md) と [#92](semantic-evaluation-issue92.md) の独立評価の考え方を再利用するが、#92の生成1＋評価9の予算と承認は流用しない。
@@ -129,7 +132,7 @@ MergeとSkillの反映は別の記録にする。Mergeしただけでは配備�
 
 1. 安全違反・誤適用・明確な悪化・利用者の撤回が1件でもあれば `HALTED`（停止し、rollbackを判断する）。
 2. 連番に欠けがあれば効果未確認（`SEQUENCE_GAP`）。
-3. 窓の中で同じ問題が再発したら `IMPROVEMENT_UNCONFIRMED` とし、候補を再評価する。悪化とは分けて扱う。
+3. 窓の中で同じ問題が再発したら `IMPROVEMENT_UNCONFIRMED` とし、悪化とは分けて扱う。再評価は同じ経験を根拠にした新しい候補IDで記録し、元の候補は `DEPLOYED`、配備は `IMPROVEMENT_UNCONFIRMED` のまま残す。
 4. 窓の中に、Skillが適用されなかった作業や結果不明の未完了作業があれば `IMPROVEMENT_UNCONFIRMED`。次の作業で埋め合わせない。
 5. 窓が3件に満たなければ効果未確認（`WINDOW_INCOMPLETE`、配備は `DEPLOYED_EFFECT_UNCONFIRMED` のまま）。
 6. それ以外は `EFFECT_CONFIRMED`。失敗した作業も、同じ問題が再発していなければ窓に数える。
@@ -140,6 +143,7 @@ MergeとSkillの反映は別の記録にする。Mergeしただけでは配備�
 intentの発動条件は、直前に停止（`HALTED`）させた条件と一致させる。別の条件を書いて事前承認を流用しようとした場合は保留する（`TRIGGER_MISMATCH`）。
 手順は次の順に固定する。
 
+0. 発動条件・承認・想定hashを確認する。満たさなければintentを記録せずに保留する。満たさないintentの行は不正な遷移として拒否する。
 1. 排他lockを取る。
 2. intent（lock・実行者・発動条件・承認根拠・想定する現在hash・backupのhash）を `ROLLING_BACK` として先に永続化する。
 3. 現在hashを読み、想定した候補のhashと照合する。
@@ -153,7 +157,7 @@ intentの発動条件は、直前に停止（`HALTED`）させた条件と一致
 - intentの後に終了記録がない、または書込が途中で止まった（`PARTIAL_WRITE`、例: `rollback-partial-write`）。
 - 結果が分からない（`UNKNOWN_RESULT`）、復元後のhashが合わない（`RESTORED_HASH_MISMATCH`）。
 
-記録した理由は観測と整合させる。現在hashが観測できないのに `CURRENT_HASH_MISMATCH` や `RESTORED_HASH_MISMATCH` とは書かない。
+記録した理由は観測と整合させる。現在hashが観測できないのに `CURRENT_HASH_MISMATCH` とは書かない。`RESTORED_HASH_MISMATCH` は、観測した復元後のhash（`restored_sha256`）が期待と違う場合だけに使う。
 事前承認の期限切れや実行者違いは、rollbackを始めずに保留する（例: `rollback-preapproval-expired`）。
 採用・復旧の永続化と承認の結び付けは、[#8のfixture採用](fixture-adoption.md) の仕組みを再利用元とする。ただし本書は実Skillへの書込手段を追加しない。
 

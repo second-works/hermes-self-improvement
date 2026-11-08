@@ -67,7 +67,7 @@ SIZE = {'kind': 'size_review', 'review_id': 'sr-review-steps', 'candidate_id': '
         'exception_reason': None, 'verdict': 'WITHIN_GUIDE'}
 PLAN = {'kind': 'deployment_plan', 'deployment_id': 'd-review-steps', 'candidate_id': 'c-review-steps',
         'evaluation_id': 'ev-review-steps', 'size_review_id': 'sr-review-steps',
-        'target': {'skill_id': 'pr-review', 'canonical_ref': 'demo-app:.claude/skills/pr-review/SKILL.md',
+        'target': {'repository_id': 'demo-app', 'skill_id': 'pr-review', 'canonical_ref': 'demo-app:.claude/skills/pr-review/SKILL.md',
                    'deploy_ref': 'demo-app:.claude/skills/pr-review/SKILL.md'},
         'route': {'type': 'LOCAL_MANUAL'},
         'hashes': {'baseline': h('baseline'), 'candidate': h('candidate'), 'evaluation': h('evaluation'),
@@ -106,14 +106,22 @@ def obs(n, task='COMPLETED', recurred=False, adverse=None, applied=True):
 A = 'demo-app'
 
 
-def base_deploy(plan=PLAN):
-    return [ev('e14', '2026-11-03T09:00:00Z', '2026-11-03', A, 'wu-app-eval', EVAL),
-            ev('e15', '2026-11-03T09:10:00Z', '2026-11-03', A, 'wu-app-eval', SIZE),
+CANDIDATE_OPEN = {'kind': 'candidate', 'candidate_id': 'c-review-steps', 'experience_ids': ['x-app-1', 'x-cli-1'],
+                  'target_skill_id': 'pr-review', 'cause': 'MISSING_PROCEDURE',
+                  'scope': {'type': 'SHARED', 'basis': 'REPEATED_IN_REPOSITORIES',
+                            'repository_ids': ['demo-app', 'demo-cli'], 'decided_by': 'example-owner'},
+                  'state': {'status': 'OPEN'}}
+
+
+def base_deploy(plan=PLAN, with_candidate=True, evaluation=EVAL, size=SIZE):
+    head = [ev('e10', '2026-11-03T06:00:00Z', '2026-11-03', A, 'wu-app-triage', CANDIDATE_OPEN)] if with_candidate else []
+    return head + [ev('e14', '2026-11-03T09:00:00Z', '2026-11-03', A, 'wu-app-eval', evaluation),
+            ev('e15', '2026-11-03T09:10:00Z', '2026-11-03', A, 'wu-app-eval', size),
             ev('e16', '2026-11-04T00:30:00Z', '2026-11-04', A, 'wu-app-deploy', plan)]
 
 
-def deployed_prefix():
-    return base_deploy() + [
+def deployed_prefix(with_candidate=True):
+    return base_deploy(with_candidate=with_candidate) + [
         ev('e17', '2026-11-04T01:00:00Z', '2026-11-04', A, 'wu-app-deploy', approved(PLAN)),
         ev('e18', '2026-11-04T02:00:00Z', '2026-11-04', A, 'wu-app-deploy', deployed())]
 
@@ -147,12 +155,7 @@ def ledger():
            {'kind': 'experience', 'experience_id': 'x-cli-3', 'end_event_id': 'e08',
             'experience_type': 'REWORK', 'summary': '既存Skillの手順があったのに読み込まず作業をやり直した',
             'evidence_refs': ['synthetic:demo-cli/pr-8/commit-2'], 'cause': 'NOT_LOADED'}),
-        ev('e10', '2026-11-03T06:00:00Z', '2026-11-03', 'demo-app', 'wu-app-triage',
-           {'kind': 'candidate', 'candidate_id': 'c-review-steps', 'experience_ids': ['x-app-1', 'x-cli-1'],
-            'target_skill_id': 'pr-review', 'cause': 'MISSING_PROCEDURE',
-            'scope': {'type': 'SHARED', 'basis': 'REPEATED_IN_REPOSITORIES',
-                      'repository_ids': ['demo-app', 'demo-cli'], 'decided_by': 'example-owner'},
-            'state': {'status': 'OPEN'}}),
+        ev('e10', '2026-11-03T06:00:00Z', '2026-11-03', 'demo-app', 'wu-app-triage', CANDIDATE_OPEN),
         ev('e11', '2026-11-03T06:05:00Z', '2026-11-03', 'demo-cli', 'wu-cli-triage',
            {'kind': 'candidate', 'candidate_id': 'c-cli-scope-check', 'experience_ids': ['x-cli-1'],
             'target_skill_id': 'pr-review', 'cause': 'MISSING_PROCEDURE', 'scope': {'type': 'REPOSITORY_LOCAL'},
@@ -167,7 +170,7 @@ def ledger():
             'target_skill_id': 'release-steps', 'cause': 'NOT_LOADED', 'scope': {'type': 'REPOSITORY_LOCAL'},
             'state': {'status': 'HOLD', 'reason': '読込不足のため本文追記ではなく入口と起動条件を確認する'}}),
     ]
-    rows += deployed_prefix()
+    rows += deployed_prefix(with_candidate=False)
     rows += [
         ev('e19', '2026-11-04T02:05:00Z', '2026-11-04', A, 'wu-app-deploy',
            {'kind': 'candidate', 'candidate_id': 'c-review-steps', 'experience_ids': ['x-app-1', 'x-cli-1'],
@@ -309,7 +312,8 @@ def scenarios():
     add('rollback-hash-conflict', 'rollback', '現在hashが想定した候補と違うので上書きしない。',
         halted + [intent(), final({'status': 'RECOVERY_REQUIRED', 'intent_id': 'ri-1',
                                     'reason': 'CURRENT_HASH_MISMATCH',
-                                    'observed_current_sha256': h('edited-by-someone-else')})],
+                                    'observed_current_sha256': h('edited-by-someone-else'),
+                                    'restored_sha256': None})],
         {'decision': 'RECOVERY_REQUIRED', 'reason': 'CURRENT_HASH_MISMATCH'})
     add('rollback-partial-write', 'rollback', 'intentを残したまま終了記録がない（途中書込）。',
         halted + [intent()], {'decision': 'RECOVERY_REQUIRED', 'reason': 'PARTIAL_WRITE'})
@@ -317,6 +321,37 @@ def scenarios():
         halted + [intent(at='2026-11-20T00:00:01Z')], {'decision': 'HOLD', 'reason': 'ROLLBACK_NOT_AUTHORIZED'})
     add('rollback-other-executor', 'rollback', '事前承認にない実行者が即時rollbackしようとした。',
         halted + [intent(executor='someone-else')], {'decision': 'HOLD', 'reason': 'ROLLBACK_NOT_AUTHORIZED'})
+
+    add('rollback-intent-mismatch', 'rollback', 'intentの想定現在hashが計画の反映後hashと違う。',
+        halted + [ev('er1', '2026-11-05T06:05:00Z', '2026-11-05', A, 'wu-app-rollback',
+                     {'kind': 'deployment_event', 'deployment_id': 'd-review-steps',
+                      'state': {**intent()['record']['state'], 'expected_current_sha256': h('unexpected')}})],
+        {'decision': 'HOLD', 'reason': 'INTENT_MISMATCH'})
+
+    late = base_deploy() + [ev('e17', '2026-11-04T01:00:00Z', '2026-11-04', A, 'wu-app-deploy',
+                                approved(PLAN, expires='2026-11-07T00:00:00Z'))]
+    add('deploy-deadline-passed', 'deploy_gate', '承認は有効だが計画の期限を過ぎた。', late,
+        {'decision': 'HOLD', 'reason': 'DEADLINE_PASSED'}, at='2026-11-06T00:00:00Z')
+    other_eval = copy.deepcopy(EVAL)
+    other_eval['candidate_sha256'] = h('candidate-evaluated-elsewhere')
+    add('deploy-evaluation-mismatch', 'deploy_gate', '評価した候補hashが計画の候補hashと違う。',
+        base_deploy(evaluation=other_eval) + [ev('e17', '2026-11-04T01:00:00Z', '2026-11-04', A, 'wu-app-deploy',
+                                                 approved(PLAN))],
+        {'decision': 'HOLD', 'reason': 'EVALUATION_MISMATCH'}, at='2026-11-04T02:00:00Z')
+    held = copy.deepcopy(SIZE)
+    held.update(responsibilities=SIZE['responsibilities'][:2], verdict='HOLD')
+    add('deploy-size-review-hold', 'deploy_gate', '分量レビューが保留のまま反映しようとした。',
+        base_deploy(size=held) + [ev('e17', '2026-11-04T01:00:00Z', '2026-11-04', A, 'wu-app-deploy', approved(PLAN))],
+        {'decision': 'HOLD', 'reason': 'SIZE_REVIEW_HOLD'}, at='2026-11-04T02:00:00Z')
+    foreign = copy.deepcopy(PLAN)
+    foreign['target']['repository_id'] = 'demo-cli'
+    add('deploy-other-repository-local', 'deploy_gate', '他repoのSkillを手元の手動反映で変えようとした。',
+        base_deploy(plan=foreign) + [ev('e17', '2026-11-04T01:00:00Z', '2026-11-04', A, 'wu-app-deploy',
+                                        approved(foreign))],
+        {'decision': 'HOLD', 'reason': 'OWNER_REPOSITORY_PR_REQUIRED'}, at='2026-11-04T02:00:00Z')
+    add('effect-not-applied-in-window', 'effect_window', '窓の2件目でSkillが適用されなかった。',
+        deployed_prefix() + obs_rows([obs(1), obs(2, applied=False), obs(3)]),
+        {'decision': 'IMPROVEMENT_UNCONFIRMED', 'reason': 'NOT_APPLIED_IN_WINDOW'})
 
     skip = base_deploy() + [ev('e18', '2026-11-04T02:00:00Z', '2026-11-04', A, 'wu-app-deploy', deployed())]
     add('transition-deploy-without-approval', 'transition', 'APPROVEDを経ずに反映済みを記録した。', skip,

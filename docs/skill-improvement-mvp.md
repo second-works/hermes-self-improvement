@@ -53,6 +53,7 @@ manifestにないrepoを推測で追加しない。manifestが未承認なら記
 その後は効果確認済み（`EFFECT_CONFIRMED`）・改善未確認（`IMPROVEMENT_UNCONFIRMED`）・停止（`HALTED`）に分かれる。
 rollbackは `HALTED → ROLLING_BACK → ROLLED_BACK / RECOVERY_REQUIRED` だけを許可する。取り下げは `WITHDRAWN`。
 反映前（Merge後を含む）に計画を追記し直すと `PLANNED` へ戻り、以前の承認とMergeの記録は使えない。
+評価・分量レビューに記録した判定は、記録内容から判定し直した結果と一致させる。`DUPLICATE` は既に記録された候補だけを指し、`MERGED` は所有repoのPR経路の配備にだけ記録できる。
 承認を経ない反映など、[許可遷移](../schemas/skill-improvement/state-transitions.json) にない遷移は拒否する（例: `transition-deploy-without-approval`）。
 
 ## 4. 原因の6分類と対処
@@ -108,7 +109,7 @@ rollbackは `HALTED → ROLLING_BACK → ROLLED_BACK / RECOVERY_REQUIRED` だけ
 | 他repo経路ではMergeの記録がある | `MERGE_MISSING` |
 
 MergeとSkillの反映は別の記録にする。Mergeしただけでは配備済みとしない。
-反映の記録には、根拠にした最新の承認イベントと、反映前に観測したhash・反映後のhashを残し、計画の期待hashと照合する。反映時刻（`deployed_at`）は追記時刻（`recorded_at`）以前とし、どちらの時刻でも上の確認を満たす必要がある。確認には、その時刻までに追記された記録だけを使う（後から追記したMerge記録などで、それより前の反映を正当化しない）。この確認を通らない反映の記録（反映後hashの不一致を含む）は、台帳に追記できない不正な行として扱い、人の確認を待つ。
+反映の記録には、根拠にした最新の承認イベントと、反映前に観測したhash・反映後のhashを残し、計画の期待hashと照合する。反映時刻（`deployed_at`）は追記時刻（`recorded_at`）以前とし、どちらの時刻でも上の確認を満たす必要がある。確認には、その時刻までに追記された記録だけを使う（後から追記したMerge記録などで、それより前の反映を正当化しない）。2つの時刻の確認は同じ計画と承認に基づく必要があり、その間に計画や承認を追記し直した反映の行は拒否する（`DEPLOY_BASIS_CHANGED`）。この確認を通らない反映の記録（反映後hashの不一致を含む）は、台帳に追記できない不正な行として扱い、人の確認を待つ。
 
 ## 7. 評価
 
@@ -138,7 +139,7 @@ MergeとSkillの反映は別の記録にする。Mergeしただけでは配備�
 5. 窓が3件に満たなければ効果未確認（`WINDOW_INCOMPLETE`、配備は `DEPLOYED_EFFECT_UNCONFIRMED` のまま）。
 6. それ以外は `EFFECT_CONFIRMED`。失敗した作業も、同じ問題が再発していなければ窓に数える。
 
-効果の状態（`EFFECT_CONFIRMED` / `IMPROVEMENT_UNCONFIRMED` / `HALTED`）は、すでに追記した観測から上の順で導いた結果と、根拠にした観測IDが一致するときだけ記録できる。一致しない行は不正な行として拒否する。
+効果の状態（`EFFECT_CONFIRMED` / `IMPROVEMENT_UNCONFIRMED` / `HALTED`）は、すでに追記した観測から上の順で導いた結果と、根拠にした観測IDが一致するときだけ記録できる。根拠にできるのは反映後に追記した観測だけで、一致しない行は不正な行として拒否する。
 
 ## 9. rollbackと復旧待ち
 

@@ -258,14 +258,22 @@ def deploy_guard(manifest, rows, index):
     prefix = rows[:index]
     if state['deployed_at'] > row['recorded_at']:
         return 'DEPLOY_RECORD_MISMATCH'
-    # The self-reported deployed_at and the append time must both pass the gate.
+    deployment_id = row['record']['deployment_id']
+    # The self-reported deployed_at and the append time must both pass the gate, against the same
+    # plan and approval: nothing for this deployment may be re-planned or re-approved in between.
+    bases = []
     for moment in (state['deployed_at'], row['recorded_at']):
-        if judge_deploy_gate(manifest, prefix, moment, row['record']['deployment_id']) != ('ALLOWED', None):
+        if judge_deploy_gate(manifest, prefix, moment, deployment_id) != ('ALLOWED', None):
             return 'DEPLOY_GATE_HOLD'
-    plan = records(prefix, 'deployment_plan', deployment_id=row['record']['deployment_id'])[-1]['record']
-    approvals = [item for item in deployment_states(prefix, row['record']['deployment_id'])
-                 if item['record']['state']['status'] == 'APPROVED']
-    if state['approval_event_id'] != approvals[-1]['event_id'] or \
+        visible = [item for item in prefix if item['recorded_at'] <= moment]
+        plan_row = records(visible, 'deployment_plan', deployment_id=deployment_id)[-1]
+        approval_row = [item for item in deployment_states(visible, deployment_id)
+                        if item['record']['state']['status'] == 'APPROVED'][-1]
+        bases.append((plan_row['event_id'], approval_row['event_id']))
+    if bases[0] != bases[1]:
+        return 'DEPLOY_BASIS_CHANGED'
+    plan = next(item for item in prefix if item['event_id'] == bases[0][0])['record']
+    if state['approval_event_id'] != bases[0][1] or \
             state['observed_before_sha256'] != plan['hashes']['expected_before'] or \
             state['observed_after_sha256'] != plan['hashes']['expected_after']:
         return 'DEPLOY_RECORD_MISMATCH'
@@ -282,6 +290,17 @@ def replay(rows, transitions, manifest=None):
     deployment, candidate, illegal, planned_for = {}, {}, [], {}
     for index, row in enumerate(rows):
         record = row['record']
+        if record['kind'] == 'evaluation' and record['verdict'] != judge_evaluation(record):
+            illegal.append((row['event_id'], 'gate', 'VERDICT_MISMATCH'))
+        if record['kind'] == 'size_review' and record['verdict'] != judge_size(record)[0]:
+            illegal.append((row['event_id'], 'gate', 'VERDICT_MISMATCH'))
+        if record['kind'] == 'candidate' and record['state']['status'] == 'DUPLICATE' and \
+                record['state']['duplicate_of'] not in candidate:
+            illegal.append((row['event_id'], 'gate', 'DUPLICATE_TARGET_MISSING'))
+        if record['kind'] == 'deployment_event' and record['state']['status'] == 'MERGED' and \
+                records(rows[:index], 'deployment_plan', deployment_id=record['deployment_id'])[-1][
+                    'record']['route']['type'] != 'OWNER_REPOSITORY_PR':
+            illegal.append((row['event_id'], 'gate', 'MERGE_WITHOUT_PR_ROUTE'))
         if record['kind'] == 'candidate' and 'deployment_id' in record['state']:
             linked = record['state']['deployment_id']
             needed = DEPLOYED_STATES if record['state']['status'] == 'DEPLOYED' else {'ROLLED_BACK'}
@@ -357,8 +376,11 @@ def effect_state_mismatch(prefix, row):
     state = row['record']['state']
     deployment_id = row['record']['deployment_id']
     if state['status'] == 'HALTED':
+        deployed = [item for item in deployment_states(prefix, deployment_id)
+                    if item['record']['state']['status'] == 'DEPLOYED_EFFECT_UNCONFIRMED'][-1]
         supporting = [item['record'] for item in records(prefix, 'effect_observation', deployment_id=deployment_id)
-                      if item['record']['observation_id'] == state['observation_id']]
+                      if item['record']['observation_id'] == state['observation_id'] and
+                      item['recorded_at'] > deployed['record']['state']['deployed_at']]
         return None if supporting and supporting[-1]['adverse'] == state['trigger'] else 'EFFECT_STATE_MISMATCH'
     verdict, _, window = effect_window(prefix, deployment_id)
     if verdict != state['status'] or window != state['observation_ids']:
@@ -835,6 +857,50 @@ class SkillImprovementContract(unittest.TestCase):
         first(halted, 'deployment_event', 'HALTED')['record']['state']['trigger'] = 'SAFETY_VIOLATION'
         rejected = replay(halted, self.transitions, manifest)[2]
         self.assertIn((first(halted, 'deployment_event', 'HALTED')['event_id'], 'gate', 'EFFECT_STATE_MISMATCH'), rejected)
+
+    def test_deployment_record_is_bound_to_one_plan_and_approval(self):
+        manifest = self.manifests['manifest.example.json']
+        rows = copy.deepcopy(self.scenarios['deploy-allowed']['records'])
+        plan_row = first(rows, 'deployment_plan')
+        revised = copy.deepcopy(plan_row)
+        revised.update(event_id='e16r', recorded_at='2026-11-04T03:00:00Z')
+        revised['record']['hashes']['expected_after'] = '4' * 64
+        approval = copy.deepcopy(first(rows, 'deployment_event', 'APPROVED'))
+        approval.update(event_id='e17r', recorded_at='2026-11-04T03:10:00Z')
+        approval['record']['state'].update(approved_at='2026-11-04T03:10:00Z', plan_event_id='e16r',
+                                           plan_sha256=sha(revised['record']))
+        deployed = copy.deepcopy(approval)
+        deployed.update(event_id='e18', recorded_at='2026-11-04T04:00:00Z')
+        deployed['record']['state'] = {
+            'status': 'DEPLOYED_EFFECT_UNCONFIRMED', 'deployed_by': 'example-owner',
+            'deployed_at': '2026-11-04T02:00:00Z', 'approval_event_id': 'e17r',
+            'observed_before_sha256': plan_row['record']['hashes']['expected_before'],
+            'observed_after_sha256': '4' * 64}
+        self.assertIn(('e18', 'gate', 'DEPLOY_BASIS_CHANGED'),
+                      replay(rows + [revised, approval, deployed], self.transitions, manifest)[2])
+        # An adverse observation from before the deployment cannot justify HALTED.
+        halted = copy.deepcopy(self.scenarios['rollback-success']['records'])
+        observation = first(halted, 'effect_observation')
+        observation['recorded_at'] = '2026-11-04T01:30:00Z'
+        self.assertIn((first(halted, 'deployment_event', 'HALTED')['event_id'], 'gate', 'EFFECT_STATE_MISMATCH'),
+                      replay(halted, self.transitions, manifest)[2])
+
+    def test_replay_checks_labels_duplicates_and_merge_route(self):
+        manifest = self.manifests['manifest.example.json']
+        rows = copy.deepcopy(self.ledger)
+        first(rows, 'evaluation')['record']['verdict'] = 'CONTRACT_FAILED'
+        first(rows, 'size_review')['record']['verdict'] = 'HOLD'
+        duplicate = next(row for row in rows if row['record'].get('state', {}).get('status') == 'DUPLICATE')
+        duplicate['record']['state']['duplicate_of'] = 'c-missing'
+        rejected = {(event, reason) for event, _, reason in replay(rows, self.transitions, manifest)[2]}
+        self.assertLessEqual({(first(rows, 'evaluation')['event_id'], 'VERDICT_MISMATCH'),
+                              (first(rows, 'size_review')['event_id'], 'VERDICT_MISMATCH'),
+                              (duplicate['event_id'], 'DUPLICATE_TARGET_MISSING')}, rejected)
+        local = copy.deepcopy(self.scenarios['deploy-allowed']['records'])
+        merged = copy.deepcopy(first(local, 'deployment_event', 'APPROVED'))
+        merged.update(event_id='e17m', recorded_at='2026-11-04T01:20:00Z')
+        merged['record']['state'] = {'status': 'MERGED', 'pr_ref': 'synthetic:demo-app/pr-4', 'merge_commit': 'a' * 40}
+        self.assertIn(('e17m', 'gate', 'MERGE_WITHOUT_PR_ROUTE'), replay(local + [merged], self.transitions, manifest)[2])
 
     def test_committed_examples_equal_the_builder_output(self):
         spec = importlib.util.spec_from_file_location('build_examples', FIXTURES / 'build_examples.py')

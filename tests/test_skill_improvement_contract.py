@@ -295,12 +295,15 @@ def replay(rows, transitions, manifest=None):
         if record['kind'] == 'size_review' and record['verdict'] != judge_size(record)[0]:
             illegal.append((row['event_id'], 'gate', 'VERDICT_MISMATCH'))
         if record['kind'] == 'candidate' and record['state']['status'] == 'DUPLICATE' and \
-                record['state']['duplicate_of'] not in candidate:
+                (record['state']['duplicate_of'] not in candidate or
+                 record['state']['duplicate_of'] == record['candidate_id']):
             illegal.append((row['event_id'], 'gate', 'DUPLICATE_TARGET_MISSING'))
-        if record['kind'] == 'deployment_event' and record['state']['status'] == 'MERGED' and \
-                records(rows[:index], 'deployment_plan', deployment_id=record['deployment_id'])[-1][
-                    'record']['route']['type'] != 'OWNER_REPOSITORY_PR':
-            illegal.append((row['event_id'], 'gate', 'MERGE_WITHOUT_PR_ROUTE'))
+        if record['kind'] == 'deployment_event' and record['state']['status'] == 'MERGED':
+            plans = records(rows[:index], 'deployment_plan', deployment_id=record['deployment_id'])
+            if not plans:
+                illegal.append((row['event_id'], 'gate', 'PLAN_MISSING'))
+            elif plans[-1]['record']['route']['type'] != 'OWNER_REPOSITORY_PR':
+                illegal.append((row['event_id'], 'gate', 'MERGE_WITHOUT_PR_ROUTE'))
         if record['kind'] == 'candidate' and 'deployment_id' in record['state']:
             linked = record['state']['deployment_id']
             needed = DEPLOYED_STATES if record['state']['status'] == 'DEPLOYED' else {'ROLLED_BACK'}
@@ -901,6 +904,22 @@ class SkillImprovementContract(unittest.TestCase):
         merged.update(event_id='e17m', recorded_at='2026-11-04T01:20:00Z')
         merged['record']['state'] = {'status': 'MERGED', 'pr_ref': 'synthetic:demo-app/pr-4', 'merge_commit': 'a' * 40}
         self.assertIn(('e17m', 'gate', 'MERGE_WITHOUT_PR_ROUTE'), replay(local + [merged], self.transitions, manifest)[2])
+
+    def test_unplanned_merge_and_self_duplicate_are_rejected_rows(self):
+        manifest = self.manifests['manifest.example.json']
+        merge = copy.deepcopy(first(self.scenarios['deploy-allowed']['records'], 'deployment_event', 'APPROVED'))
+        merge.update(event_id='e-merge')
+        merge['record'].update(deployment_id='d-unplanned')
+        merge['record']['state'] = {'status': 'MERGED', 'pr_ref': 'synthetic:demo-app/pr-5', 'merge_commit': 'b' * 40}
+        rejected = replay([merge], self.transitions, manifest)[2]
+        self.assertIn(('e-merge', 'gate', 'PLAN_MISSING'), rejected)
+        rows = copy.deepcopy(self.ledger)
+        own = copy.deepcopy(first(rows, 'candidate'))
+        own.update(event_id='e-self', recorded_at='2026-11-03T06:01:00Z')
+        own['record']['state'] = {'status': 'DUPLICATE', 'duplicate_of': own['record']['candidate_id'],
+                                  'reason': 'synthetic'}
+        rows.insert(rows.index(first(rows, 'candidate')) + 1, own)
+        self.assertIn(('e-self', 'gate', 'DUPLICATE_TARGET_MISSING'), replay(rows, self.transitions, manifest)[2])
 
     def test_committed_examples_equal_the_builder_output(self):
         spec = importlib.util.spec_from_file_location('build_examples', FIXTURES / 'build_examples.py')

@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "description": "Skill改善MVPの許可遷移。ここにない遷移は不正として拒否する。PLANNEDはdeployment_planの追記で始まり、反映前（Merge後を含む）の計画の再追記はPLANNEDへ戻して以前の承認とMergeの記録を無効にする。",
+  "candidate": {
+    "initial": [
+      "OPEN",
+      "HOLD",
+      "DECLINED",
+      "DUPLICATE"
+    ],
+    "transitions": {
+      "OPEN": [
+        "HOLD",
+        "DECLINED",
+        "DUPLICATE",
+        "DEPLOYED"
+      ],
+      "HOLD": [
+        "OPEN",
+        "DECLINED",
+        "DUPLICATE"
+      ],
+      "DEPLOYED": [
+        "ROLLED_BACK"
+      ],
+      "DECLINED": [],
+      "DUPLICATE": [],
+      "ROLLED_BACK": []
+    }
+  },
+  "deployment": {
+    "initial": [
+      "PLANNED"
+    ],
+    "transitions": {
+      "PLANNED": [
+        "PLANNED",
+        "APPROVED",
+        "WITHDRAWN"
+      ],
+      "APPROVED": [
+        "PLANNED",
+        "MERGED",
+        "DEPLOYED_EFFECT_UNCONFIRMED",
+        "WITHDRAWN"
+      ],
+      "MERGED": [
+        "PLANNED",
+        "DEPLOYED_EFFECT_UNCONFIRMED",
+        "WITHDRAWN"
+      ],
+      "DEPLOYED_EFFECT_UNCONFIRMED": [
+        "EFFECT_CONFIRMED",
+        "IMPROVEMENT_UNCONFIRMED",
+        "HALTED"
+      ],
+      "EFFECT_CONFIRMED": [
+        "HALTED"
+      ],
+      "IMPROVEMENT_UNCONFIRMED": [
+        "HALTED"
+      ],
+      "HALTED": [
+        "ROLLING_BACK"
+      ],
+      "ROLLING_BACK": [
+        "ROLLED_BACK",
+        "RECOVERY_REQUIRED"
+      ],
+      "ROLLED_BACK": [],
+      "RECOVERY_REQUIRED": [],
+      "WITHDRAWN": []
+    }
+  }
+}

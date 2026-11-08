@@ -1,0 +1,289 @@
+{
+  "scenario_id": "effect-not-loaded-first",
+  "check": "effect_window",
+  "description": "最初の該当作業ではSkillが読まれず、窓は読込確認から始まる。",
+  "manifest": "manifest.example.json",
+  "records": [
+    {
+      "schema_version": 1,
+      "event_id": "e10",
+      "recorded_at": "2026-11-03T06:00:00Z",
+      "work_date": "2026-11-03",
+      "timezone": "Asia/Tokyo",
+      "repository_id": "demo-app",
+      "work_unit_id": "wu-app-triage",
+      "classification": "PUBLIC",
+      "record": {
+        "kind": "candidate",
+        "candidate_id": "c-review-steps",
+        "experience_ids": [
+          "x-app-1",
+          "x-cli-1"
+        ],
+        "target_skill_id": "pr-review",
+        "cause": "MISSING_PROCEDURE",
+        "scope": {
+          "type": "SHARED",
+          "basis": "REPEATED_IN_REPOSITORIES",
+          "repository_ids": [
+            "demo-app",
+            "demo-cli"
+          ],
+          "decided_by": "example-owner"
+        },
+        "state": {
+          "status": "OPEN"
+        }
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "e14",
+      "recorded_at": "2026-11-03T09:00:00Z",
+      "work_date": "2026-11-03",
+      "timezone": "Asia/Tokyo",
+      "repository_id": "demo-app",
+      "work_unit_id": "wu-app-eval",
+      "classification": "PUBLIC",
+      "record": {
+        "kind": "evaluation",
+        "evaluation_id": "ev-review-steps",
+        "candidate_id": "c-review-steps",
+        "baseline_sha256": "f46b2d59853e568a2ae83fe422d111ded918686d1e42a25de09edf686a148baa",
+        "candidate_sha256": "b7a8afc34ef412c05442178c888b91f1fa9496df3ef66b6dc9c5efbabf2c34f0",
+        "evaluation_sha256": "34bba2b70aa1a474825a1624339ef0eb0032536fdf4611ab824b3be80a8f3424",
+        "required_contract": {
+          "cases": 5,
+          "candidate_passed": 5
+        },
+        "regression": {
+          "baseline_passing_cases": 4,
+          "candidate_failed_among_them": 0
+        },
+        "improvement": {
+          "method": "DETERMINISTIC",
+          "target_cases": 3,
+          "baseline_passed": 1,
+          "candidate_passed": 3,
+          "trials": 3,
+          "stable": true,
+          "control_valid": true
+        },
+        "verdict": "IMPROVED"
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "e15",
+      "recorded_at": "2026-11-03T09:10:00Z",
+      "work_date": "2026-11-03",
+      "timezone": "Asia/Tokyo",
+      "repository_id": "demo-app",
+      "work_unit_id": "wu-app-eval",
+      "classification": "PUBLIC",
+      "record": {
+        "kind": "size_review",
+        "review_id": "sr-review-steps",
+        "candidate_id": "c-review-steps",
+        "target_ref": "demo-app:.claude/skills/pr-review/SKILL.md",
+        "guide_lines": 120,
+        "lines_before": 96,
+        "lines_after": 104,
+        "net_added_lines": 8,
+        "moved_to": [],
+        "responsibilities_before": [
+          "r-scope",
+          "r-order",
+          "r-stop"
+        ],
+        "responsibilities": [
+          {
+            "id": "r-scope",
+            "status": "KEPT",
+            "location": "SKILL.md#scope"
+          },
+          {
+            "id": "r-order",
+            "status": "KEPT",
+            "location": "SKILL.md#order"
+          },
+          {
+            "id": "r-stop",
+            "status": "KEPT",
+            "location": "SKILL.md#stop"
+          }
+        ],
+        "exception_reason": null,
+        "verdict": "WITHIN_GUIDE"
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "e16",
+      "recorded_at": "2026-11-04T00:30:00Z",
+      "work_date": "2026-11-04",
+      "timezone": "Asia/Tokyo",
+      "repository_id": "demo-app",
+      "work_unit_id": "wu-app-deploy",
+      "classification": "PUBLIC",
+      "record": {
+        "kind": "deployment_plan",
+        "deployment_id": "d-review-steps",
+        "candidate_id": "c-review-steps",
+        "evaluation_id": "ev-review-steps",
+        "size_review_id": "sr-review-steps",
+        "target": {
+          "repository_id": "demo-app",
+          "skill_id": "pr-review",
+          "canonical_ref": "demo-app:.claude/skills/pr-review/SKILL.md",
+          "deploy_ref": "demo-app:.claude/skills/pr-review/SKILL.md"
+        },
+        "route": {
+          "type": "LOCAL_MANUAL"
+        },
+        "hashes": {
+          "baseline": "f46b2d59853e568a2ae83fe422d111ded918686d1e42a25de09edf686a148baa",
+          "candidate": "b7a8afc34ef412c05442178c888b91f1fa9496df3ef66b6dc9c5efbabf2c34f0",
+          "evaluation": "34bba2b70aa1a474825a1624339ef0eb0032536fdf4611ab824b3be80a8f3424",
+          "expected_before": "b190722efb295cead11ed180b2ee6dbf8116a7a4672baf8ecd83c7c41dbbcc86",
+          "expected_after": "aedb952dad3021a65e8d89918bbb709a0ff9efafefe0d7078b0a13c75af4d9cb"
+        },
+        "backup": {
+          "ref": "approved-local-backup:pr-review-before",
+          "sha256": "b190722efb295cead11ed180b2ee6dbf8116a7a4672baf8ecd83c7c41dbbcc86"
+        },
+        "owner": "example-owner",
+        "deadline": "2026-11-06T00:00:00Z",
+        "applicability": {
+          "conditions": [
+            "PRレビュー依頼を受けた作業",
+            "pr-review Skillを読み込んだ作業"
+          ],
+          "skill_version": "pr-review candidate b7a8afc34ef4"
+        },
+        "rollback_preapproval": {
+          "approved_by": "example-owner",
+          "executor": "example-owner",
+          "conditions": [
+            "SAFETY_VIOLATION",
+            "MISAPPLICATION",
+            "CLEAR_WORSENING",
+            "USER_WITHDRAWAL"
+          ],
+          "expires_at": "2026-11-20T00:00:00Z"
+        }
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "e17",
+      "recorded_at": "2026-11-04T01:00:00Z",
+      "work_date": "2026-11-04",
+      "timezone": "Asia/Tokyo",
+      "repository_id": "demo-app",
+      "work_unit_id": "wu-app-deploy",
+      "classification": "PUBLIC",
+      "record": {
+        "kind": "deployment_event",
+        "deployment_id": "d-review-steps",
+        "state": {
+          "status": "APPROVED",
+          "approved_by": "example-owner",
+          "approved_at": "2026-11-04T01:00:00Z",
+          "expires_at": "2026-11-05T00:00:00Z",
+          "plan_event_id": "e16",
+          "plan_sha256": "0e52d99d1c834acbfadebc5e556fed245ce499e842e4cf24e03a970a45911eb5"
+        }
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "e18",
+      "recorded_at": "2026-11-04T02:00:00Z",
+      "work_date": "2026-11-04",
+      "timezone": "Asia/Tokyo",
+      "repository_id": "demo-app",
+      "work_unit_id": "wu-app-deploy",
+      "classification": "PUBLIC",
+      "record": {
+        "kind": "deployment_event",
+        "deployment_id": "d-review-steps",
+        "state": {
+          "status": "DEPLOYED_EFFECT_UNCONFIRMED",
+          "deployed_by": "example-owner",
+          "deployed_at": "2026-11-04T02:00:00Z",
+          "approval_event_id": "e17",
+          "observed_before_sha256": "b190722efb295cead11ed180b2ee6dbf8116a7a4672baf8ecd83c7c41dbbcc86",
+          "observed_after_sha256": "aedb952dad3021a65e8d89918bbb709a0ff9efafefe0d7078b0a13c75af4d9cb"
+        }
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "eo0",
+      "recorded_at": "2026-11-04T05:00:00Z",
+      "work_date": "2026-11-04",
+      "timezone": "Asia/Tokyo",
+      "repository_id": "demo-app",
+      "work_unit_id": "wu-app-o0",
+      "classification": "PUBLIC",
+      "record": {
+        "kind": "effect_observation",
+        "observation_id": "o-1",
+        "deployment_id": "d-review-steps",
+        "sequence": 1,
+        "applicable": true,
+        "skill_applied": false,
+        "task_result": "COMPLETED",
+        "issue_recurred": false,
+        "adverse": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "eo1",
+      "recorded_at": "2026-11-05T05:00:00Z",
+      "work_date": "2026-11-05",
+      "timezone": "Asia/Tokyo",
+      "repository_id": "demo-app",
+      "work_unit_id": "wu-app-o1",
+      "classification": "PUBLIC",
+      "record": {
+        "kind": "effect_observation",
+        "observation_id": "o-2",
+        "deployment_id": "d-review-steps",
+        "sequence": 2,
+        "applicable": true,
+        "skill_applied": true,
+        "task_result": "COMPLETED",
+        "issue_recurred": false,
+        "adverse": null
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_id": "eo2",
+      "recorded_at": "2026-11-06T05:00:00Z",
+      "work_date": "2026-11-06",
+      "timezone": "Asia/Tokyo",
+      "repository_id": "demo-app",
+      "work_unit_id": "wu-app-o2",
+      "classification": "PUBLIC",
+      "record": {
+        "kind": "effect_observation",
+        "observation_id": "o-3",
+        "deployment_id": "d-review-steps",
+        "sequence": 3,
+        "applicable": true,
+        "skill_applied": true,
+        "task_result": "COMPLETED",
+        "issue_recurred": false,
+        "adverse": null
+      }
+    }
+  ],
+  "expected": {
+    "decision": "EFFECT_UNCONFIRMED",
+    "reason": "WINDOW_INCOMPLETE"
+  }
+}

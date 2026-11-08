@@ -1,0 +1,48 @@
+{
+  "scenario_id": "evaluation-control-invalid",
+  "check": "evaluation",
+  "description": "劣化対照が不合格にならず比較不能。",
+  "manifest": "manifest.example.json",
+  "records": [
+    {
+      "schema_version": 1,
+      "event_id": "e14",
+      "recorded_at": "2026-11-03T09:00:00Z",
+      "work_date": "2026-11-03",
+      "timezone": "Asia/Tokyo",
+      "repository_id": "demo-app",
+      "work_unit_id": "wu-app-eval",
+      "classification": "PUBLIC",
+      "record": {
+        "kind": "evaluation",
+        "evaluation_id": "ev-review-steps",
+        "candidate_id": "c-review-steps",
+        "baseline_sha256": "f46b2d59853e568a2ae83fe422d111ded918686d1e42a25de09edf686a148baa",
+        "candidate_sha256": "b7a8afc34ef412c05442178c888b91f1fa9496df3ef66b6dc9c5efbabf2c34f0",
+        "evaluation_sha256": "34bba2b70aa1a474825a1624339ef0eb0032536fdf4611ab824b3be80a8f3424",
+        "required_contract": {
+          "cases": 5,
+          "candidate_passed": 5
+        },
+        "regression": {
+          "baseline_passing_cases": 4,
+          "candidate_failed_among_them": 0
+        },
+        "improvement": {
+          "method": "DETERMINISTIC",
+          "target_cases": 3,
+          "baseline_passed": 1,
+          "candidate_passed": 3,
+          "trials": 3,
+          "stable": true,
+          "control_valid": false
+        },
+        "verdict": "IMPROVEMENT_UNCONFIRMED"
+      }
+    }
+  ],
+  "expected": {
+    "decision": "IMPROVEMENT_UNCONFIRMED",
+    "reason": null
+  }
+}

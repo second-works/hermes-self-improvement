@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "manifest_id": "example-manual-improvement",
+  "classification": "PUBLIC",
+  "stage": "RECORD_AND_MANUAL_IMPROVEMENT",
+  "timezone": "Asia/Tokyo",
+  "period": {
+    "start_date": "2026-11-02",
+    "end_date": "2026-11-15"
+  },
+  "ledger_location": {
+    "kind": "PUBLIC_FIXTURE",
+    "label": "skill-improvement-example"
+  },
+  "approval": {
+    "approved_by": "example-owner",
+    "approved_at": "2026-11-01T00:00:00Z",
+    "ref": "synthetic approval record (not a real approval)"
+  },
+  "repositories": [
+    {
+      "repository_id": "demo-app",
+      "allowed_roots": [
+        "docs",
+        ".claude/skills"
+      ],
+      "read_items": [
+        "EXPLICIT_INPUT",
+        "END_RECORD"
+      ],
+      "classification": "PUBLIC",
+      "owner": "example-owner"
+    },
+    {
+      "repository_id": "demo-cli",
+      "allowed_roots": [
+        "skills"
+      ],
+      "read_items": [
+        "EXPLICIT_INPUT",
+        "END_RECORD",
+        "PR_REVIEW_COMMENT"
+      ],
+      "classification": "PUBLIC",
+      "owner": "example-owner"
+    }
+  ]
+}

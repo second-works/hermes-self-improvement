@@ -1,0 +1,52 @@
+{
+  "scenario_id": "size-responsibility-dropped",
+  "check": "size_review",
+  "description": "行数は減ったが停止条件の責務r-stopの行き先がない。",
+  "manifest": "manifest.example.json",
+  "records": [
+    {
+      "schema_version": 1,
+      "event_id": "e15",
+      "recorded_at": "2026-11-03T09:10:00Z",
+      "work_date": "2026-11-03",
+      "timezone": "Asia/Tokyo",
+      "repository_id": "demo-app",
+      "work_unit_id": "wu-app-eval",
+      "classification": "PUBLIC",
+      "record": {
+        "kind": "size_review",
+        "review_id": "sr-review-steps",
+        "candidate_id": "c-review-steps",
+        "target_ref": "demo-app:.claude/skills/pr-review/SKILL.md",
+        "guide_lines": 120,
+        "lines_before": 96,
+        "lines_after": 78,
+        "net_added_lines": -18,
+        "moved_to": [],
+        "responsibilities_before": [
+          "r-scope",
+          "r-order",
+          "r-stop"
+        ],
+        "responsibilities": [
+          {
+            "id": "r-scope",
+            "status": "KEPT",
+            "location": "SKILL.md#scope"
+          },
+          {
+            "id": "r-order",
+            "status": "KEPT",
+            "location": "SKILL.md#order"
+          }
+        ],
+        "exception_reason": null,
+        "verdict": "HOLD"
+      }
+    }
+  ],
+  "expected": {
+    "decision": "HOLD",
+    "reason": "RESPONSIBILITY_UNACCOUNTED"
+  }
+}

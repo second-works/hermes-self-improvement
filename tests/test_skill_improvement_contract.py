@@ -168,6 +168,10 @@ def judge_deploy_gate(manifest, rows, at, deployment_id=None):
     rows = [row for row in rows if row['recorded_at'] <= at]
     plans = [row for row in records(rows, 'deployment_plan')
              if deployment_id is None or row['record']['deployment_id'] == deployment_id]
+    if manifest['approval']['approved_at'] > at:
+        return 'HOLD', 'MANIFEST_NOT_APPROVED'
+    if not plans:
+        return 'HOLD', 'PLAN_MISSING'
     plan_row = plans[-1]
     plan = plan_row['record']
     listed = [item['repository_id'] for item in manifest['repositories']]
@@ -772,6 +776,21 @@ class SkillImprovementContract(unittest.TestCase):
         self.assertEqual(judge_deploy_gate(manifest, rows, '2026-11-04T02:00:00Z'), ('HOLD', 'MERGE_MISSING'))
         self.assertEqual(judge_deploy_gate(manifest, rows[:-1], '2026-11-04T03:30:00Z'), ('ALLOWED', None))
         self.assertIn(('e18', 'gate', 'DEPLOY_GATE_HOLD'), replay(rows, self.transitions, manifest)[2])
+
+    def test_prerequisites_must_exist_at_the_judged_time(self):
+        manifest = self.manifests['manifest.example.json']
+        allowed = self.scenarios['deploy-allowed']
+        # A deployment time before the plan was appended is a rejected row, not a crash.
+        early = copy.deepcopy(self.ledger)
+        row = first(early, 'deployment_event', 'DEPLOYED_EFFECT_UNCONFIRMED')
+        row['record']['state']['deployed_at'] = '2026-11-01T00:00:00Z'
+        self.assertEqual(judge_deploy_gate(manifest, early, '2026-11-01T00:00:00Z', 'd-review-steps'),
+                         ('HOLD', 'PLAN_MISSING'))
+        self.assertIn((row['event_id'], 'gate', 'DEPLOY_GATE_HOLD'), replay(early, self.transitions, manifest)[2])
+        # A manifest approved after the deployment time does not authorize it retroactively.
+        later = copy.deepcopy(manifest)
+        later['approval']['approved_at'] = '2026-11-10T00:00:00Z'
+        self.assertEqual(judge_deploy_gate(later, allowed['records'], allowed['at']), ('HOLD', 'MANIFEST_NOT_APPROVED'))
 
     def test_committed_examples_equal_the_builder_output(self):
         spec = importlib.util.spec_from_file_location('build_examples', FIXTURES / 'build_examples.py')

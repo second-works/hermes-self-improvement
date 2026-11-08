@@ -97,6 +97,7 @@ rollbackは `HALTED → ROLLING_BACK → ROLLED_BACK / RECOVERY_REQUIRED` だけ
 
 | 確認 | 保留理由 |
 | --- | --- |
+| 判定時刻までにmanifestが承認され、反映計画が追記されている | `MANIFEST_NOT_APPROVED / PLAN_MISSING` |
 | manifestのrepoが一意で、記録repo・所有repo・PR先repoがすべて登録済み、段階が手動改善で、期間内 | `MANIFEST_DUPLICATE_REPOSITORY / REPOSITORY_NOT_IN_MANIFEST / STAGE_RECORD_ONLY / OUTSIDE_PERIOD` |
 | 経路が所有repoと合う | `OWNER_REPOSITORY_PR_REQUIRED / OWNER_REPOSITORY_MISMATCH` |
 | 候補の最新状態が `OPEN` | `CANDIDATE_NOT_OPEN` |

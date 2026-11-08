@@ -470,6 +470,11 @@ class LedgerTest(unittest.TestCase):
                       '--result', 'NO_CANDIDATE'),
                      ('propose', '--repository', 'demo-app', '--work-unit', 'w', '--experience-id', 'x',
                       '--target-skill', 's', '--cause', leaked),
+                     ('propose', '--repository', 'demo-app', '--work-unit', 'w', '--experience-id', 'x',
+                      '--target-skill', 's', '--cause', "x'y'" + leaked),
+                     ('bad' + "'q'" + leaked,),
+                     ('end', '--re=' + leaked),
+                     ('end', '--experience', '{' + leaked),
                      ('end', '--bogus', leaked),
                      ('verify', '--bogus', leaked)):
             done = self.run_cli(*args)

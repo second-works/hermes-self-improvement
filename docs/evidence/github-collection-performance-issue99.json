@@ -1,0 +1,124 @@
+{
+  "issue": 99,
+  "base_sha": "fecf94a4cfb10591db1e31f71c8b1bffd9021839",
+  "classification": "PUBLIC",
+  "mode": "foreground_read_only",
+  "limits": {
+    "seconds": 180,
+    "calls": 500,
+    "items": 5000,
+    "pages": 10
+  },
+  "before": {
+    "elapsed_seconds": 123.471,
+    "status": "COMPLETE",
+    "items": 99,
+    "calls": 248,
+    "http_requests": 248,
+    "operations": {
+      "meta": {
+        "count": 1,
+        "seconds": 0.618,
+        "failures": 0
+      },
+      "inventory": {
+        "count": 2,
+        "seconds": 2.2088,
+        "failures": 0
+      },
+      "issue_detail": {
+        "count": 52,
+        "seconds": 24.8998,
+        "failures": 0
+      },
+      "comments": {
+        "count": 99,
+        "seconds": 44.4305,
+        "failures": 0
+      },
+      "pr_detail": {
+        "count": 47,
+        "seconds": 24.5739,
+        "failures": 0
+      },
+      "closing": {
+        "count": 47,
+        "seconds": 26.5811,
+        "failures": 0
+      }
+    }
+  },
+  "after": {
+    "elapsed_seconds": 113.993,
+    "status": "COMPLETE",
+    "items": 99,
+    "calls": 248,
+    "http_requests": 206,
+    "operations": {
+      "meta": {
+        "count": 1,
+        "seconds": 0.4537,
+        "failures": 0
+      },
+      "inventory": {
+        "count": 2,
+        "seconds": 2.0348,
+        "failures": 0
+      },
+      "closing_batch": {
+        "count": 5,
+        "seconds": 2.885,
+        "failures": 0
+      },
+      "issue_detail": {
+        "count": 52,
+        "seconds": 23.2306,
+        "failures": 0
+      },
+      "comments": {
+        "count": 99,
+        "seconds": 41.2912,
+        "failures": 0
+      },
+      "pr_detail": {
+        "count": 47,
+        "seconds": 43.9619,
+        "failures": 0
+      }
+    }
+  },
+  "frozen_replay": {
+    "items": 99,
+    "items_hash": "399ecb3b19d82793a48d67b6379522c977ca3eb1bcebd1f555a32be4551ca0cd",
+    "decisions_hash": "c468ed42a68e113b00ab9f6236f598e89943a2da513c85b5ea54bff9bf1a2252",
+    "logical_reads": [
+      248,
+      248
+    ],
+    "http_requests": [
+      248,
+      206
+    ],
+    "source_snapshot": "b2ec80fe501c9db66a9af322cd5d6f573df70df098dd752ca4e739f13a7d2339",
+    "equivalent": true
+  },
+  "artifacts": {
+    "issue99-before-verified/manifest.json": "b1d00771b37641355a9b82b8813672131ae9aa06c7bd3a9a0e0ed3a4d26247cb",
+    "issue99-before-verified/metrics.json": "ac96c407dc839699dc0b351553cb8c64d84d6439130bd7175a062da1b60e0834",
+    "issue99-before-verified/plan.json": "236ffc87c1a722417323cbaeff1eef743320bb89f01dec654205b8f855287358",
+    "issue99-before-verified/raw-calls.json": "ce8dda4221b736154a49cf83f1d890037e07e845dc786989c662216f8f6f2337",
+    "issue99-before-verified/snapshot.json": "4eb96057111dd5c85178221156e988d0fc182855c49c9d6c7520d886300ba578",
+    "issue99-after-verified/manifest.json": "e157f0940adcacfc1eb7983a058c2f3d7fbb70b9404a82c2204edd0425b8c308",
+    "issue99-after-verified/metrics.json": "bec0b0998e3f14756d097a18a181bbada4dc2f4060fae16cabc5ded0e493c9b8",
+    "issue99-after-verified/plan.json": "e7bb7ac4e02a9d502cd7cf8aa3542f702f04c34781edb692fb3b32455ac5c7fb",
+    "issue99-after-verified/raw-calls.json": "00b5432693a4a6b2714bf15e947eb421c82fda2079a458eb483e215abc3b1b4b",
+    "issue99-after-verified/snapshot.json": "849a08e03229b2d8c58ef4bcd29361e0c4a4d5c701045c3f11135755c60fdc54"
+  },
+  "collector_sha256": "7d6ef9826e873f9c446c2effec2874c9a9f460622b18fade23d9f80c4386408f",
+  "limitations": [
+    "One foreground sample per implementation; no statistical speed guarantee.",
+    "No new LaunchAgent run: 180-second unattended warning remains unverified.",
+    "Transport time combines gh startup, network, and remote response; old failure cause cannot be isolated.",
+    "Live raw PR metadata repo.size changed; preservation hashes therefore differ. Frozen replay proves raw and decision equivalence."
+  ]
+}

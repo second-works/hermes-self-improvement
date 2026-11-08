@@ -52,7 +52,7 @@ manifestにないrepoを推測で追加しない。manifestが未承認なら記
 配備の状態は計画（`PLANNED`）→承認（`APPROVED`）→（他repoならMerge記録 `MERGED`）→反映済み・効果未確認（`DEPLOYED_EFFECT_UNCONFIRMED`）と進む。
 その後は効果確認済み（`EFFECT_CONFIRMED`）・改善未確認（`IMPROVEMENT_UNCONFIRMED`）・停止（`HALTED`）に分かれる。
 rollbackは `HALTED → ROLLING_BACK → ROLLED_BACK / RECOVERY_REQUIRED` だけを許可する。取り下げは `WITHDRAWN`。
-反映前に計画を追記し直すと `PLANNED` へ戻り、以前の承認は使えない。
+反映前（Merge後を含む）に計画を追記し直すと `PLANNED` へ戻り、以前の承認とMergeの記録は使えない。
 承認を経ない反映など、[許可遷移](../schemas/skill-improvement/state-transitions.json) にない遷移は拒否する（例: `transition-deploy-without-approval`）。
 
 ## 4. 原因の6分類と対処
@@ -151,7 +151,7 @@ intentの発動条件は、直前に停止（`HALTED`）させた条件と一致
 5. 復元後のhashを反映前の期待hashと照合する。
 6. `ROLLED_BACK` を記録する。
 
-終了の記録（`ROLLED_BACK` / `RECOVERY_REQUIRED`）は、観測したhashから導かれる結果と一致しなければ不正な行として拒否する。
+終了の記録（`ROLLED_BACK` / `RECOVERY_REQUIRED`）は、まず観測したhashから結果を導き、記録した状態と理由がそれと一致しなければ不正な行として拒否する。現在hashと復元後hashがどちらも期待どおりなら、結果は `ROLLED_BACK` であり、`RECOVERY_REQUIRED` と記録することはできない。
 
 次の場合は上書きせず `RECOVERY_REQUIRED` にし、人の確認なしに再試行しない。
 

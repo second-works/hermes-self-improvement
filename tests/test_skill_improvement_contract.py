@@ -350,21 +350,19 @@ def judge_rollback(rows, deployment_id):
     if not finals:
         return 'RECOVERY_REQUIRED', 'PARTIAL_WRITE'
     final = finals[-1]
-    observed = final['observed_current_sha256']
+    observed, restored = final['observed_current_sha256'], final['restored_sha256']
+    # Derive the outcome from the observed hashes first; the recorded label must then agree.
     if observed is not None and observed != intent['expected_current_sha256']:
         return 'RECOVERY_REQUIRED', 'CURRENT_HASH_MISMATCH'
-    restored = final['restored_sha256']
-    if final['status'] == 'ROLLED_BACK' or final['reason'] == 'RESTORED_HASH_MISMATCH':
-        if observed is None or restored is None:
+    if restored is not None:
+        if observed is None:
             return 'RECOVERY_REQUIRED', 'REASON_INCONSISTENT'
         if restored != plan['hashes']['expected_before']:
             return 'RECOVERY_REQUIRED', 'RESTORED_HASH_MISMATCH'
-        if final['status'] == 'RECOVERY_REQUIRED':
-            return 'RECOVERY_REQUIRED', 'REASON_INCONSISTENT'
         return 'ROLLED_BACK', None
-    if final['reason'] == 'CURRENT_HASH_MISMATCH':
-        return 'RECOVERY_REQUIRED', 'REASON_INCONSISTENT'
-    return 'RECOVERY_REQUIRED', final['reason']
+    if final['reason'] in ('PARTIAL_WRITE', 'UNKNOWN_RESULT'):
+        return 'RECOVERY_REQUIRED', final['reason']
+    return 'RECOVERY_REQUIRED', 'REASON_INCONSISTENT'
 
 
 class SkillImprovementContract(unittest.TestCase):
@@ -722,6 +720,33 @@ class SkillImprovementContract(unittest.TestCase):
         restored[-1]['record']['state']['restored_sha256'] = '1' * 64
         self.assertIn((restored[-1]['event_id'], 'gate', 'RESTORED_HASH_MISMATCH'),
                       replay(restored, self.transitions, manifest)[2])
+
+    def test_codex_review_findings_are_handled(self):
+        manifest = self.manifests['manifest.example.json']
+        # A completion record that hides a verified restore behind a recovery label is rejected.
+        relabeled = copy.deepcopy(self.scenarios['rollback-success']['records'])
+        relabeled[-1]['record']['state'].update(status='RECOVERY_REQUIRED', reason='UNKNOWN_RESULT')
+        self.assertEqual(judge_rollback(relabeled, 'd-review-steps'), ('ROLLED_BACK', None))
+        self.assertIn((relabeled[-1]['event_id'], 'gate', 'ROLLED_BACK'),
+                      replay(relabeled, self.transitions, manifest)[2])
+        # After Merge but before deployment, a revised plan returns to PLANNED and needs a new approval.
+        allowed = copy.deepcopy(self.scenarios['deploy-allowed']['records'])
+        plan_row = first(allowed, 'deployment_plan')
+        plan_row['record']['route'] = {'type': 'OWNER_REPOSITORY_PR', 'owner_repository_id': 'demo-app',
+                                       'issue_ref': 'synthetic:demo-app/issue-3'}
+        approval = first(allowed, 'deployment_event', 'APPROVED')
+        approval['record']['state']['plan_sha256'] = sha(plan_row['record'])
+        merged = copy.deepcopy(approval)
+        merged.update(event_id='e17m', recorded_at='2026-11-04T01:20:00Z')
+        merged['record']['state'] = {'status': 'MERGED', 'pr_ref': 'synthetic:demo-app/pr-4', 'merge_commit': 'a' * 40}
+        replanned = copy.deepcopy(plan_row)
+        replanned.update(event_id='e16r', recorded_at='2026-11-04T01:30:00Z')
+        replanned['record']['deadline'] = '2026-11-05T12:00:00Z'
+        rows = allowed + [merged]
+        self.assertEqual(judge_deploy_gate(manifest, rows, '2026-11-04T02:00:00Z'), ('ALLOWED', None))
+        rows = rows + [replanned]
+        self.assertEqual(replay(rows, self.transitions, manifest)[2], [])
+        self.assertEqual(judge_deploy_gate(manifest, rows, '2026-11-04T02:00:00Z'), ('HOLD', 'APPROVAL_MISMATCH'))
 
     def test_committed_examples_equal_the_builder_output(self):
         spec = importlib.util.spec_from_file_location('build_examples', FIXTURES / 'build_examples.py')

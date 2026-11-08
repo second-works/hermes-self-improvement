@@ -278,6 +278,14 @@ class PilotTests(unittest.TestCase):
         self.assertEqual(path.read_bytes(),first)
         self.collect.assert_not_called()
 
+
+    def test_stop_request_does_not_depend_on_valid_configuration(self):
+        (self.pilot.state/'config.json').write_bytes(b'{')
+        self.assertEqual(self.pilot.stop()['status'],'STOP_REQUESTED')
+        self.assertTrue(self.pilot.stop_requested())
+        self.collect.assert_not_called()
+        self.assertEqual(p.Pilot(self.root/'unconfigured').stop()['status'],'NOT_CONFIGURED')
+
     def test_real_child_collects_public_fixture_then_freezes_first_report(self):
         root=self.root/'native';(root/'scripts').mkdir(parents=True)
         program=root/'scripts/report_github_work_guide.py'

@@ -345,7 +345,8 @@ class Pilot:
 
     def stop(self):
         self.path_check()
-        self.config()
+        if not self.state.exists():
+            return {'status': 'NOT_CONFIGURED', 'model_calls': 0}
         try:
             save(self.state / 'stop.requested', {'reason': 'USER_STOP'})
         except FileExistsError:

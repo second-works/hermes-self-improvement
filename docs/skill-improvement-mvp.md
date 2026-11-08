@@ -18,6 +18,7 @@ Risk Tier: HIGH。実Skillへの反映・復旧の承認条件と、評価の合
 | PUBLIC判定例 | [scenarios](../fixtures/skill_improvement/scenarios) | 保留・停止・復旧待ちになる例と陽性対照 |
 | 例の生成 | [build_examples.py](../fixtures/skill_improvement/build_examples.py) | 合成例を作り直す。承認hashなどの計算値を手で直さない |
 | 照合テスト | [test_skill_improvement_contract.py](../tests/test_skill_improvement_contract.py) | schema・参照・遷移・判定表と例の整合を確認する |
+| 台帳CLI（#107） | [skill-improvement-ledger.md](skill-improvement-ledger.md) | 終了記録・経験・候補をローカル台帳へ追記する手順と拒否条件 |
 
 PUBLIC例のhash・ID・repo・担当者はすべて合成値で、承認の記録ではない。
 台帳は1行1イベントのappend-only JSONLとする。状態の変更も新しい行の追記で表し、既存行を書き換えない。

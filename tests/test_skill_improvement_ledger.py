@@ -321,6 +321,54 @@ class LedgerTest(unittest.TestCase):
         self.assertEqual(len(rows), len(example.splitlines()))
         self.assertEqual(summary(rows)['session_ends'], {'CANDIDATE_FOUND': 3, 'NO_CANDIDATE': 1, 'UNDETERMINED': 1})
 
+    def test_review_findings_on_boundaries_are_refused(self):
+        local = Manifest(manifest_data('APPROVED_LOCAL_DIRECTORY'), self.contract, NOW)
+        checkout = self.base / 'other-checkout'
+        (checkout / '.git').mkdir(parents=True)
+        (checkout / 'nested' / 'skill-ledger').mkdir(parents=True)
+        for path, manifest, code in (
+                (Path.home() / '.HERMES' / 'skill-ledger', self.manifest, 'LEDGER_IN_HERMES_HOME'),
+                (Path(str(ROOT).upper()) / 'skill-ledger', local, 'LEDGER_INSIDE_REPOSITORY'),
+                (checkout / 'nested' / 'skill-ledger', local, 'LEDGER_INSIDE_REPOSITORY')):
+            with self.subTest(path=str(path)), self.assertRaises(LedgerError) as caught:
+                Ledger(path, manifest, self.contract)
+            self.assertEqual(caught.exception.code, code)
+        for text in ('sk-ant-api03-abcdefgh', 'sk-proj-abcdefghij', 'glpat-abcdefghij', 'password=hunter2',
+                     'API_KEY: abc'):
+            with self.subTest(text=text):
+                self.refused('SECRET_LIKE_INPUT', self.ledger.record_end, 'demo-app', 'wu-s', 'UNDETERMINED',
+                             '2026-11-04', reason=f'理由 {text}')
+
+    def test_candidates_through_a_duplicate_still_link_instead_of_opening(self):
+        ids = self.ledger.record_end('demo-app', 'wu-1', 'CANDIDATE_FOUND', '2026-11-04', experiences=[
+            dict(CORRECTION, refs=['input:一']), dict(CORRECTION, refs=['input:二'])])['experience_ids']
+        first = self.ledger.propose('demo-app', 'triage', [ids[0]], 'pr-review', 'MISSING_PROCEDURE')
+        second = self.ledger.propose('demo-app', 'triage', ids, 'pr-review', 'MISSING_PROCEDURE')
+        third = self.ledger.propose('demo-app', 'triage', [ids[1]], 'pr-review', 'MISSING_PROCEDURE')
+        self.assertEqual(second['state']['duplicate_of'], first['candidate_id'])
+        self.assertEqual(third['state']['status'], 'DUPLICATE')
+        self.assertEqual(summary(self.ledger.read())['candidates'], {'OPEN': 1, 'DUPLICATE': 2})
+        self.refused('CANDIDATE_CONFLICT', self.ledger.propose, 'demo-app', 'triage', [ids[1]], 'pr-review',
+                     'DUPLICATE', duplicate_of=first['candidate_id'])
+
+    def test_unusual_ledger_files_stop_without_hanging_or_tracebacks(self):
+        self.file().write_bytes(b'[' * 200000 + b'\n')
+        self.refused('LEDGER_CORRUPT', self.ledger.read)
+        self.file().unlink()
+        os.mkfifo(self.file())
+        # The test helper cannot read a FIFO either, so check the code directly.
+        with self.assertRaises(LedgerError) as caught:
+            self.ledger.record_end('demo-app', 'wu-1', 'NO_CANDIDATE', '2026-11-04')
+        self.assertEqual(caught.exception.code, 'LEDGER_CORRUPT')
+        self.file().unlink()
+        self.ledger.record_end('demo-app', 'wu-1', 'NO_CANDIDATE', '2026-11-04')
+        with mock.patch.object(ledger_module, 'MAX_LEDGER_BYTES', len(self.raw()) + 10):
+            self.refused('LEDGER_FULL', self.ledger.record_end, 'demo-app', 'wu-2', 'NO_CANDIDATE', '2026-11-04')
+        row = json.loads(self.raw())
+        row.update(event_id='e-utc', work_unit_id='wu-utc', timezone='UTC')
+        self.file().write_bytes(self.raw() + json.dumps(row).encode() + b'\n')
+        self.refused('LEDGER_CORRUPT', self.ledger.read)
+
     # --- Done 4: no model, HTTP or outside writes; CLI behaviour ---
 
     def test_ledger_code_imports_no_network_model_or_process_modules(self):

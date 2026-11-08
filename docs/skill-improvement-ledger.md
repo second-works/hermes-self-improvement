@@ -11,8 +11,8 @@
 | --- | --- |
 | 台帳ディレクトリは絶対pathで、symlinkや `..` を含まない | `LEDGER_PATH_INVALID` |
 | ディレクトリ名はmanifestの `ledger_location.label` と一致する | `LEDGER_LABEL_MISMATCH` |
-| 実データ（`APPROVED_LOCAL_DIRECTORY`）は本repoの外に置く | `LEDGER_INSIDE_REPOSITORY` |
-| `~/.hermes` の下には置かない（pathの比較だけで、中身は読まない） | `LEDGER_IN_HERMES_HOME` |
+| 実データ（`APPROVED_LOCAL_DIRECTORY`）は本repoを含むどのgit checkout（祖先に `.git` がある場所）の外にも置く | `LEDGER_INSIDE_REPOSITORY` |
+| `~/.hermes` の下には置かない（大文字小文字を区別しないpathの比較だけで、中身もメタデータも読まない） | `LEDGER_IN_HERMES_HOME` |
 | `PUBLIC_FIXTURE` の台帳にはPUBLICの記録だけを置く | `CLASSIFICATION_NOT_PUBLIC` |
 
 ディレクトリは利用者が先に作る。CLIは中に `ledger.jsonl`（台帳、権限600）と `ledger.lock`（排他lock）だけを作る。
@@ -38,7 +38,7 @@ python3 -I -B scripts/record_skill_experience.py --manifest M --ledger D end --r
 
 - IDは入力から決まる。終了記録はrepoと作業単位から、経験はさらに順番から、候補は対象Skillと経験IDの組から作る。
 - 同じ入力の再送は何も追記せず `ALREADY_RECORDED` を返す。同じ作業単位へ違う内容を送ると `WORK_UNIT_ALREADY_ENDED` で拒否する。再送では作業日も同じ値を渡す。
-- 同じ対象Skillについて、経験IDまたは根拠参照が既存の候補と重なる候補は、新しい `OPEN` にせず、元候補への `DUPLICATE` として記録する。経験IDには元候補と重なった経験を含める。
+- 同じ対象Skillについて、経験IDまたは根拠参照が既存の候補（`DUPLICATE` の候補を含む）と重なる候補は、新しい `OPEN` にせず、元候補への `DUPLICATE` として記録する。経験IDには元候補と重なった経験を含める。
 - 原因の初期状態は第4節の表に従う。`TEMPORARY` は `DECLINED`、`CONFLICT_OR_UNVERIFIED` は `HOLD`、それ以外は `OPEN`。
 
 ## 4. 根拠参照
@@ -54,13 +54,13 @@ python3 -I -B scripts/record_skill_experience.py --manifest M --ledger D end --r
 | `path:` | 許可rootの下の相対path（`.` `..` は不可） | `path:docs/guide.md` |
 | `synthetic:` | `PUBLIC_FIXTURE` の台帳だけ | `synthetic:demo-app/pr-1` |
 
-URLなどそれ以外の種類は `REF_KIND_NOT_ALLOWED`、秘密値らしい文字列は `SECRET_LIKE_INPUT` で拒否する。
+URLなどそれ以外の種類は `REF_KIND_NOT_ALLOWED` で拒否する。要約・理由・根拠に、よく知られたtoken形式（GitHub・GitLab・OpenAI/Anthropic系の `sk-`・AWS・Google・Slack・秘密鍵）や `password=` のような代入があれば `SECRET_LIKE_INPUT` で拒否する。検出は補助であり、秘密値を入れない運用が前提。
 
 ## 5. 書込と破損
 
-- 追記は排他lockの中で、読直し→検査→1回の書込→`fsync` の順に行う。lockを10秒待っても取れなければ `LOCK_TIMEOUT`。
+- 台帳ディレクトリは `/` から1段ずつsymlinkを辿らずに開く。追記は排他lockの中で、読直し→検査→1回の書込→同期（macOSでは `F_FULLFSYNC`）の順に行う。lockを10秒待っても取れなければ `LOCK_TIMEOUT`。追記後に読込上限（32MB）を超える場合は `LEDGER_FULL` で拒否し、新しい承認済み台帳へ移る。
 - 書込が失敗・途中で終わった場合は、元の長さへ戻して `WRITE_FAILED` を返す。戻せなかった場合は `WRITE_FAILED_RECOVERY_REQUIRED` を返し、人が確認する。成功とは返さない。
-- 読込時に、途中で切れた最終行、厳密でないJSON（重複キーなど）、schema違反、event_idの重複、経験と終了記録の不整合、遷移表にない候補の変化があれば `LEDGER_CORRUPT` で止まる。行を落としたり修復したりせず、その後の追記もしない。
+- 読込時に、通常ファイル以外（FIFOなど）、途中で切れた最終行、厳密でないJSON（重複キー・深すぎる入れ子など）、schema違反、manifestと異なるtimezone、`PUBLIC_FIXTURE` 台帳の非PUBLIC行、event_idの重複、経験と終了記録の不整合、遷移表にない候補の変化があれば `LEDGER_CORRUPT` で止まる。行を落としたり修復したりせず、その後の追記もしない。
 - `recorded_at` は後から追記する行ほど新しくする。時計が戻っていれば `CLOCK_REGRESSION` で拒否する（#106の合成例は時刻順ではないため、読込時には検査しない）。
 
 ## 6. 対象外

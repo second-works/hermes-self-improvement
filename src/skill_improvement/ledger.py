@@ -34,8 +34,9 @@ CAUSES = ('MISSING_PROCEDURE', 'NOT_LOADED', 'NOT_FOLLOWED', 'TEMPORARY', 'CONFL
 REF_KINDS = {'input': 'EXPLICIT_INPUT', 'end': 'END_RECORD', 'pr-review': 'PR_REVIEW_COMMENT',
              'commit': 'COMMIT_MESSAGE', 'path': None, 'synthetic': None}
 SEGMENT = r'[A-Za-z0-9._-]+'
-SECRET_LIKE = re.compile(r'(ghp_|gho_|ghs_|github_pat_|sk-[A-Za-z0-9]{8}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{20}'
-                         r'|xox[abpr]-|-----BEGIN [A-Z ]*PRIVATE KEY)')
+SECRET_LIKE = re.compile(r'(gh[pousr]_[A-Za-z0-9]|github_pat_|glpat-|sk-[A-Za-z0-9_-]{8}|AKIA[0-9A-Z]{16}'
+                         r'|AIza[0-9A-Za-z_-]{20}|xox[abprs]-|-----BEGIN [A-Z ]*PRIVATE KEY'
+                         r'|(password|passwd|secret|token|api[_-]?key|access[_-]?key)\s*[:=])', re.IGNORECASE)
 # Initial candidate state follows the cause table in docs/skill-improvement-mvp.md section 4.
 CAUSE_INITIAL_STATE = {
     'TEMPORARY': {'status': 'DECLINED', 'reason': '一時事情でありSkillを変更しない'},
@@ -123,7 +124,7 @@ class Manifest:
     @classmethod
     def load(cls, path, contract, now):
         try:
-            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
         except OSError as error:
             raise LedgerError('MANIFEST_UNREADABLE', error.strerror or '') from None
         try:
@@ -132,7 +133,7 @@ class Manifest:
             os.close(fd)
         try:
             return cls(strict_json(data.decode('utf-8')), contract, now)
-        except (UnicodeDecodeError, ValueError):
+        except (UnicodeDecodeError, ValueError, RecursionError):
             raise LedgerError('MANIFEST_INVALID', 'not strict JSON') from None
 
     def repository(self, repository_id):
@@ -198,15 +199,34 @@ def ledger_directory(path, manifest):
     location = manifest.data['ledger_location']
     directory = Path(path)
     require(directory.is_absolute(), 'LEDGER_PATH_INVALID', 'absolute path required')
+    # Path comparison only, before anything touches the file system: the Hermes home is never opened,
+    # listed or resolved. Case is folded because the default macOS file system ignores it.
+    require(not inside(directory, Path.home() / '.hermes'), 'LEDGER_IN_HERMES_HOME')
     require(os.path.realpath(directory) == str(directory), 'LEDGER_PATH_INVALID',
             'symlinks and non-canonical paths are not allowed')
     require(directory.name == location['label'], 'LEDGER_LABEL_MISMATCH', directory.name)
-    # Path comparison only: the Hermes home is never opened or listed.
-    require(not directory.is_relative_to(Path.home() / '.hermes'), 'LEDGER_IN_HERMES_HOME')
     if location['kind'] == 'APPROVED_LOCAL_DIRECTORY':
-        require(not directory.is_relative_to(ROOT), 'LEDGER_INSIDE_REPOSITORY',
-                '実データの台帳を公開source/fixtureと混在させない')
+        # Real data stays out of every git checkout, not only the one running this code.
+        require(not inside(directory, ROOT) and
+                not any(os.path.lexists(folder / '.git') for folder in (directory, *directory.parents)),
+                'LEDGER_INSIDE_REPOSITORY', '実データの台帳を公開source/fixtureと混在させない')
     return directory
+
+
+def inside(path, parent):
+    path, parent = str(path).casefold(), str(parent).casefold().rstrip('/')
+    return path == parent or path.startswith(parent + '/')
+
+
+def durable_sync(fd):
+    # On macOS fsync may leave data in the drive cache; F_FULLFSYNC asks the drive to flush it.
+    if hasattr(fcntl, 'F_FULLFSYNC'):
+        try:
+            fcntl.fcntl(fd, fcntl.F_FULLFSYNC)
+            return
+        except OSError:
+            pass
+    os.fsync(fd)
 
 
 class Ledger:
@@ -218,11 +238,16 @@ class Ledger:
 
     @contextmanager
     def _open_directory(self):
+        # Walk from / one component at a time so no component can be swapped for a symlink.
+        fd = os.open('/', DIRECTORY)
         try:
-            fd = os.open(self.directory, DIRECTORY)
-        except OSError as error:
-            raise LedgerError('LEDGER_DIRECTORY_UNAVAILABLE', error.strerror or '') from None
-        try:
+            for part in self.directory.parts[1:]:
+                try:
+                    child = os.open(part, DIRECTORY, dir_fd=fd)
+                except OSError as error:
+                    raise LedgerError('LEDGER_DIRECTORY_UNAVAILABLE', error.strerror or '') from None
+                os.close(fd)
+                fd = child
             yield fd
         finally:
             os.close(fd)
@@ -230,7 +255,7 @@ class Ledger:
     @contextmanager
     def _locked(self, dirfd):
         try:
-            fd = os.open(LOCK_FILE, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600, dir_fd=dirfd)
+            fd = os.open(LOCK_FILE, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600, dir_fd=dirfd)
         except OSError as error:
             raise LedgerError('LOCK_UNAVAILABLE', error.strerror or '') from None
         try:
@@ -249,7 +274,7 @@ class Ledger:
 
     def _read_bytes(self, dirfd):
         try:
-            fd = os.open(LEDGER_FILE, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=dirfd)
+            fd = os.open(LEDGER_FILE, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dirfd)
         except FileNotFoundError:
             return b''
         except OSError as error:
@@ -268,7 +293,7 @@ class Ledger:
         for number, line in enumerate(data.split(b'\n')[:-1], start=1):
             try:
                 row = strict_json(line.decode('utf-8'))
-            except (UnicodeDecodeError, ValueError):
+            except (UnicodeDecodeError, ValueError, RecursionError):
                 raise LedgerError('LEDGER_CORRUPT', f'line {number} is not strict JSON') from None
             rows.append(row)
         check_rows(rows, self.contract, self.manifest)
@@ -292,11 +317,14 @@ class Ledger:
             except LedgerError as error:
                 raise LedgerError('NEW_ROW_REJECTED', error.detail) from None
             payload = b''.join(schema.canonical(row) + b'\n' for row in new_rows)
+            require(len(data) + len(payload) <= MAX_LEDGER_BYTES, 'LEDGER_FULL',
+                    'appending would exceed the readable size; start a new approved ledger')
             self._write(dirfd, len(data), payload)
             return outcome
 
     def _write(self, dirfd, expected_size, payload):
-        fd = os.open(LEDGER_FILE, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o600, dir_fd=dirfd)
+        fd = os.open(LEDGER_FILE, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600,
+                     dir_fd=dirfd)
         try:
             info = os.fstat(fd)
             require(stat.S_ISREG(info.st_mode) and info.st_nlink == 1 and info.st_size == expected_size,
@@ -304,12 +332,12 @@ class Ledger:
             try:
                 written = os.write(fd, payload)
                 require(written == len(payload), 'WRITE_FAILED', 'short write')
-                os.fsync(fd)
+                durable_sync(fd)
             except (OSError, LedgerError) as error:
                 # Restore the original length so a half-written line never stays behind.
                 try:
                     os.ftruncate(fd, expected_size)
-                    os.fsync(fd)
+                    durable_sync(fd)
                 except OSError:
                     raise LedgerError('WRITE_FAILED_RECOVERY_REQUIRED',
                                       'the ledger may end with a partial line; restore it by hand') from None
@@ -438,6 +466,7 @@ class Ledger:
             if candidate_id in candidates:
                 first = candidates[candidate_id][0]['record']
                 same = (first['cause'], first['scope'], first['target_skill_id']) == (cause, scope, target_skill_id)
+                same = same and (duplicate_of is None or first['state'].get('duplicate_of') == duplicate_of)
                 require(same, 'CANDIDATE_CONFLICT', candidate_id)
                 return [], {'status': 'ALREADY_RECORDED', 'candidate_id': candidate_id,
                             'state': candidates[candidate_id][-1]['record']['state']}
@@ -449,7 +478,8 @@ class Ledger:
             else:
                 for other, history in candidates.items():
                     head = history[0]['record']
-                    if head['state']['status'] == 'DUPLICATE' or head['target_skill_id'] != target_skill_id:
+                    # DUPLICATE candidates count too: their own experiences are a basis already in use.
+                    if head['target_skill_id'] != target_skill_id:
                         continue
                     overlap = [item for item in head['experience_ids'] if item in experience_ids or
                                set(experiences[item]['record']['evidence_refs']) & refs]
@@ -545,6 +575,9 @@ def check_rows(rows, contract, manifest):
         seen.add(row['event_id'])
         require(row['repository_id'] in manifest.repositories, 'LEDGER_CORRUPT',
                 f'{where}: repository not in manifest')
+        require(row['timezone'] == manifest.data['timezone'], 'LEDGER_CORRUPT', f'{where}: timezone differs from manifest')
+        require(manifest.data['ledger_location']['kind'] != 'PUBLIC_FIXTURE' or row['classification'] == 'PUBLIC',
+                'LEDGER_CORRUPT', f'{where}: non-PUBLIC row in a PUBLIC_FIXTURE ledger')
         record = row['record']
         if record['kind'] == 'session_end':
             key = (row['repository_id'], row['work_unit_id'])

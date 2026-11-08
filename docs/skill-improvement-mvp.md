@@ -107,7 +107,7 @@ rollbackは `HALTED → ROLLING_BACK → ROLLED_BACK / RECOVERY_REQUIRED` だけ
 | 他repo経路ではMergeの記録がある | `MERGE_MISSING` |
 
 MergeとSkillの反映は別の記録にする。Mergeしただけでは配備済みとしない。
-反映の記録には、根拠にした最新の承認イベントと、反映前に観測したhash・反映後のhashを残し、計画の期待hashと照合する。この確認を通らない反映の記録は、台帳に追記できない不正な行として扱う。
+反映の記録には、根拠にした最新の承認イベントと、反映前に観測したhash・反映後のhashを残し、計画の期待hashと照合する。反映時刻（`deployed_at`）は追記時刻（`recorded_at`）以前とし、どちらの時刻でも上の確認を満たす必要がある。この確認を通らない反映の記録（反映後hashの不一致を含む）は、台帳に追記できない不正な行として扱い、人の確認を待つ。
 
 ## 7. 評価
 
@@ -150,6 +150,8 @@ intentの発動条件は、直前に停止（`HALTED`）させた条件と一致
 4. backupから復元する。
 5. 復元後のhashを反映前の期待hashと照合する。
 6. `ROLLED_BACK` を記録する。
+
+終了の記録（`ROLLED_BACK` / `RECOVERY_REQUIRED`）は、観測したhashから導かれる結果と一致しなければ不正な行として拒否する。
 
 次の場合は上書きせず `RECOVERY_REQUIRED` にし、人の確認なしに再試行しない。
 

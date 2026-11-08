@@ -250,13 +250,18 @@ def deploy_guard(manifest, rows, index):
     row = rows[index]
     state = row['record']['state']
     prefix = rows[:index]
-    if judge_deploy_gate(manifest, prefix, state['deployed_at'], row['record']['deployment_id']) != ('ALLOWED', None):
-        return 'DEPLOY_GATE_HOLD'
+    if state['deployed_at'] > row['recorded_at']:
+        return 'DEPLOY_RECORD_MISMATCH'
+    # The self-reported deployed_at and the append time must both pass the gate.
+    for moment in (state['deployed_at'], row['recorded_at']):
+        if judge_deploy_gate(manifest, prefix, moment, row['record']['deployment_id']) != ('ALLOWED', None):
+            return 'DEPLOY_GATE_HOLD'
     plan = records(prefix, 'deployment_plan', deployment_id=row['record']['deployment_id'])[-1]['record']
     approvals = [item for item in deployment_states(prefix, row['record']['deployment_id'])
                  if item['record']['state']['status'] == 'APPROVED']
     if state['approval_event_id'] != approvals[-1]['event_id'] or \
-            state['observed_before_sha256'] != plan['hashes']['expected_before']:
+            state['observed_before_sha256'] != plan['hashes']['expected_before'] or \
+            state['observed_after_sha256'] != plan['hashes']['expected_after']:
         return 'DEPLOY_RECORD_MISMATCH'
     return None
 
@@ -294,6 +299,11 @@ def replay(rows, transitions, manifest=None):
             illegal.append((row['event_id'], 'gate', rollback_authorization(rows[:index + 1], row)))
         elif new == 'DEPLOYED_EFFECT_UNCONFIRMED' and manifest is not None and deploy_guard(manifest, rows, index):
             illegal.append((row['event_id'], 'gate', deploy_guard(manifest, rows, index)))
+        elif new in ('ROLLED_BACK', 'RECOVERY_REQUIRED') and current == 'ROLLING_BACK':
+            # The recorded end of a rollback has to be the outcome its observed hashes imply.
+            judged = judge_rollback(rows[:index + 1], key)
+            if judged != (new, record['state'].get('reason')):
+                illegal.append((row['event_id'], 'gate', judged[1] or judged[0]))
         store[key] = new
     return deployment, candidate, illegal
 
@@ -696,6 +706,22 @@ class SkillImprovementContract(unittest.TestCase):
         self.assertEqual(judge_rollback(unproven, 'd-review-steps'), ('RECOVERY_REQUIRED', 'REASON_INCONSISTENT'))
         unproven[-1]['record']['state']['restored_sha256'] = '2' * 64
         self.assertEqual(judge_rollback(unproven, 'd-review-steps'), ('RECOVERY_REQUIRED', 'RESTORED_HASH_MISMATCH'))
+
+    def test_third_review_findings_are_rejected(self):
+        manifest = self.manifests['manifest.example.json']
+        deployed = first(self.ledger, 'deployment_event', 'DEPLOYED_EFFECT_UNCONFIRMED')
+        wrong_after = copy.deepcopy(self.ledger)
+        first(wrong_after, 'deployment_event', 'DEPLOYED_EFFECT_UNCONFIRMED')['record']['state'][
+            'observed_after_sha256'] = '3' * 64
+        self.assertIn((deployed['event_id'], 'gate', 'DEPLOY_RECORD_MISMATCH'),
+                      replay(wrong_after, self.transitions, manifest)[2])
+        late = copy.deepcopy(self.ledger)
+        first(late, 'deployment_event', 'DEPLOYED_EFFECT_UNCONFIRMED')['recorded_at'] = '2026-11-05T01:00:00Z'
+        self.assertIn((deployed['event_id'], 'gate', 'DEPLOY_GATE_HOLD'), replay(late, self.transitions, manifest)[2])
+        restored = copy.deepcopy(self.scenarios['rollback-success']['records'])
+        restored[-1]['record']['state']['restored_sha256'] = '1' * 64
+        self.assertIn((restored[-1]['event_id'], 'gate', 'RESTORED_HASH_MISMATCH'),
+                      replay(restored, self.transitions, manifest)[2])
 
     def test_committed_examples_equal_the_builder_output(self):
         spec = importlib.util.spec_from_file_location('build_examples', FIXTURES / 'build_examples.py')

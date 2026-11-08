@@ -16,6 +16,7 @@ Risk Tier: HIGH。実Skillへの反映・復旧の承認条件と、評価の合
 | 許可遷移 | [state-transitions.json](../schemas/skill-improvement/state-transitions.json) | 候補と配備の状態遷移。表にない遷移は拒否する |
 | PUBLIC台帳例 | [ledger.example.jsonl](../fixtures/skill_improvement/ledger.example.jsonl) | 合成2 repoでの、記録から効果確認までの一連 |
 | PUBLIC判定例 | [scenarios](../fixtures/skill_improvement/scenarios) | 保留・停止・復旧待ちになる例と陽性対照 |
+| 例の生成 | [build_examples.py](../fixtures/skill_improvement/build_examples.py) | 合成例を作り直す。承認hashなどの計算値を手で直さない |
 | 照合テスト | [test_skill_improvement_contract.py](../tests/test_skill_improvement_contract.py) | schema・参照・遷移・判定表と例の整合を確認する |
 
 PUBLIC例のhash・ID・repo・担当者はすべて合成値で、承認の記録ではない。
@@ -31,6 +32,7 @@ PUBLIC例のhash・ID・repo・担当者はすべて合成値で、承認の記�
 
 manifestには、対象repo（2つ以上）の識別子・許可root・読取項目・情報分類・担当と、全体の期間・timezone・保存先・承認を書く。
 manifestにないrepoを推測で追加しない。manifestが未承認なら記録も始めない。
+`repository_id` はmanifest内で一意とする。schemaでは表せないため、台帳の実装と照合テストで検査する。期間はmanifestのtimezoneの日付で判定する。
 `RECORD_ONLY` のmanifestでは、承認票が揃っていても反映を保留にする（例: `deploy-record-only-stage`）。
 
 ## 3. 記録の種類と状態
@@ -90,15 +92,15 @@ rollbackは `HALTED → ROLLING_BACK → ROLLED_BACK / RECOVERY_REQUIRED` だけ
 - rollbackの事前承認（承認者・実行者・発動条件・期限）。なければ `null` とし、即時rollbackはできない。
 - 経路: 手元での手動反映（`LOCAL_MANUAL`）か、所有repoの専用Issue/PR（`OWNER_REPOSITORY_PR`）か。他repoのSkillは所有repoのIssue/PRでしか変更しない。
 
-承認は計画イベントのIDと、計画の `record` 部分を正規化JSON（キー順・区切り固定・UTF-8）にしたSHA-256（`plan_sha256`）に結び付ける。
+承認は計画イベントのID（`plan_event_id`）と、計画の `record` 部分を正規化JSON（キー順・区切り固定・UTF-8）にしたSHA-256（`plan_sha256`）に結び付ける。
 反映してよいのは次をすべて満たすときだけで、満たさなければ理由付きで保留する。
 
 | 確認 | 保留理由 |
 | --- | --- |
-| repoがmanifestにあり、段階が手動改善で、期間内 | `REPOSITORY_NOT_IN_MANIFEST / STAGE_RECORD_ONLY / OUTSIDE_PERIOD` |
+| manifestのrepoが一意で、対象repoがあり、段階が手動改善で、期間内 | `MANIFEST_DUPLICATE_REPOSITORY / REPOSITORY_NOT_IN_MANIFEST / STAGE_RECORD_ONLY / OUTSIDE_PERIOD` |
 | 評価が `IMPROVED` で、hashが計画と一致 | `EVALUATION_NOT_IMPROVED / EVALUATION_MISMATCH` |
 | 分量レビューが `HOLD` でない | `SIZE_REVIEW_HOLD` |
-| 最新計画に対する承認があり、`plan_sha256` が一致 | `APPROVAL_MISSING / APPROVAL_MISMATCH` |
+| 最新計画に対する承認があり、`plan_event_id` と `plan_sha256` が一致 | `APPROVAL_MISSING / APPROVAL_MISMATCH` |
 | 承認の期限内、計画の期限内 | `APPROVAL_EXPIRED / DEADLINE_PASSED` |
 | 他repo経路ではMergeの記録がある | `MERGE_MISSING` |
 
@@ -120,7 +122,7 @@ MergeとSkillの反映は別の記録にする。Mergeしただけでは配備�
 
 ## 8. 効果窓
 
-反映後、適用条件に合う作業を連続番号（`sequence`）で記録する。失敗・未完了の作業も落とさない。
+反映後に観測した作業を、配備ごとに1からの連続番号（`sequence`）で記録する。適用条件に合うかは `applicable` で示し、合わない作業も番号を飛ばさずに記録する。失敗・未完了の作業も落とさない。反映前に記録された観測は数えない。
 効果窓は、Skillの読込・適用を確認できた最初の該当作業を含む連続3件とする。適用条件とversionは反映前に計画へ固定する。
 
 判定は次の順で行う。
@@ -135,6 +137,7 @@ MergeとSkillの反映は別の記録にする。Mergeしただけでは配備�
 ## 9. rollbackと復旧待ち
 
 即時rollbackは、計画に固定した事前承認の範囲（対象・発動条件・実行者・期限）でだけ行う。範囲外は別の承認（`SEPARATE_APPROVAL`）を記録してから行う。
+intentの発動条件は、直前に停止（`HALTED`）させた条件と一致させる。別の条件を書いて事前承認を流用しようとした場合は保留する（`TRIGGER_MISMATCH`）。
 手順は次の順に固定する。
 
 1. 排他lockを取る。
@@ -150,6 +153,7 @@ MergeとSkillの反映は別の記録にする。Mergeしただけでは配備�
 - intentの後に終了記録がない、または書込が途中で止まった（`PARTIAL_WRITE`、例: `rollback-partial-write`）。
 - 結果が分からない（`UNKNOWN_RESULT`）、復元後のhashが合わない（`RESTORED_HASH_MISMATCH`）。
 
+記録した理由は観測と整合させる。現在hashが観測できないのに `CURRENT_HASH_MISMATCH` や `RESTORED_HASH_MISMATCH` とは書かない。
 事前承認の期限切れや実行者違いは、rollbackを始めずに保留する（例: `rollback-preapproval-expired`）。
 採用・復旧の永続化と承認の結び付けは、[#8のfixture採用](fixture-adoption.md) の仕組みを再利用元とする。ただし本書は実Skillへの書込手段を追加しない。
 
@@ -184,6 +188,6 @@ GitHub、commit、PRへ出すのは、PUBLICな契約、合成例、公開可能
 ## 13. 照合方法と限界
 
 `python3 -I -B tests/test_skill_improvement_contract.py -v` で、schema・参照・遷移と、第5〜9節の判定表をPUBLIC例へ当てて確認する。
-テストは記録された判定ラベルをそのまま信じず、件数・hash・期限・連番から判定し直す。事実を変えた例で結果が変わることも確認する。
+テストは記録された判定ラベルをそのまま信じず、件数・hash・期限・連番から判定し直す。事実を変えた例で結果が変わることも確認する。コミット済みの例が [build_examples.py](../fixtures/skill_improvement/build_examples.py) の出力と一致することも確認する。
 このテストは固定CI（`scripts/test.sh`）には含まれない。ローカルで別途実行した結果をPRに記録する。
 実Skillへの書込、障害注入、モデル呼出、他repoへの書込は行っていない。合成例の合格は、実運用での有用性や効果の証明ではない（#109で確認する）。

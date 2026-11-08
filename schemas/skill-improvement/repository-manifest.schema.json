@@ -10,7 +10,7 @@
     "manifest_id": {"$ref": "#/$defs/id"},
     "classification": {"$ref": "#/$defs/classification"},
     "stage": {"enum": ["RECORD_ONLY", "RECORD_AND_MANUAL_IMPROVEMENT"]},
-    "timezone": {"type": "string", "pattern": "^(UTC|[A-Z][A-Za-z_]+(/[A-Z][A-Za-z_]+)+)$"},
+    "timezone": {"type": "string", "pattern": "^(UTC|[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)+)$"},
     "period": {
       "type": "object",
       "additionalProperties": false,

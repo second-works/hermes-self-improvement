@@ -10,7 +10,7 @@
     "event_id": {"$ref": "#/$defs/id"},
     "recorded_at": {"$ref": "#/$defs/utc"},
     "work_date": {"$ref": "#/$defs/date"},
-    "timezone": {"type": "string", "pattern": "^(UTC|[A-Z][A-Za-z_]+(/[A-Z][A-Za-z_]+)+)$"},
+    "timezone": {"type": "string", "pattern": "^(UTC|[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)+)$"},
     "repository_id": {"$ref": "#/$defs/id"},
     "work_unit_id": {"$ref": "#/$defs/id"},
     "classification": {"enum": ["PUBLIC", "INTERNAL", "CONFIDENTIAL"]},

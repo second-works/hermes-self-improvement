@@ -385,6 +385,18 @@ class LedgerTest(unittest.TestCase):
                 self.refused('SECRET_LIKE_INPUT', self.ledger.record_end, 'demo-app', 'wu-s', 'UNDETERMINED',
                              '2026-11-04', reason=f'理由 {text}')
 
+    def test_secret_like_identifiers_are_not_stored(self):
+        fake = 's' + 'k-' + 'q' * 20
+        self.refused('SECRET_LIKE_INPUT', self.ledger.record_end, 'demo-app', fake, 'NO_CANDIDATE', '2026-11-04')
+        ids = self.ledger.record_end('demo-app', 'wu-1', 'CANDIDATE_FOUND', '2026-11-04',
+                                     experiences=[CORRECTION])['experience_ids']
+        self.refused('SECRET_LIKE_INPUT', self.ledger.propose, 'demo-app', fake, ids, 'pr-review', 'MISSING_PROCEDURE')
+        self.refused('SECRET_LIKE_INPUT', self.ledger.propose, 'demo-app', 'triage', ids, fake, 'MISSING_PROCEDURE')
+        shared = {'type': 'SHARED', 'basis': 'MISSING_COMMON_CONTRACT', 'contract_ref': 'input:共通契約',
+                  'decided_by': fake}
+        self.refused('SECRET_LIKE_INPUT', self.ledger.propose, 'demo-app', 'triage', ids, 'pr-review',
+                     'MISSING_PROCEDURE', shared)
+
     def test_candidates_through_a_duplicate_still_link_instead_of_opening(self):
         ids = self.ledger.record_end('demo-app', 'wu-1', 'CANDIDATE_FOUND', '2026-11-04', experiences=[
             dict(CORRECTION, refs=['input:一']), dict(CORRECTION, refs=['input:二'])])['experience_ids']

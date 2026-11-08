@@ -192,6 +192,13 @@ class Manifest:
                     'REF_PATH_OUTSIDE_ROOTS', 'path must be under an allowed root')
 
 
+def check_identifier(value, code, pattern=r'[a-z0-9][a-z0-9-]{0,63}'):
+    """Identifiers are stored verbatim, so they get the same secret check as free text."""
+    require(type(value) is str and re.fullmatch(pattern, value), code, 'lowercase letters, digits and hyphens')
+    require(not SECRET_LIKE.search(value), 'SECRET_LIKE_INPUT', '秘密値らしい文字列は記録しない')
+    return value
+
+
 def check_text(value, code, limit, one_line=True):
     require(type(value) is str and 1 <= len(value) <= limit, code, 'length')
     require(not (one_line and ('\n' in value or '\r' in value)), code, 'must be one line')
@@ -378,8 +385,7 @@ class Ledger:
                    experiences=(), classification=None):
         """Record one session end. Re-sending the same input is a no-op; changed input is refused."""
         self.manifest.repository(repository_id)
-        require(type(work_unit_id) is str and re.fullmatch(r'[a-z0-9][a-z0-9-]{0,63}', work_unit_id),
-                'WORK_UNIT_INVALID', str(work_unit_id))
+        check_identifier(work_unit_id, 'WORK_UNIT_INVALID')
         level = self.manifest.classification(repository_id, classification)
         work_date = work_date or self.manifest.today(self.clock())
         experiences = list(experiences)
@@ -440,16 +446,16 @@ class Ledger:
                 scope=None, duplicate_of=None, work_date=None, classification=None):
         """Turn recorded experiences into one candidate, linking same-basis proposals as DUPLICATE."""
         self.manifest.repository(repository_id)
-        require(type(work_unit_id) is str and re.fullmatch(r'[a-z0-9][a-z0-9-]{0,63}', work_unit_id),
-                'WORK_UNIT_INVALID', str(work_unit_id))
-        require(type(target_skill_id) is str and re.fullmatch(r'[a-z0-9][a-z0-9-]{0,63}', target_skill_id),
-                'TARGET_SKILL_INVALID', str(target_skill_id))
+        check_identifier(work_unit_id, 'WORK_UNIT_INVALID')
+        check_identifier(target_skill_id, 'TARGET_SKILL_INVALID')
         require(cause in CAUSES, 'CAUSE_UNKNOWN', str(cause))
         experience_ids = sorted(set(experience_ids))
         require(1 <= len(experience_ids) <= 16, 'EXPERIENCE_REQUIRED')
         scope = scope or {'type': 'REPOSITORY_LOCAL'}
         if 'contract_ref' in scope:
             check_text(scope['contract_ref'], 'SCOPE_INVALID', 200)
+        if 'decided_by' in scope:
+            check_identifier(scope['decided_by'], 'SCOPE_INVALID', r'[a-z0-9][a-z0-9-]{0,39}')
         require((cause == 'DUPLICATE') == (duplicate_of is not None), 'DUPLICATE_TARGET_REQUIRED',
                 '原因がDUPLICATEのときだけ元候補を指定する')
         work_date = work_date or self.manifest.today(self.clock())
@@ -525,6 +531,8 @@ class Ledger:
     def set_state(self, candidate_id, status, reason, duplicate_of=None, work_date=None,
                   repository_id=None, work_unit_id=None):
         """Append a candidate state change allowed by the #106 transition table."""
+        if work_unit_id is not None:
+            check_identifier(work_unit_id, 'WORK_UNIT_INVALID')
         require(status in ('OPEN', 'HOLD', 'DECLINED', 'DUPLICATE'), 'STATE_NOT_ALLOWED_HERE',
                 'DEPLOYED / ROLLED_BACK は配備の記録で扱い、このCLIでは書かない')
         state = {'status': status}

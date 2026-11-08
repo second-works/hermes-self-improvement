@@ -164,6 +164,8 @@ def latest_candidate_state(rows, candidate_id):
 
 
 def judge_deploy_gate(manifest, rows, at, deployment_id=None):
+    # Only records already appended at `at` can satisfy a prerequisite; later rows never clear it.
+    rows = [row for row in rows if row['recorded_at'] <= at]
     plans = [row for row in records(rows, 'deployment_plan')
              if deployment_id is None or row['record']['deployment_id'] == deployment_id]
     plan_row = plans[-1]
@@ -747,6 +749,29 @@ class SkillImprovementContract(unittest.TestCase):
         rows = rows + [replanned]
         self.assertEqual(replay(rows, self.transitions, manifest)[2], [])
         self.assertEqual(judge_deploy_gate(manifest, rows, '2026-11-04T02:00:00Z'), ('HOLD', 'APPROVAL_MISMATCH'))
+
+    def test_merge_recorded_after_deployment_time_does_not_clear_it(self):
+        manifest = self.manifests['manifest.example.json']
+        rows = copy.deepcopy(self.scenarios['deploy-allowed']['records'])
+        plan_row = first(rows, 'deployment_plan')
+        plan_row['record']['route'] = {'type': 'OWNER_REPOSITORY_PR', 'owner_repository_id': 'demo-app',
+                                       'issue_ref': 'synthetic:demo-app/issue-3'}
+        approval = first(rows, 'deployment_event', 'APPROVED')
+        approval['record']['state']['plan_sha256'] = sha(plan_row['record'])
+        merged = copy.deepcopy(approval)
+        merged.update(event_id='e17m', recorded_at='2026-11-04T03:00:00Z')
+        merged['record']['state'] = {'status': 'MERGED', 'pr_ref': 'synthetic:demo-app/pr-4', 'merge_commit': 'a' * 40}
+        deployed = copy.deepcopy(approval)
+        deployed.update(event_id='e18', recorded_at='2026-11-04T04:00:00Z')
+        deployed['record']['state'] = {
+            'status': 'DEPLOYED_EFFECT_UNCONFIRMED', 'deployed_by': 'example-owner',
+            'deployed_at': '2026-11-04T02:00:00Z', 'approval_event_id': approval['event_id'],
+            'observed_before_sha256': plan_row['record']['hashes']['expected_before'],
+            'observed_after_sha256': plan_row['record']['hashes']['expected_after']}
+        rows += [merged, deployed]
+        self.assertEqual(judge_deploy_gate(manifest, rows, '2026-11-04T02:00:00Z'), ('HOLD', 'MERGE_MISSING'))
+        self.assertEqual(judge_deploy_gate(manifest, rows[:-1], '2026-11-04T03:30:00Z'), ('ALLOWED', None))
+        self.assertIn(('e18', 'gate', 'DEPLOY_GATE_HOLD'), replay(rows, self.transitions, manifest)[2])
 
     def test_committed_examples_equal_the_builder_output(self):
         spec = importlib.util.spec_from_file_location('build_examples', FIXTURES / 'build_examples.py')

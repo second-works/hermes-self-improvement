@@ -33,6 +33,7 @@ python3 -I -B scripts/report_skill_improvement.py --manifest M --ledger D [--sta
 | merge commit | 数えない（`--no-merges`） | 統合操作は作業そのものではない |
 | bot | 作者名かメールに `[bot]` を含むcommitは数えない | 人の作業日だけを分母にする |
 | 複数branch | 許可branchから辿れるcommitを1回だけ数える | 同じcommitが複数branchにあっても1日を二重に数えない |
+| 日時の逆転 | 許可branchから辿れるcommitをすべて読み、日付で絞る（`--since` は使わない） | `--since` は古い日時のcommitで探索を止め、その先の期間内の祖先を落とす。読み直しはcacheで抑える |
 | 同日の複数作業 | 1日として数える | 単位は作業日。終了記録が同日に複数あっても分子は1 |
 | 遅れた記録 | 記録時刻ではなく `work_date` で数える | 後から追記した終了記録も、その作業日の分子になる |
 | 作業日外の終了記録 | 記録率に入れず、`end_records_outside_work_days` に別に出す | 分母にない日を分子へ入れると率が1を超えうる |
@@ -80,4 +81,4 @@ python3 -I -B scripts/report_skill_improvement.py --manifest M --ledger D [--sta
 python3 -I -B tests/test_skill_improvement_metrics.py -v
 ```
 
-一時ディレクトリのgit repoへ日時と作者を指定したcommitを作り、複数branch・bot・merge・cherry-pick・timezoneの日付境界・週境界・commitのない作業日・分母0・遅れた記録・未記録日・同日の複数作業・許可外branch・ないbranch・symlinkや `~/.hermes` のcheckout・gitdir・commondirの拒否・alternatesとincludeの拒否・署名検証プログラムを起動しないこと（陽性対照つき）・読めないrepoで止まること・cache再利用と再計算・14日の合成データでの3判定を確認する。
+一時ディレクトリのgit repoへ日時と作者を指定したcommitを作り、複数branch・bot・merge・cherry-pick・committer日時の逆転・timezoneの日付境界・週境界・commitのない作業日・分母0・遅れた記録・未記録日・同日の複数作業・許可外branch・ないbranch・symlinkや `~/.hermes` のcheckout・gitdir・commondirの拒否・alternatesとincludeの拒否・署名検証プログラムを起動しないこと（陽性対照つき）・読めないrepoで止まること・cache再利用と再計算・14日の合成データでの3判定を確認する。

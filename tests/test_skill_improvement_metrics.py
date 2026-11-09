@@ -153,6 +153,16 @@ class MetricsTest(unittest.TestCase):
         self.assertTrue(any('demo-cli' in item for item in report['limits']))
         self.assertEqual(report['cache'], 'SAVED')
 
+    def test_backwards_committer_dates_do_not_hide_in_period_ancestors(self):
+        repo = Repo(self.base / 'skewed-app', self.home)
+        repo.commit('2026-11-05 10:00')
+        repo.commit('2026-10-01 10:00')   # clock went backwards: git log --since would stop here
+        repo.commit('2026-11-09 10:00')
+        self.use_manifest(manifest_data(repo.path, branches=('main',)))
+        coverage = self.report()['coverage']
+        self.assertEqual(coverage['sources']['commit_days'], 2)
+        self.assertEqual(coverage['unrecorded_work_days'], [['demo-app', '2026-11-05'], ['demo-app', '2026-11-09']])
+
     def test_empty_denominator_is_not_zero_and_missing_effort_is_undetermined(self):
         self.use_manifest(manifest_data(None))
         report = self.report()

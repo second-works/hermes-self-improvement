@@ -5,7 +5,7 @@ configuration. The checkout's own config is still read by git, so settings that 
 read another file are forced off, and config includes are refused. Nothing is fetched, no remote is
 contacted, and nothing in the checkout is written.
 """
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 import hashlib
 from itertools import dropwhile
 import os
@@ -177,13 +177,14 @@ def commit_dates(item, tips, zone, start, end):
     """Local dates (manifest timezone) of non-merge, non-bot commits reachable from the allowed branches.
 
     The committer date is used: a cherry-pick or rebase counts on the day it was applied. A commit on
-    several branches counts once.
+    several branches counts once. All reachable commits are read and filtered by date: `--since` stops at
+    the first older commit, so it drops in-period ancestors when committer dates go backwards. The
+    report cache keeps this from running again while nothing changed.
     """
     gitdir = git_directory(item)[0]
-    since = datetime.combine(start, datetime.min.time(), zone).astimezone(timezone.utc) - timedelta(days=1)
     seen, dates, bots = set(), set(), 0
     for sha in sorted({value for value in tips.values() if value}):
-        done = run_git(gitdir, 'log', '--no-merges', '--no-show-signature', f'--since={int(since.timestamp())}',
+        done = run_git(gitdir, 'log', '--no-merges', '--no-show-signature',
                        '--format=%H%x09%ct%x09%an%x09%ae', sha)
         require(done.returncode == 0, 'REPOSITORY_UNAVAILABLE', f"{item['repository_id']}: git log failed")
         for line in done.stdout.splitlines():

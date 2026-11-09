@@ -126,8 +126,10 @@ def compute(manifest, rows, start, end, commit_days, commit_stats):
     results = {item['result'] for item in conditions.values()}
     verdict = 'NOT_MET' if 'NOT_MET' in results else 'UNDETERMINED' if 'UNDETERMINED' in results else 'CONDITIONS_MET'
 
-    recording = [row['record']['minutes'] for row in efforts if row['record']['activity'] == 'RECORD']
-    per_end = round(sum(recording) / len(ends), 1) if recording and ends else None
+    # Only end records that have their recording time are averaged; the others are unknown, not zero.
+    recording = [row['record'] for row in efforts if row['record']['activity'] == 'RECORD']
+    timed = {record['subject_id'] for record in recording}
+    per_end = round(sum(record['minutes'] for record in recording) / len(timed), 1) if timed else None
     if coverage_rate is not None and coverage_rate < COVERAGE_TARGET:
         aid = 'SUGGESTED'
     elif per_end is not None and per_end > RECORDING_MINUTES_PER_END:
@@ -154,7 +156,9 @@ def compute(manifest, rows, start, end, commit_days, commit_stats):
             'unit': 'WORK_DAY',
             'work_days': len(denominator), 'recorded_work_days': len(numerator), 'rate': coverage_rate,
             'unrecorded_work_days': [list(key) for key in sorted(denominator - numerator)],
-            'end_records': len(ends), 'end_records_outside_work_days': len(end_keys - denominator),
+            'end_records': len(ends),
+            'end_records_outside_work_days': sum((row['repository_id'], row['work_date']) not in denominator
+                                                 for row in ends),
             'undetermined_rate': rate(undetermined, len(ends)),
             'sources': {'commit_days': len(committed), 'registered_days': len(registered),
                         'registered_only_days': len(registered - committed)},
@@ -183,6 +187,19 @@ def _digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def _code_digest():
+    """Changing how the report is computed must not return a report cached by older code."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    parts = []
+    for name in ('metrics.py', 'commits.py'):
+        with open(os.path.join(here, name), 'rb') as handle:
+            parts.append(handle.read())
+    return _digest(b'\0'.join(parts))
+
+
+CODE_DIGEST = _code_digest()
+
+
 def build_report(manifest, manifest_bytes, ledger, start=None, end=None):
     """Read inputs, reuse the cached report when nothing changed, otherwise recompute and cache it."""
     period = manifest.data['period']
@@ -191,12 +208,18 @@ def build_report(manifest, manifest_bytes, ledger, start=None, end=None):
     require(start <= end, 'PERIOD_INVALID', 'start after end')
     require(period['start_date'] <= start.isoformat() and end.isoformat() <= period['end_date'],
             'OUTSIDE_PERIOD', 'the report period must be inside the manifest period')
+    readable = [item for item in manifest.data['repositories'] if 'local_checkout' in item]
+    # A PUBLIC_FIXTURE ledger may sit inside a repository, so its cache may only hold PUBLIC data.
+    require(manifest.data['ledger_location']['kind'] != 'PUBLIC_FIXTURE' or
+            all(item['classification'] == 'PUBLIC' for item in readable), 'CLASSIFICATION_NOT_PUBLIC',
+            'a PUBLIC_FIXTURE ledger reads only PUBLIC checkouts')
     data, rows = ledger.snapshot()
-    tips = {item['repository_id']: branch_tips(item) for item in manifest.data['repositories']
-            if 'local_checkout' in item}
+    state = {item['repository_id']: branch_tips(item) for item in readable}
+    tips = {repository: value[0] for repository, value in state.items()}
     fingerprint = _digest(schema.canonical({
-        'version': REPORT_VERSION, 'manifest': _digest(manifest_bytes), 'ledger': _digest(data),
-        'tips': tips, 'start': start.isoformat(), 'end': end.isoformat()}))
+        'version': REPORT_VERSION, 'code': CODE_DIGEST, 'manifest': _digest(manifest_bytes), 'ledger': _digest(data),
+        'tips': tips, 'shallow': {repository: value[1] for repository, value in state.items()},
+        'start': start.isoformat(), 'end': end.isoformat()}))
     cached = read_cache(ledger)
     if cached and cached.get('fingerprint') == fingerprint:
         return dict(cached['report'], status='UNCHANGED', fingerprint=fingerprint)

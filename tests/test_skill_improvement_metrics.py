@@ -214,7 +214,7 @@ class MetricsTest(unittest.TestCase):
             item = dict(self.data['repositories'][0], local_checkout=str(path))
             with mock.patch('os.path.realpath', wraps=os.path.realpath) as realpath:
                 with self.assertRaises(LedgerError, msg=str(path)) as caught:
-                    commits.checkout_path(item)
+                    commits.git_directory(item)
             self.assertEqual(caught.exception.code, 'REPOSITORY_UNAVAILABLE')
             if 'hermes' in str(path).lower():
                 realpath.assert_not_called()
@@ -233,7 +233,8 @@ class MetricsTest(unittest.TestCase):
             self.assertIn(call.args[1].value, commits.ALLOWED_SUBCOMMANDS)
         environment = commits.git_environment()
         self.assertEqual((environment['GIT_CONFIG_GLOBAL'], environment['GIT_CONFIG_NOSYSTEM'],
-                          environment['GIT_TERMINAL_PROMPT']), (os.devnull, '1', '0'))
+                          environment['GIT_TERMINAL_PROMPT'], environment['GIT_NO_REPLACE_OBJECTS']),
+                         (os.devnull, '1', '0', '1'))
         forbidden = {'socket', 'http', 'urllib', 'requests', 'ssl', 'asyncio', 'openai', 'anthropic'}
         for name in ('metrics.py', 'commits.py', 'cli.py'):
             tree = ast.parse((ROOT / 'src' / 'skill_improvement' / name).read_text(encoding='utf-8'))
@@ -258,6 +259,82 @@ class MetricsTest(unittest.TestCase):
                                 env={'PATH': os.environ.get('PATH', ''), 'HOME': str(self.home),
                                      'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': os.devnull})
         self.assertEqual(status.stdout, '')
+
+    def test_checkout_config_cannot_start_a_signature_program(self):
+        marker = self.base / 'gpg-ran'
+        script = self.base / 'fake-gpg'
+        script.write_text('#!/bin/sh\ntouch "' + str(marker) + '"\nexit 1\n')
+        script.chmod(0o755)
+        body = self.repo.git('cat-file', 'commit', 'HEAD')
+        head, _, message = body.partition('\n\n')
+        signature = 'gpgsig -----BEGIN PGP SIGNATURE-----\n \n AAAA\n -----END PGP SIGNATURE-----'
+        signed = head + '\n' + signature + '\n\n' + message + '\n'
+        path = self.base / 'signed-commit'
+        path.write_text(signed)
+        sha = self.repo.git('hash-object', '-t', 'commit', '-w', str(path))
+        self.repo.git('update-ref', 'refs/heads/main', sha)
+        self.repo.git('config', 'log.showSignature', 'true')
+        self.repo.git('config', 'gpg.program', str(script))
+        # Positive control: plain git with this checkout's config does run the program.
+        self.repo.git('log', '-1', '--format=%H', 'main')
+        self.assertTrue(marker.exists())
+        marker.unlink()
+        report = self.report()
+        self.assertEqual(report['status'], 'COMPUTED')
+        self.assertFalse(marker.exists())
+
+    def test_git_pointer_files_must_stay_outside_hermes_home(self):
+        hermes_git = Path.home() / '.hermes' / 'r' / '.git'
+        checkout = self.base / 'pointer-app'
+        checkout.mkdir()
+        (checkout / '.git').write_text(f'gitdir: {hermes_git}\n')
+        with mock.patch('os.path.realpath', wraps=os.path.realpath) as realpath:
+            with self.assertRaises(LedgerError) as caught:
+                commits.git_directory(dict(self.data['repositories'][0], local_checkout=str(checkout)))
+        self.assertEqual(caught.exception.code, 'REPOSITORY_UNAVAILABLE')
+        self.assertFalse(any('.hermes' in str(call).lower() for call in realpath.call_args_list))
+        # A worktree has a gitdir file and a commondir; both are followed and checked.
+        worktree = self.base / 'worktree-app'
+        self.repo.git('worktree', 'add', '-q', str(worktree), 'feature/a')
+        item = dict(self.data['repositories'][0], local_checkout=str(worktree))
+        gitdir, common = commits.git_directory(item)
+        self.assertEqual(common, self.repo.path / '.git')
+        self.assertIn('main', commits.branch_tips(item)[0])
+        (gitdir / 'commondir').write_text(str(hermes_git) + '\n')
+        with self.assertRaises(LedgerError):
+            commits.git_directory(item)
+
+    def test_alternates_and_config_includes_are_refused(self):
+        item = self.data['repositories'][0]
+        config = self.repo.path / '.git' / 'config'
+        original = config.read_text()
+        config.write_text(original + '[includeIf "gitdir:/"]\n\tpath = /elsewhere/config\n')
+        with self.assertRaises(LedgerError):
+            commits.git_directory(item)
+        config.write_text(original)
+        alternates = self.repo.path / '.git' / 'objects' / 'info' / 'alternates'
+        alternates.parent.mkdir(exist_ok=True)
+        alternates.write_text('/elsewhere/objects\n')
+        with self.assertRaises(LedgerError):
+            commits.git_directory(item)
+
+    def test_unreadable_repository_stops_the_report_without_cache(self):
+        broken = self.base / 'broken-app'
+        (broken / '.git').mkdir(parents=True)
+        data = manifest_data(broken)
+        self.use_manifest(data)
+        with self.assertRaises(LedgerError) as caught:
+            self.report()
+        self.assertEqual(caught.exception.code, 'REPOSITORY_UNAVAILABLE')
+        self.assertFalse((self.directory / metrics.CACHE_FILE).exists())
+
+    def test_public_fixture_ledger_reads_only_public_checkouts(self):
+        data = manifest_data(self.repo.path)
+        data['repositories'][0]['classification'] = 'INTERNAL'
+        self.use_manifest(data)
+        with self.assertRaises(LedgerError) as caught:
+            self.report()
+        self.assertEqual(caught.exception.code, 'CLASSIFICATION_NOT_PUBLIC')
 
     # --- Done 3: automation conditions over 14 days of synthetic data ---
 
@@ -315,7 +392,8 @@ class MetricsTest(unittest.TestCase):
         self.ledger.record_end('demo-app', 'wu-5', 'NO_CANDIDATE', '2026-11-09')
         report = self.report()
         self.assertEqual(report['coverage']['rate'], 1.0)
-        self.assertEqual(report['recording_aid']['record_minutes_per_end'], 0.5)
+        # Only the end record with a RECORD time is averaged (3 minutes for one end), not all six ends.
+        self.assertEqual(report['recording_aid']['record_minutes_per_end'], 3.0)
         self.assertEqual(report['recording_aid']['verdict'], 'NOT_SUGGESTED')
 
     # --- CLI ---

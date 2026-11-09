@@ -23,7 +23,7 @@
 python3 -I -B scripts/report_skill_improvement.py --manifest M --ledger D [--start YYYY-MM-DD] [--end YYYY-MM-DD]
 ```
 
-期間を省くとmanifestの期間全体。期間はmanifestの期間の中だけ指定できる（外なら `OUTSIDE_PERIOD`、形式・前後が不正なら `PERIOD_INVALID`）。結果は標準出力へJSONで1行出す。拒否は標準エラーへ `{"error", "detail"}` を出し、終了コード2で終わる。台帳には書かない。
+期間を省くとmanifestの期間全体。期間はmanifestの期間の中だけ指定できる（外なら `OUTSIDE_PERIOD`、形式・前後が不正なら `PERIOD_INVALID`）。結果は標準出力へJSONで1行出す。拒否は標準エラーへ `{"error", "detail"}` を出し、終了コード2で終わる。台帳の行は書かず、台帳ディレクトリへ集計のcache（`report-cache.json`）だけを書く。`PUBLIC_FIXTURE` の台帳はrepo内に置けるため、commitを読むrepoがPUBLICでなければ `CLASSIFICATION_NOT_PUBLIC` で拒否する。
 
 ## 3. 作業日の数え方
 
@@ -44,7 +44,7 @@ python3 -I -B scripts/report_skill_improvement.py --manifest M --ledger D [--sta
 
 | 項目 | 内容 |
 | --- | --- |
-| `coverage` | 作業日数・記録済み作業日数・率、未記録の作業日の一覧、終了記録数、作業日外の終了記録数、判定未完了の割合、分母の内訳（commit日・登録日・登録だけの日） |
+| `coverage` | 作業日数・記録済み作業日数・率、未記録の作業日の一覧、終了記録数、作業日外の終了記録の件数、判定未完了の割合、分母の内訳（commit日・登録日・登録だけの日） |
 | `weeks` | 週ごとの作業日数・記録済み日数・率・作業時間 |
 | `candidates` | 期間内に作られた候補の状態別件数と、`DUPLICATE` を除く独立候補数 |
 | `effort_minutes` | 作業別の合計分、合計、週平均（合計×7÷期間日数） |
@@ -64,13 +64,15 @@ python3 -I -B scripts/report_skill_improvement.py --manifest M --ledger D [--sta
 | 作業時間の週平均 | 30分を超える | `effort` が1件もない |
 
 `CONDITIONS_MET` でも、削減できる時間・自動化後に残る時間・開発保守の負担を人が比べるまで何も始めない。
-記録補助フックは自動化の条件とは別に判断する。記録率が0.8未満、または終了記録1件あたりの記録時間（`RECORD`）が5分を超えると `SUGGESTED`、どちらも分からないと `UNDETERMINED`。提案は配備の承認ではない。
+記録補助フックは自動化の条件とは別に判断する。記録率が0.8未満、または終了記録1件あたりの記録時間（`RECORD` の時間を記録した終了記録だけで平均する）が5分を超えると `SUGGESTED`、どちらも分からないと `UNDETERMINED`。提案は配備の承認ではない。
 
 ## 5. 読む範囲と再計算
 
 - `local_checkout` は絶対pathで、symlink・`.`・`..`・`/System/Volumes/Data` の別名を含まず、git checkoutであること。`~/.hermes` の下は大文字小文字を区別しないpathの比較だけで拒否し、中身もメタデータも読まない。満たさなければ `REPOSITORY_UNAVAILABLE`。
-- 実行するのは、ローカルの `git rev-parse`（branchの先端）と `git log`（commit日付・作者）だけ。利用者とシステムのgit設定を読まず、fetch・pull・remote・APIの取得をしない。checkoutには書かない。
-- branchの先端・台帳の内容・manifest・期間・集計の版から指紋を作る。前回と同じなら台帳ディレクトリの `report-cache.json` を返し（`status: UNCHANGED`）、`git log` を実行しない。どれかが変われば再計算する（`status: COMPUTED`）。cacheが壊れていれば信用せず再計算する。cacheを書けなくても集計結果は返し、`cache: NOT_SAVED` と出す。
+- `.git` はディレクトリか `gitdir:` ファイル（worktree）に限り、symlinkは拒否する。gitdirと `commondir` の指す先も同じ条件で検査する。object alternatesとgit設定のinclude（`include` / `includeIf`）は、検査していない場所を読ませるため拒否する。
+- 実行するのは、ローカルの `git rev-parse`（branchの先端）と `git log`（commit日付・作者）だけ。利用者とシステムのgit設定を読まず、fetch・pull・remote・APIの取得をしない。checkoutには書かない。checkout自身の設定は読まれるため、外部プログラムの起動や別ファイルの読込につながる設定（署名検証・mailmap・pager・fsmonitor）を毎回無効にし、replace objectも使わない。
+- branchがないこと（`rev-parse --verify --quiet` の終了コード1）以外のgitの失敗は `REPOSITORY_UNAVAILABLE` で止まり、commit 0件として集計しない。cacheも書かない。
+- branchの先端・shallowの境界・台帳の内容・manifest・期間・集計の版とコードから指紋を作る。前回と同じなら台帳ディレクトリの `report-cache.json` を返し（`status: UNCHANGED`）、`git log` を実行しない。どれかが変われば再計算する（`status: COMPUTED`）。cacheが壊れていれば信用せず再計算する。cacheを書けなくても集計結果は返し、`cache: NOT_SAVED` と出す。
 
 ## 6. 検証
 
@@ -78,4 +80,4 @@ python3 -I -B scripts/report_skill_improvement.py --manifest M --ledger D [--sta
 python3 -I -B tests/test_skill_improvement_metrics.py -v
 ```
 
-一時ディレクトリのgit repoへ日時と作者を指定したcommitを作り、複数branch・bot・merge・cherry-pick・timezoneの日付境界・週境界・commitのない作業日・分母0・遅れた記録・未記録日・同日の複数作業・許可外branch・ないbranch・symlinkや `~/.hermes` のcheckout拒否・cache再利用と再計算・14日の合成データでの3判定を確認する。
+一時ディレクトリのgit repoへ日時と作者を指定したcommitを作り、複数branch・bot・merge・cherry-pick・timezoneの日付境界・週境界・commitのない作業日・分母0・遅れた記録・未記録日・同日の複数作業・許可外branch・ないbranch・symlinkや `~/.hermes` のcheckout・gitdir・commondirの拒否・alternatesとincludeの拒否・署名検証プログラムを起動しないこと（陽性対照つき）・読めないrepoで止まること・cache再利用と再計算・14日の合成データでの3判定を確認する。

@@ -19,6 +19,7 @@ Risk Tier: HIGH。実Skillへの反映・復旧の承認条件と、評価の合
 | 例の生成 | [build_examples.py](../fixtures/skill_improvement/build_examples.py) | 合成例を作り直す。承認hashなどの計算値を手で直さない |
 | 照合テスト | [test_skill_improvement_contract.py](../tests/test_skill_improvement_contract.py) | schema・参照・遷移・判定表と例の整合を確認する |
 | 台帳CLI（#107） | [skill-improvement-ledger.md](skill-improvement-ledger.md) | 終了記録・経験・候補をローカル台帳へ追記する手順と拒否条件 |
+| 集計（#108） | [skill-improvement-metrics.md](skill-improvement-metrics.md) | 作業日単位の記録率・負担・自動化条件の週次集計 |
 
 PUBLIC例のhash・ID・repo・担当者はすべて合成値で、承認の記録ではない。
 台帳は1行1イベントのappend-only JSONLとする。状態の変更も新しい行の追記で表し、既存行を書き換えない。
@@ -43,6 +44,13 @@ manifestにないrepoを推測で追加しない。manifestが未承認なら記
 - `CANDIDATE_FOUND`: 経験のIDを1件以上持つ。経験には種類・一行要約（120字以内）・根拠参照・原因分類が必要。
 - `NO_CANDIDATE`: 経験の種類や根拠を求めない。記録負担を増やさないため、空の経験は作らない。
 - `UNDETERMINED`: 判定できなかった理由を必ず書く。候補なしとして数えない。
+
+#108で次の2種類を追加した（利用者が選択肢Aとして承認）。既存の台帳はそのまま有効で、追加前の行の意味は変えない。
+
+- 作業日登録（`work_day`）: commitのない作業日を、作業単位ごとに1件、一行要約（120字以内）付きで登録する。記録率の分母に加えるだけで、終了記録の代わりにはならない。
+- 作業時間（`effort`）: 人が使った分（1〜1440分）を、作業（`RECORD / CANDIDATE / EVALUATION / APPROVAL / DEPLOYMENT`）と、記録済みの対象ID（終了記録のevent_id・候補ID・評価ID・配備ID）に結び付けて記録する。作業単位・作業・対象ごとに1件。
+
+manifestのrepoには、commitを読む場合だけ `local_checkout`（絶対path）と `allowed_branches`（1〜16件のローカルbranch名）を組で書く。片方だけは拒否する。
 
 経験の種類は、訂正（`CORRECTION`）・手戻り（`REWORK`）・反復指摘（`REPEATED_FEEDBACK`）・より良い方法（`BETTER_METHOD`）の4つ。
 根拠は参照文字列だけを保存し、URLを自動取得しない。

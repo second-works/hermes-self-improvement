@@ -29,6 +29,7 @@ LOCK_WAIT_SECONDS = 10
 DIRECTORY = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
 LEVELS = ('PUBLIC', 'INTERNAL', 'CONFIDENTIAL')
 EXPERIENCE_TYPES = ('CORRECTION', 'REWORK', 'REPEATED_FEEDBACK', 'BETTER_METHOD')
+EFFORT_ACTIVITIES = ('RECORD', 'CANDIDATE', 'EVALUATION', 'APPROVAL', 'DEPLOYMENT')
 CAUSES = ('MISSING_PROCEDURE', 'NOT_LOADED', 'NOT_FOLLOWED', 'TEMPORARY', 'CONFLICT_OR_UNVERIFIED', 'DUPLICATE')
 # Evidence is stored as a reference string only. Each kind needs the manifest read item it names.
 REF_KINDS = {'input': 'EXPLICIT_INPUT', 'end': 'END_RECORD', 'pr-review': 'PR_REVIEW_COMMENT',
@@ -120,6 +121,10 @@ class Manifest:
             self.zone = ZoneInfo(data['timezone'])
         except (ZoneInfoNotFoundError, ValueError):
             raise LedgerError('MANIFEST_INVALID', 'timezone') from None
+        for item in data['repositories']:
+            # Commit reading (#108) needs both the checkout and the branches it may read, or neither.
+            require(('local_checkout' in item) == ('allowed_branches' in item), 'MANIFEST_INVALID',
+                    'local_checkout and allowed_branches go together')
         self.data = data
         self.repositories = {item['repository_id']: item for item in data['repositories']}
 
@@ -134,9 +139,11 @@ class Manifest:
         finally:
             os.close(fd)
         try:
-            return cls(strict_json(data.decode('utf-8')), contract, now)
+            manifest = cls(strict_json(data.decode('utf-8')), contract, now)
         except (UnicodeDecodeError, ValueError, RecursionError):
             raise LedgerError('MANIFEST_INVALID', 'not strict JSON') from None
+        manifest.raw = data
+        return manifest
 
     def repository(self, repository_id):
         require(repository_id in self.repositories, 'REPOSITORY_NOT_IN_MANIFEST', repository_id)
@@ -314,8 +321,16 @@ class Ledger:
         return rows
 
     def read(self):
+        return self.snapshot()[1]
+
+    def snapshot(self):
+        """The ledger bytes and their parsed rows, read together under the lock."""
         with self._open_directory() as dirfd, self._locked(dirfd):
-            return self.parse(self._read_bytes(dirfd))
+            data = self._read_bytes(dirfd)
+            return data, self.parse(data)
+
+    def open_directory(self):
+        return self._open_directory()
 
     def append(self, build):
         """Under the lock: read, build new rows from the current rows, check, then append durably."""
@@ -528,6 +543,53 @@ class Ledger:
 
         return self.append(build)
 
+    def record_work_day(self, repository_id, work_unit_id, summary_text, work_date=None, classification=None):
+        """Register a work day without commits. It only adds to the coverage denominator (#108)."""
+        self.manifest.repository(repository_id)
+        check_identifier(work_unit_id, 'WORK_UNIT_INVALID')
+        check_text(summary_text, 'SUMMARY_INVALID', 120)
+        level = self.manifest.classification(repository_id, classification)
+        work_date = work_date or self.manifest.today(self.clock())
+        event = 'e-' + short_hash('work-day', repository_id, work_unit_id)
+        record = {'kind': 'work_day', 'summary': summary_text}
+
+        def build(rows):
+            row = self._envelope(repository_id, work_unit_id, work_date, level, event, record)
+            existing = [item for item in rows if item['event_id'] == event]
+            if existing:
+                require(comparable(existing[0]) == comparable(row), 'WORK_UNIT_ALREADY_REGISTERED',
+                        f'{repository_id}/{work_unit_id}')
+                return [], {'status': 'ALREADY_RECORDED', 'event_ids': [event]}
+            return [row], {'status': 'RECORDED', 'event_ids': [event]}
+
+        return self.append(build)
+
+    def record_effort(self, repository_id, work_unit_id, activity, minutes, subject_id, work_date=None,
+                      classification=None):
+        """Record minutes a person spent on one activity for an existing subject (#108)."""
+        self.manifest.repository(repository_id)
+        check_identifier(work_unit_id, 'WORK_UNIT_INVALID')
+        require(activity in EFFORT_ACTIVITIES, 'ACTIVITY_UNKNOWN', 'one of ' + ', '.join(EFFORT_ACTIVITIES))
+        require(type(minutes) is int and 1 <= minutes <= 1440, 'MINUTES_INVALID', '1-1440')
+        check_identifier(subject_id, 'SUBJECT_INVALID')
+        level = self.manifest.classification(repository_id, classification)
+        work_date = work_date or self.manifest.today(self.clock())
+        event = 'e-' + short_hash('effort', repository_id, work_unit_id, activity, subject_id)
+        record = {'kind': 'effort', 'activity': activity, 'minutes': minutes, 'subject_id': subject_id}
+
+        def build(rows):
+            row = self._envelope(repository_id, work_unit_id, work_date, level, event, record)
+            require(subject_id in effort_subjects(rows)[activity], 'SUBJECT_UNKNOWN',
+                    f'no recorded {activity.lower()} subject with that id')
+            existing = [item for item in rows if item['event_id'] == event]
+            if existing:
+                require(comparable(existing[0]) == comparable(row), 'EFFORT_ALREADY_RECORDED',
+                        'one entry per work unit, activity and subject')
+                return [], {'status': 'ALREADY_RECORDED', 'event_ids': [event]}
+            return [row], {'status': 'RECORDED', 'event_ids': [event]}
+
+        return self.append(build)
+
     def set_state(self, candidate_id, status, reason, duplicate_of=None, work_date=None,
                   repository_id=None, work_unit_id=None):
         """Append a candidate state change allowed by the #106 transition table."""
@@ -574,6 +636,23 @@ class Ledger:
         return self.append(build)
 
 
+def effort_subjects(rows):
+    """IDs an effort record may point at, by activity (#108)."""
+    subjects = {activity: set() for activity in EFFORT_ACTIVITIES}
+    for row in rows:
+        record = row['record']
+        if record['kind'] == 'session_end':
+            subjects['RECORD'].add(row['event_id'])
+        elif record['kind'] == 'candidate':
+            subjects['CANDIDATE'].add(record['candidate_id'])
+        elif record['kind'] == 'evaluation':
+            subjects['EVALUATION'].add(record['evaluation_id'])
+        elif record['kind'] == 'deployment_plan':
+            subjects['APPROVAL'].add(record['deployment_id'])
+            subjects['DEPLOYMENT'].add(record['deployment_id'])
+    return subjects
+
+
 def comparable(row):
     """A row without its append time, used to recognise a re-sent request."""
     return {key: value for key, value in row.items() if key != 'recorded_at'}
@@ -590,6 +669,8 @@ def candidate_rows(rows):
 def check_rows(rows, contract, manifest):
     """Whole-ledger checks: schema, unique IDs, links between records, and candidate transitions."""
     seen, ends, ended, experiences, candidates = set(), {}, set(), {}, {}
+    days, subjects = set(), {'RECORD': set(), 'CANDIDATE': set(), 'EVALUATION': set(), 'APPROVAL': set(),
+                             'DEPLOYMENT': set()}
     transitions = contract['transitions']['candidate']
     for number, row in enumerate(rows, start=1):
         where = f'line {number}'
@@ -611,6 +692,19 @@ def check_rows(rows, contract, manifest):
             require(key not in ended, 'LEDGER_CORRUPT', f'{where}: second session_end for one work unit')
             ended.add(key)
             ends[row['event_id']] = row
+            subjects['RECORD'].add(row['event_id'])
+        elif record['kind'] == 'work_day':
+            key = (row['repository_id'], row['work_unit_id'])
+            require(key not in days, 'LEDGER_CORRUPT', f'{where}: second work_day for one work unit')
+            days.add(key)
+        elif record['kind'] == 'effort':
+            require(record['subject_id'] in subjects[record['activity']], 'LEDGER_CORRUPT',
+                    f'{where}: effort for an unknown {record["activity"].lower()} subject')
+        elif record['kind'] == 'evaluation':
+            subjects['EVALUATION'].add(record['evaluation_id'])
+        elif record['kind'] == 'deployment_plan':
+            subjects['APPROVAL'].add(record['deployment_id'])
+            subjects['DEPLOYMENT'].add(record['deployment_id'])
         elif record['kind'] == 'experience':
             end = ends.get(record['end_event_id'])
             require(end is not None and end['record']['status'] == 'CANDIDATE_FOUND' and
@@ -645,6 +739,7 @@ def check_rows(rows, contract, manifest):
                 require(original & set(record['experience_ids']), 'LEDGER_CORRUPT',
                         f'{where}: DUPLICATE shares no experience with its original')
             candidates.setdefault(record['candidate_id'], []).append(row)
+            subjects['CANDIDATE'].add(record['candidate_id'])
     for event_id, end in ends.items():
         listed = end['record'].get('experience_ids', [])
         require(all(item in experiences and experiences[item]['record']['end_event_id'] == event_id

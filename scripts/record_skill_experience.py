@@ -7,30 +7,12 @@ Output is one JSON object on stdout; a refusal prints {"error": CODE} on stderr 
 import argparse
 import json
 from pathlib import Path
-import re
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-from skill_improvement.ledger import (CAUSES, EXPERIENCE_TYPES, Ledger, LedgerError, Manifest,  # noqa: E402
+from skill_improvement.cli import QuietParser  # noqa: E402
+from skill_improvement.ledger import (CAUSES, EFFORT_ACTIVITIES, EXPERIENCE_TYPES, Ledger, LedgerError, Manifest,  # noqa: E402
                                       load_contract, summary, utc_now)
-
-
-class QuietParser(argparse.ArgumentParser):
-    """argparse errors normally repeat the offending value; this one never echoes input values."""
-
-    def error(self, message):
-        # Never rebuild the message from input: only text taken from this parser's own definitions.
-        detail = 'invalid arguments; see --help'
-        named = re.match(r'argument ([^:]+):', message)
-        if message.startswith('the following arguments are required:'):
-            required = message.split(':', 1)[1].split(',')
-            known = {option for action in self._actions for option in action.option_strings}
-            names = [item.strip() for item in required if item.strip() in known]
-            detail = 'missing required arguments: ' + ', '.join(names) if names else detail
-        elif named and named.group(1) in {'/'.join(action.option_strings) for action in self._actions}:
-            detail = f'invalid value for {named.group(1)}; see --help'
-        print(json.dumps({'error': 'ARGUMENTS_INVALID', 'detail': detail}, ensure_ascii=False), file=sys.stderr)
-        sys.exit(2)
 
 
 def experience(text):
@@ -81,6 +63,23 @@ def parser():
     state.add_argument('--duplicate-of')
     state.add_argument('--work-date')
 
+    day = commands.add_parser('work-day', help='register a work day without commits (coverage denominator)')
+    day.add_argument('--repository', required=True)
+    day.add_argument('--work-unit', required=True)
+    day.add_argument('--summary', required=True, help='one line, 120 characters or fewer')
+    day.add_argument('--work-date')
+    day.add_argument('--classification', choices=['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'UNKNOWN'])
+
+    effort = commands.add_parser('effort', help='record minutes spent on one activity')
+    effort.add_argument('--repository', required=True)
+    effort.add_argument('--work-unit', required=True)
+    effort.add_argument('--activity', required=True, choices=EFFORT_ACTIVITIES)
+    effort.add_argument('--minutes', required=True, type=int)
+    effort.add_argument('--subject', required=True,
+                        help='end event_id (RECORD), candidate_id, evaluation_id or deployment_id')
+    effort.add_argument('--work-date')
+    effort.add_argument('--classification', choices=['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'UNKNOWN'])
+
     commands.add_parser('verify', help='re-read the whole ledger and print counts')
     return root
 
@@ -113,6 +112,12 @@ def run(args):
                               scope_of(args), args.duplicate_of, args.work_date, args.classification)
     if args.command == 'set-state':
         return ledger.set_state(args.candidate, args.status, args.reason, args.duplicate_of, args.work_date)
+    if args.command == 'work-day':
+        return ledger.record_work_day(args.repository, args.work_unit, args.summary, args.work_date,
+                                      args.classification)
+    if args.command == 'effort':
+        return ledger.record_effort(args.repository, args.work_unit, args.activity, args.minutes, args.subject,
+                                    args.work_date, args.classification)
     return dict(summary(ledger.read()), status='VERIFIED')
 
 

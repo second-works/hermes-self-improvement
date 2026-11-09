@@ -77,7 +77,8 @@ def compute(manifest, rows, start, end, commit_days, commit_stats):
         minutes[row['record']['activity']] = minutes.get(row['record']['activity'], 0) + row['record']['minutes']
     total_minutes = sum(minutes.values())
     period_days = (end - start).days + 1
-    weekly_average = round(total_minutes * 7 / period_days, 1)
+    weekly_average = total_minutes * 7 / period_days
+    displayed_weekly_average = round(weekly_average, 1)
 
     weeks = []
     first = week_start(start)
@@ -110,16 +111,17 @@ def compute(manifest, rows, start, end, commit_days, commit_stats):
         if row['record']['kind'] == 'deployment_event':
             deployment_state[row['record']['deployment_id']] = row['record']['state']['status']
 
-    coverage_rate = rate(len(numerator), len(denominator))
+    coverage_ratio = len(numerator) / len(denominator) if denominator else None
+    coverage_rate = round(coverage_ratio, 4) if coverage_ratio is not None else None
     conditions = {
         'period_days': {'value': period_days, 'threshold': MIN_PERIOD_DAYS,
                         'result': 'MET' if period_days >= MIN_PERIOD_DAYS else 'NOT_MET'},
         'coverage': {'value': coverage_rate, 'threshold': COVERAGE_TARGET,
-                     'result': 'UNDETERMINED' if coverage_rate is None else
-                     'MET' if coverage_rate >= COVERAGE_TARGET else 'NOT_MET'},
+                     'result': 'UNDETERMINED' if coverage_ratio is None else
+                     'MET' if coverage_ratio >= COVERAGE_TARGET else 'NOT_MET'},
         'independent_candidates': {'value': independent, 'threshold': MIN_INDEPENDENT_CANDIDATES,
                                    'result': 'MET' if independent >= MIN_INDEPENDENT_CANDIDATES else 'NOT_MET'},
-        'weekly_minutes': {'value': weekly_average, 'threshold': WEEKLY_MINUTES_THRESHOLD,
+        'weekly_minutes': {'value': displayed_weekly_average, 'threshold': WEEKLY_MINUTES_THRESHOLD,
                            'result': 'UNDETERMINED' if not efforts else
                            'MET' if weekly_average > WEEKLY_MINUTES_THRESHOLD else 'NOT_MET'},
     }
@@ -129,12 +131,12 @@ def compute(manifest, rows, start, end, commit_days, commit_stats):
     # Only end records that have their recording time are averaged; the others are unknown, not zero.
     recording = [row['record'] for row in efforts if row['record']['activity'] == 'RECORD']
     timed = {record['subject_id'] for record in recording}
-    per_end = round(sum(record['minutes'] for record in recording) / len(timed), 1) if timed else None
-    if coverage_rate is not None and coverage_rate < COVERAGE_TARGET:
+    per_end = sum(record['minutes'] for record in recording) / len(timed) if timed else None
+    if coverage_ratio is not None and coverage_ratio < COVERAGE_TARGET:
         aid = 'SUGGESTED'
     elif per_end is not None and per_end > RECORDING_MINUTES_PER_END:
         aid = 'SUGGESTED'
-    elif coverage_rate is None or per_end is None:
+    elif coverage_ratio is None or per_end is None:
         aid = 'UNDETERMINED'
     else:
         aid = 'NOT_SUGGESTED'
@@ -165,7 +167,7 @@ def compute(manifest, rows, start, end, commit_days, commit_stats):
         },
         'weeks': weeks,
         'candidates': {'independent': independent, 'by_state': by_state},
-        'effort_minutes': {'by_activity': minutes, 'total': total_minutes, 'weekly_average': weekly_average},
+        'effort_minutes': {'by_activity': minutes, 'total': total_minutes, 'weekly_average': displayed_weekly_average},
         'size_reviews': {'count': len(reviews),
                          'net_added_lines': sum(row['record']['net_added_lines'] for row in reviews),
                          'with_reference_moves': sum(bool(row['record']['moved_to']) for row in reviews),
@@ -176,7 +178,8 @@ def compute(manifest, rows, start, end, commit_days, commit_stats):
                                                           for state in deployment_state.values())},
         'automation': {'verdict': verdict, 'conditions': conditions,
                        'note': '条件の達成は検討開始の目安で、承認でも自動実行でもない'},
-        'recording_aid': {'verdict': aid, 'coverage': coverage_rate, 'record_minutes_per_end': per_end,
+        'recording_aid': {'verdict': aid, 'coverage': coverage_rate,
+                          'record_minutes_per_end': round(per_end, 1) if per_end is not None else None,
                           'note': '記録補助フックは自動化の3条件とは別に判断する。提案は配備の承認ではない'},
         'commits': commit_stats,
         'limits': limits,

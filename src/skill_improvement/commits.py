@@ -11,6 +11,7 @@ from itertools import dropwhile
 import os
 from pathlib import Path
 import re
+import stat
 import subprocess
 
 from skill_improvement.ledger import LedgerError, inside, require
@@ -55,7 +56,10 @@ def safe_directory(path, repository, what):
 def pointer(base, name, repository):
     """Read a one-line path file such as `.git` (gitdir: X) or `commondir`, relative to base."""
     try:
-        with open(base / name, 'rb') as handle:
+        with open(base / name, 'rb', opener=lambda path, flags: os.open(
+                path, flags | os.O_NOFOLLOW | os.O_NONBLOCK)) as handle:
+            require(stat.S_ISREG(os.fstat(handle.fileno()).st_mode), 'REPOSITORY_UNAVAILABLE',
+                    f'{repository}: {name} must be a regular file')
             text = handle.read(4097).decode('utf-8').strip()
     except (OSError, UnicodeDecodeError):
         raise LedgerError('REPOSITORY_UNAVAILABLE', f'{repository}: {name} is unreadable') from None

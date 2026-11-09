@@ -338,6 +338,16 @@ class MetricsTest(unittest.TestCase):
         with self.assertRaises(LedgerError):
             commits.git_directory(item)
 
+    def test_commondir_symlink_is_rejected_before_reading_its_target(self):
+        fake_hermes = self.home / '.hermes'
+        fake_hermes.mkdir()
+        target = fake_hermes / 'pointer'
+        target.write_text(str(self.repo.path / '.git') + '\n')
+        (self.repo.path / '.git' / 'commondir').symlink_to(target)
+        with mock.patch.object(Path, 'home', return_value=self.home):
+            with self.assertRaisesRegex(LedgerError, 'REPOSITORY_UNAVAILABLE: .*commondir is unreadable'):
+                self.report()
+
     def test_symlinks_inside_the_git_directory_are_refused(self):
         item = self.data['repositories'][0]
         elsewhere = self.base / 'elsewhere-refs'
@@ -430,6 +440,12 @@ class MetricsTest(unittest.TestCase):
         report = self.report()
         self.assertEqual(report['candidates'], {'independent': 1, 'by_state': {'OPEN': 1, 'DUPLICATE': 1}})
 
+    def test_automation_compares_unrounded_threshold_values(self):
+        weekly = self.synthetic(31, 4, 133)['automation']['conditions']['weekly_minutes']
+        self.assertEqual(weekly, {'value': 30.0, 'threshold': 30, 'result': 'MET'})
+        coverage = self.synthetic(4004, 4, 18000, recorded_ratio=3203 / 4004)['automation']['conditions']['coverage']
+        self.assertEqual(coverage, {'value': 0.8, 'threshold': 0.8, 'result': 'NOT_MET'})
+
     def test_recording_aid_uses_minutes_per_end(self):
         self.record_ledger()
         # Coverage 0.75 < 0.8 already suggests the aid; minutes per end alone also can.
@@ -440,6 +456,19 @@ class MetricsTest(unittest.TestCase):
         # Only the end record with a RECORD time is averaged (3 minutes for one end), not all six ends.
         self.assertEqual(report['recording_aid']['record_minutes_per_end'], 3.0)
         self.assertEqual(report['recording_aid']['verdict'], 'NOT_SUGGESTED')
+
+    def test_recording_aid_compares_unrounded_average(self):
+        self.use_manifest(manifest_data(None))
+        day = '2026-11-02'
+        self.ledger.record_work_day('demo-app', 'wu-day', '合成の作業日', day)
+        for index in range(21):
+            unit = f'wu-{index}'
+            end = self.ledger.record_end('demo-app', unit, 'NO_CANDIDATE', day)
+            self.ledger.record_effort('demo-app', unit, 'RECORD', 6 if index == 20 else 5, end['event_ids'][0], day)
+        aid = self.report()['recording_aid']
+        self.assertEqual(aid['coverage'], 1.0)
+        self.assertEqual(aid['record_minutes_per_end'], 5.0)
+        self.assertEqual(aid['verdict'], 'SUGGESTED')
 
     # --- CLI ---
 

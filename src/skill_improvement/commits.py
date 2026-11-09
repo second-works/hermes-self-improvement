@@ -108,6 +108,9 @@ def git_directory(item):
         common = safe_directory(pointer(gitdir, 'commondir', repository), repository, 'common git directory')
     for directory in {gitdir, common}:
         no_symlinks_inside(directory, repository)
+    # grafts rewrite history without moving any branch tip, so a cached report could go stale.
+    require(not os.path.lexists(common / 'info' / 'grafts'), 'REPOSITORY_UNAVAILABLE',
+            f'{repository}: grafts are not supported')
     alternates = common / 'objects' / 'info' / 'alternates'
     require(not os.path.lexists(alternates) or os.path.getsize(alternates) == 0, 'REPOSITORY_UNAVAILABLE',
             f'{repository}: object alternates are not supported')

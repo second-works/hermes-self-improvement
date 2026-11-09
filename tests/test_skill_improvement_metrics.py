@@ -316,6 +316,12 @@ class MetricsTest(unittest.TestCase):
             with self.assertRaises(LedgerError, msg=header):
                 commits.git_directory(item)
         config.write_text(original)
+        grafts = self.repo.path / '.git' / 'info' / 'grafts'
+        grafts.parent.mkdir(exist_ok=True)
+        grafts.write_text(self.repo.git('rev-parse', 'HEAD') + '\n')
+        with self.assertRaises(LedgerError):
+            commits.git_directory(item)
+        grafts.unlink()
         alternates = self.repo.path / '.git' / 'objects' / 'info' / 'alternates'
         alternates.parent.mkdir(exist_ok=True)
         alternates.write_text('/elsewhere/objects\n')

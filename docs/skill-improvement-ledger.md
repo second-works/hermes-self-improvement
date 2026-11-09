@@ -3,7 +3,7 @@
 **Decision: 終了記録・経験・候補を、承認済みmanifestが指すローカルのappend-only JSONLへ、人の明示入力だけで追記する。壊れた台帳では全コマンドを止め、原本に触れない。**
 
 親は [#105](https://github.com/second-works/hermes-self-improvement/issues/105)、本書は子 [#107](https://github.com/second-works/hermes-self-improvement/issues/107) の成果物。Risk Tier: HIGH（複数repo由来の情報、入力境界、耐久記録を扱うため）。
-台帳の形式・状態・遷移は [#106の契約](skill-improvement-mvp.md) をそのまま使い、schemaは変更しない。集計は #108、実運用は #109 で扱う。
+台帳の形式・状態・遷移は [#106の契約](skill-improvement-mvp.md) を使う。#108で作業日登録（`work_day`）と作業時間（`effort`）の2種類を追加した（既存の台帳はそのまま有効）。集計は [#108](skill-improvement-metrics.md)、実運用は #109 で扱う。
 
 ## 1. 保存先
 
@@ -30,6 +30,8 @@ python3 -I -B scripts/record_skill_experience.py --manifest M --ledger D end --r
 | `end` | repo、作業単位、結果（`CANDIDATE_FOUND / NO_CANDIDATE / UNDETERMINED`）、作業日（省略時はmanifestのtimezoneで今日） | 終了記録を1件追記する。候補ありは `--experience` で経験を1〜16件（種類・一行要約120字以内・根拠参照1〜8件、原因は省略時 `UNCLASSIFIED`）。判定未完了は `--reason` が必須 |
 | `propose` | repo、作業単位、経験ID、対象Skill、原因（6分類） | 候補を1件追記する。共通化は `--shared-repositories` か `--shared-contract` と `--decided-by` |
 | `set-state` | 候補ID、状態（`OPEN / HOLD / DECLINED / DUPLICATE`）、理由 | 遷移表で許される状態変更だけを追記する。`DEPLOYED / ROLLED_BACK` は扱わない |
+| `work-day` | repo、作業単位、一行要約（120字以内）、作業日 | commitのない作業日を登録する（#108）。作業単位ごとに1件で、同じ内容の再送は `ALREADY_RECORDED`、違う内容は `WORK_UNIT_ALREADY_REGISTERED` |
+| `effort` | repo、作業単位、作業（`RECORD / CANDIDATE / EVALUATION / APPROVAL / DEPLOYMENT`）、分（1〜1440）、対象ID、作業日 | 人が使った時間を記録する（#108）。対象IDは台帳に記録済みのもの（`RECORD` は終了記録のevent_id、`CANDIDATE` は候補ID、`EVALUATION` は評価ID、`APPROVAL / DEPLOYMENT` は配備ID）に限り、なければ `SUBJECT_UNKNOWN`。作業単位・作業・対象ごとに1件で、違う内容の再送は `EFFORT_ALREADY_RECORDED` |
 | `verify` | なし | 台帳全体を読み直し、件数を出す。終了記録は経験が何件あっても1件と数える |
 
 `schema_version / event_id / recorded_at / work_date / timezone / classification` はCLIが付ける。`classification` はmanifestのrepoの分類を既定とし、より厳しい分類にだけ変えられる。分類が分からないとき（`UNKNOWN`）は記録せず保留する。
@@ -66,7 +68,7 @@ URLなどそれ以外の種類は `REF_KIND_NOT_ALLOWED` で拒否する。要�
 
 ## 6. 対象外
 
-commit集計、終了フック、常時監視、自動候補生成、モデルへの送信、HTTP通信、他repoへの書込、配備・rollbackの記録（#106の契約の配備部分）、ジョブの停止・再開・削除。
+commit集計（#108の [集計CLI](skill-improvement-metrics.md) で扱う）、終了フック、常時監視、自動候補生成、モデルへの送信、HTTP通信、他repoへの書込、配備・rollbackの記録（#106の契約の配備部分）、ジョブの停止・再開・削除。
 
 ## 7. 検証
 

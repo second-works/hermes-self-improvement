@@ -437,7 +437,9 @@ class LedgerTest(unittest.TestCase):
                      for alias in node.names}
             names |= {node.module.split('.')[0] for node in ast.walk(tree)
                       if isinstance(node, ast.ImportFrom) and node.module}
-            self.assertFalse(names & forbidden, path)
+            # Only the commit reader may start a process, and only for local git (checked in the metrics tests).
+            allowed = {'subprocess'} if path.name == 'commits.py' else set()
+            self.assertFalse(names & (forbidden - allowed), path)
 
     def run_cli(self, *args, manifest=None):
         manifest_path = self.base / 'manifest.json'
@@ -510,6 +512,96 @@ class LedgerTest(unittest.TestCase):
         rows = Ledger(self.directory, Manifest(data, self.contract, datetime.now(timezone.utc)), self.contract).read()
         self.assertEqual(summary(rows)['session_ends'], {'CANDIDATE_FOUND': 8})
         self.assertEqual(summary(rows)['experiences'], 8)
+
+
+    # --- #108 contract extension: work days without commits and effort minutes ---
+
+    def test_work_day_is_idempotent_and_one_per_work_unit(self):
+        first = self.ledger.record_work_day('demo-app', 'wu-doc-1', '設計メモだけの日', '2026-11-04')
+        self.assertEqual(first['status'], 'RECORDED')
+        self.assertEqual(self.ledger.record_work_day('demo-app', 'wu-doc-1', '設計メモだけの日', '2026-11-04')['status'],
+                         'ALREADY_RECORDED')
+        self.refused('WORK_UNIT_ALREADY_REGISTERED', self.ledger.record_work_day, 'demo-app', 'wu-doc-1', '別の要約',
+                     '2026-11-04')
+        self.refused('SUMMARY_INVALID', self.ledger.record_work_day, 'demo-app', 'wu-doc-2', '長' * 121, '2026-11-04')
+        self.refused('REPOSITORY_NOT_IN_MANIFEST', self.ledger.record_work_day, 'other-repo', 'wu-1', '作業', '2026-11-04')
+        rows = self.ledger.read()
+        self.assertEqual([row['record']['kind'] for row in rows], ['work_day'])
+
+    def test_effort_needs_a_recorded_subject_and_is_idempotent(self):
+        end = self.ledger.record_end('demo-app', 'wu-1', 'NO_CANDIDATE', '2026-11-04')
+        subject = end['event_ids'][0]
+        self.assertEqual(self.ledger.record_effort('demo-app', 'wu-1', 'RECORD', 4, subject, '2026-11-04')['status'],
+                         'RECORDED')
+        self.assertEqual(self.ledger.record_effort('demo-app', 'wu-1', 'RECORD', 4, subject, '2026-11-04')['status'],
+                         'ALREADY_RECORDED')
+        self.refused('EFFORT_ALREADY_RECORDED', self.ledger.record_effort, 'demo-app', 'wu-1', 'RECORD', 9, subject,
+                     '2026-11-04')
+        self.refused('SUBJECT_UNKNOWN', self.ledger.record_effort, 'demo-app', 'wu-1', 'CANDIDATE', 4, subject,
+                     '2026-11-04')
+        self.refused('SUBJECT_UNKNOWN', self.ledger.record_effort, 'demo-app', 'wu-1', 'RECORD', 4, 'e-unknown',
+                     '2026-11-04')
+        for minutes in (0, 1441, '5', True):
+            self.refused('MINUTES_INVALID', self.ledger.record_effort, 'demo-app', 'wu-1', 'RECORD', minutes, subject,
+                         '2026-11-04')
+        self.refused('ACTIVITY_UNKNOWN', self.ledger.record_effort, 'demo-app', 'wu-1', 'MEETING', 4, subject,
+                     '2026-11-04')
+
+    def test_effort_for_candidate_evaluation_and_deployment_subjects(self):
+        self.ledger.record_end('demo-app', 'wu-1', 'CANDIDATE_FOUND', '2026-11-04', experiences=[CORRECTION])
+        experience = [row for row in self.ledger.read() if row['record']['kind'] == 'experience'][0]
+        candidate = self.ledger.propose('demo-app', 'wu-1', [experience['record']['experience_id']], 'pr-review',
+                                        'MISSING_PROCEDURE', work_date='2026-11-04')['candidate_id']
+        self.assertEqual(self.ledger.record_effort('demo-app', 'wu-1', 'CANDIDATE', 12, candidate,
+                                                   '2026-11-04')['status'], 'RECORDED')
+        # The #106 synthetic ledger still loads, and its evaluation / deployment ids are effort subjects.
+        rows = [json.loads(line) for line in (FIXTURES / 'ledger.example.jsonl').read_text(encoding='utf-8').splitlines()]
+        manifest = Manifest(json.loads((FIXTURES / 'manifest.example.json').read_text(encoding='utf-8')),
+                            self.contract, NOW)
+        template = dict(rows[0], event_id='e-effort-x', work_unit_id='wu-app-eval')
+        for activity, subject in (('EVALUATION', 'ev-review-steps'), ('APPROVAL', 'd-review-steps'),
+                                  ('DEPLOYMENT', 'd-review-steps')):
+            row = dict(template, event_id=f'e-effort-{activity.lower()}',
+                       record={'kind': 'effort', 'activity': activity, 'minutes': 10, 'subject_id': subject})
+            ledger_module.check_rows(rows + [row], self.contract, manifest)
+            bad = dict(row, record=dict(row['record'], subject_id='c-review-steps'))
+            with self.assertRaises(LedgerError):
+                ledger_module.check_rows(rows + [bad], self.contract, manifest)
+
+    def test_manifest_needs_checkout_and_branches_together(self):
+        data = manifest_data()
+        data['repositories'][0]['local_checkout'] = '/Users/example/demo-app'
+        with self.assertRaises(LedgerError) as caught:
+            Manifest(data, self.contract, NOW)
+        self.assertEqual(caught.exception.code, 'MANIFEST_INVALID')
+        data['repositories'][0]['allowed_branches'] = ['main', 'feature/x']
+        Manifest(data, self.contract, NOW)
+        for branch in ('../main', 'main.lock', '/main', 'a..b', 'with space'):
+            data['repositories'][0]['allowed_branches'] = [branch]
+            with self.assertRaises(LedgerError, msg=branch):
+                Manifest(data, self.contract, NOW)
+        data['repositories'][0]['allowed_branches'] = ['main']
+        data['repositories'][0]['local_checkout'] = 'relative/path'
+        with self.assertRaises(LedgerError):
+            Manifest(data, self.contract, NOW)
+
+    def test_cli_work_day_and_effort(self):
+        today = datetime.now(timezone.utc).date().isoformat()
+        done = self.run_cli('work-day', '--repository', 'demo-app', '--work-unit', 'wu-doc', '--summary', '設計だけ',
+                            '--work-date', today)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        done = self.run_cli('end', '--repository', 'demo-app', '--work-unit', 'wu-doc', '--result', 'NO_CANDIDATE',
+                            '--work-date', today)
+        subject = json.loads(done.stdout)['event_ids'][0]
+        done = self.run_cli('effort', '--repository', 'demo-app', '--work-unit', 'wu-doc', '--activity', 'RECORD',
+                            '--minutes', '3', '--subject', subject, '--work-date', today)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(json.loads(done.stdout)['status'], 'RECORDED')
+        for bad in (('--minutes', 'abc'), ('--minutes', '0')):
+            done = self.run_cli('effort', '--repository', 'demo-app', '--work-unit', 'wu-doc', '--activity', 'RECORD',
+                                '--subject', subject, '--work-date', today, *bad)
+            self.assertEqual(done.returncode, 2, bad)
+            self.assertIn('"error"', done.stderr)
 
 
 if __name__ == '__main__':

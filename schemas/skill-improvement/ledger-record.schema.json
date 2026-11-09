@@ -25,7 +25,9 @@
         {"$ref": "#/$defs/size_review"},
         {"$ref": "#/$defs/deployment_plan"},
         {"$ref": "#/$defs/deployment_event"},
-        {"$ref": "#/$defs/effect_observation"}
+        {"$ref": "#/$defs/effect_observation"},
+        {"$ref": "#/$defs/work_day"},
+        {"$ref": "#/$defs/effort"}
       ]
     }
   },
@@ -435,6 +437,28 @@
         "task_result": {"enum": ["COMPLETED", "FAILED", "UNFINISHED"]},
         "issue_recurred": {"type": "boolean"},
         "adverse": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/adverse_trigger"}]}
+      }
+    },
+    "work_day": {
+      "description": "commitのない作業日の登録（#108）。終了記録とは独立し、作業日の分母だけを補う",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "summary"],
+      "properties": {
+        "kind": {"const": "work_day"},
+        "summary": {"type": "string", "minLength": 1, "maxLength": 120}
+      }
+    },
+    "effort": {
+      "description": "人が使った時間（分）の記録（#108）。対象IDは台帳に既にある終了記録・候補・評価・配備を指す",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "activity", "minutes", "subject_id"],
+      "properties": {
+        "kind": {"const": "effort"},
+        "activity": {"enum": ["RECORD", "CANDIDATE", "EVALUATION", "APPROVAL", "DEPLOYMENT"]},
+        "minutes": {"type": "integer", "minimum": 1, "maximum": 1440},
+        "subject_id": {"$ref": "#/$defs/id"}
       }
     }
   }

@@ -233,8 +233,8 @@ class MetricsTest(unittest.TestCase):
             self.assertIn(call.args[1].value, commits.ALLOWED_SUBCOMMANDS)
         environment = commits.git_environment()
         self.assertEqual((environment['GIT_CONFIG_GLOBAL'], environment['GIT_CONFIG_NOSYSTEM'],
-                          environment['GIT_TERMINAL_PROMPT'], environment['GIT_NO_REPLACE_OBJECTS']),
-                         (os.devnull, '1', '0', '1'))
+                          environment['GIT_TERMINAL_PROMPT'], environment['GIT_NO_REPLACE_OBJECTS'],
+                          environment['GIT_NO_LAZY_FETCH']), (os.devnull, '1', '0', '1', '1'))
         forbidden = {'socket', 'http', 'urllib', 'requests', 'ssl', 'asyncio', 'openai', 'anthropic'}
         for name in ('metrics.py', 'commits.py', 'cli.py'):
             tree = ast.parse((ROOT / 'src' / 'skill_improvement' / name).read_text(encoding='utf-8'))
@@ -311,10 +311,39 @@ class MetricsTest(unittest.TestCase):
         config.write_text(original + '[includeIf "gitdir:/"]\n\tpath = /elsewhere/config\n')
         with self.assertRaises(LedgerError):
             commits.git_directory(item)
+        for header in ('[core] [include]\n\tpath = /elsewhere/config\n', '[ Include ]\n\tpath = /elsewhere\n'):
+            config.write_text(original + header)
+            with self.assertRaises(LedgerError, msg=header):
+                commits.git_directory(item)
         config.write_text(original)
         alternates = self.repo.path / '.git' / 'objects' / 'info' / 'alternates'
         alternates.parent.mkdir(exist_ok=True)
         alternates.write_text('/elsewhere/objects\n')
+        with self.assertRaises(LedgerError):
+            commits.git_directory(item)
+
+    def test_symlinks_inside_the_git_directory_are_refused(self):
+        item = self.data['repositories'][0]
+        elsewhere = self.base / 'elsewhere-refs'
+        elsewhere.mkdir()
+        heads = self.repo.path / '.git' / 'refs' / 'heads'
+        (heads / 'linked').symlink_to(elsewhere)
+        with self.assertRaises(LedgerError) as caught:
+            commits.git_directory(item)
+        self.assertEqual(caught.exception.code, 'REPOSITORY_UNAVAILABLE')
+        (heads / 'linked').unlink()
+        commits.git_directory(item)
+        # hooks are not read by rev-parse or log, so a linked hook does not block the report.
+        (self.repo.path / '.git' / 'hooks' / 'pre-commit').symlink_to(elsewhere)
+        commits.git_directory(item)
+
+    def test_pointer_files_may_use_dot_dot_only_at_the_start(self):
+        worktree = self.base / 'worktree-dots'
+        self.repo.git('worktree', 'add', '-q', str(worktree), 'feature/a')
+        item = dict(self.data['repositories'][0], local_checkout=str(worktree))
+        gitdir, _ = commits.git_directory(item)
+        self.assertEqual((gitdir / 'commondir').read_text().strip(), '../..')
+        (gitdir / 'commondir').write_text('x/../../..\n')
         with self.assertRaises(LedgerError):
             commits.git_directory(item)
 

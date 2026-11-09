@@ -69,8 +69,8 @@ python3 -I -B scripts/report_skill_improvement.py --manifest M --ledger D [--sta
 ## 5. 読む範囲と再計算
 
 - `local_checkout` は絶対pathで、symlink・`.`・`..`・`/System/Volumes/Data` の別名を含まず、git checkoutであること。`~/.hermes` の下は大文字小文字を区別しないpathの比較だけで拒否し、中身もメタデータも読まない。満たさなければ `REPOSITORY_UNAVAILABLE`。
-- `.git` はディレクトリか `gitdir:` ファイル（worktree）に限り、symlinkは拒否する。gitdirと `commondir` の指す先も同じ条件で検査する。object alternatesとgit設定のinclude（`include` / `includeIf`）は、検査していない場所を読ませるため拒否する。
-- 実行するのは、ローカルの `git rev-parse`（branchの先端）と `git log`（commit日付・作者）だけ。利用者とシステムのgit設定を読まず、fetch・pull・remote・APIの取得をしない。checkoutには書かない。checkout自身の設定は読まれるため、外部プログラムの起動や別ファイルの読込につながる設定（署名検証・mailmap・pager・fsmonitor）を毎回無効にし、replace objectも使わない。
+- `.git` はディレクトリか `gitdir:` ファイル（worktree）に限り、symlinkは拒否する。gitdirと `commondir` の指す先も同じ条件で検査し、値の `..` は先頭だけ許す（`x/../y` はsymlinkをまたぐと検査と食い違うため拒否）。gitdirとcommondirの中（`hooks` を除く）にsymlinkがあれば拒否する。object alternatesとgit設定のinclude（行の途中の `[include]` を含む）は、検査していない場所を読ませるため拒否する。
+- 実行するのは、ローカルの `git rev-parse`（branchの先端）と `git log`（commit日付・作者）だけ。利用者とシステムのgit設定を読まず、fetch・pull・remote・APIの取得をしない。checkoutには書かない。checkout自身の設定は読まれるため、外部プログラムの起動や別ファイルの読込につながる設定（署名検証・mailmap・pager・fsmonitor）を毎回無効にし、replace objectと遅延fetchも使わない。
 - branchがないこと（`rev-parse --verify --quiet` の終了コード1）以外のgitの失敗は `REPOSITORY_UNAVAILABLE` で止まり、commit 0件として集計しない。cacheも書かない。
 - branchの先端・shallowの境界・台帳の内容・manifest・期間・集計の版とコードから指紋を作る。前回と同じなら台帳ディレクトリの `report-cache.json` を返し（`status: UNCHANGED`）、`git log` を実行しない。どれかが変われば再計算する（`status: COMPUTED`）。cacheが壊れていれば信用せず再計算する。cacheを書けなくても集計結果は返し、`cache: NOT_SAVED` と出す。
 

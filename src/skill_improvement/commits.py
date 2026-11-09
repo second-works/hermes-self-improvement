@@ -7,6 +7,7 @@ contacted, and nothing in the checkout is written.
 """
 from datetime import datetime, timedelta, timezone
 import hashlib
+from itertools import dropwhile
 import os
 from pathlib import Path
 import re
@@ -23,14 +24,17 @@ ALLOWED_SUBCOMMANDS = ('rev-parse', 'log')
 FORCED_CONFIG = ('core.fsmonitor=false', 'core.pager=cat', 'log.showSignature=false', 'log.mailmap=false',
                  'mailmap.file=', 'mailmap.blob=', 'gpg.program=false', 'gpg.openpgp.program=false',
                  'gpg.ssh.program=false', 'gpg.x509.program=false')
-INCLUDE = re.compile(r'^\s*\[\s*include', re.IGNORECASE | re.MULTILINE)
+# Anywhere, not only at line start: git accepts several section headers on one line (`[core] [include]`).
+INCLUDE = re.compile(r'\[\s*include', re.IGNORECASE)
+# Not read by rev-parse or log; other tools often place symlinks here.
+SKIPPED_IN_WALK = ('hooks',)
 MAX_CONFIG_BYTES = 1024 * 1024
 
 
 def git_environment():
     return {'PATH': os.environ.get('PATH', '/usr/bin:/bin'), 'LC_ALL': 'C', 'GIT_CONFIG_NOSYSTEM': '1',
             'GIT_CONFIG_GLOBAL': os.devnull, 'GIT_TERMINAL_PROMPT': '0', 'GIT_OPTIONAL_LOCKS': '0',
-            'GIT_NO_REPLACE_OBJECTS': '1', 'HOME': os.devnull}
+            'GIT_NO_REPLACE_OBJECTS': '1', 'GIT_NO_LAZY_FETCH': '1', 'HOME': os.devnull}
 
 
 def safe_directory(path, repository, what):
@@ -59,7 +63,31 @@ def pointer(base, name, repository):
         require(text.startswith('gitdir:'), 'REPOSITORY_UNAVAILABLE', f'{repository}: .git file is invalid')
         text = text[len('gitdir:'):].strip()
     require(text and '\n' not in text and len(text) <= 4096, 'REPOSITORY_UNAVAILABLE', f'{repository}: {name} is invalid')
+    # git resolves the value physically. Lexical normalisation gives the same place only when `..` comes
+    # first (from an already canonical base); `x/../y` could cross a symlink at x, so it is refused.
+    parts = [part for part in text.split('/') if part]
+    leading = len(parts) - len(list(dropwhile(lambda part: part == '..', parts)))
+    require(not {'.', '..'} & set(parts[leading:]), 'REPOSITORY_UNAVAILABLE',
+            f'{repository}: {name} may use .. only at the start')
     return Path(os.path.normpath(base / text))
+
+
+def no_symlinks_inside(directory, repository):
+    """Refuse any symlink git might follow out of the checked directory (objects, refs, HEAD, packs ...)."""
+    pending = [directory]
+    while pending:
+        current = pending.pop()
+        try:
+            entries = list(os.scandir(current))
+        except OSError:
+            raise LedgerError('REPOSITORY_UNAVAILABLE', f'{repository}: git directory is unreadable') from None
+        for entry in entries:
+            if current == directory and entry.name in SKIPPED_IN_WALK:
+                continue
+            require(not entry.is_symlink(), 'REPOSITORY_UNAVAILABLE',
+                    f'{repository}: symlinks inside the git directory are not allowed')
+            if entry.is_dir(follow_symlinks=False):
+                pending.append(entry.path)
 
 
 def git_directory(item):
@@ -78,6 +106,8 @@ def git_directory(item):
     common = gitdir
     if os.path.lexists(gitdir / 'commondir'):
         common = safe_directory(pointer(gitdir, 'commondir', repository), repository, 'common git directory')
+    for directory in {gitdir, common}:
+        no_symlinks_inside(directory, repository)
     alternates = common / 'objects' / 'info' / 'alternates'
     require(not os.path.lexists(alternates) or os.path.getsize(alternates) == 0, 'REPOSITORY_UNAVAILABLE',
             f'{repository}: object alternates are not supported')

@@ -3,12 +3,17 @@
 共通のルールは末尾の軽量ブロック（ai-development の軽量構成）に従う。この上の節は、このrepoだけのルール。
 
 ## hermes-self-improvement 固有の境界
-- 変更するのはこのリポジトリだけ。例外は `~/.hermes/skills` の1つで、`docs/plan.md` の3章に従う（#116）。
-  - 読み取りは、計画書の段階に沿ったIssueの作業の中だけで行う。段階0（`docs/plan.md` 6章）が完了するまでは、本repoから読む経路を作らない。段階0の完了は、人間が段階0のIssueをCloseしたことで判断する。エージェントが自分で完了と判断しない。
+- 変更するのはこのリポジトリだけ。repoの外で読んでよいのは `~/.hermes/skills` だけで、`docs/plan.md` の3章に従う（#116）。`~/.hermes/skills` への書き込みは、この例外に含まない。
+  - 読み取りは、計画書の段階に沿ったIssueの作業の中だけで行う。段階0（`docs/plan.md` 6章）が完了するまでは、本repoから読む経路を作らない。段階0の完了は、`docs/plan.md` 6章に段階0の完了日が書かれていることで判断する。完了日は、人間が承認してマージした計画書のPRだけで書く（9章）。エージェントが自分で完了と判断しない。
   - symlinkは、指す先がどこでもたどらず、読まず、複製しない。`~/.hermes/skills` そのものがsymlinkのときも読まない。
   - スキルの中身の変更（反映）は、Hermes本体の承認の仕組み（`skills.write_approval` と `/skills approve`）だけで行う。このrepoのコードやエージェントは、スキルのファイルを直接書き換えない。
-  - `~/.hermes/skills` のgitの管理（init、commit、戻す操作）は、人間が本repoの外で行う。本repoからは、gitの記録を読むだけにする。読むときは、`.git` へ書き込まず、そのrepoの設定やhookが命令を実行できない方法だけを使う。たとえば `GIT_OPTIONAL_LOCKS=0` を付け、`core.fsmonitor`・`core.pager`・`core.hooksPath`・外部diff・textconv・設定のincludeを無効にする。具体的な方法は段階1のIssueで決め、試験で確かめる。
-  - それ以外の `~/.hermes`（本番設定、認証情報、会話履歴、memory、サービス）は、読み込み・変更・起動しない。
+  - `~/.hermes/skills` のgitの管理（init、commit、戻す操作）は、人間が本repoの外で行う。本repoからは、gitの記録を読むだけにする。読む方法は、次を満たすものだけにする。
+    - `.git` へ書き込まない。
+    - そのrepoの設定、attributes、hookを使わない（命令を実行させない）。
+    - gitfile（`gitdir:`）や alternates で、ほかの場所を読まない。
+    - この方法は段階1のIssueで決め、試験で確かめる。それまではgitの記録を読まない。
+  - それ以外の `~/.hermes`、本番設定、認証情報、会話履歴、memory、サービスは、読み込み・変更・起動しない。`~/.hermes` の外にあるもの（launchd の設定、ほかの設定用のフォルダ、キーチェーンなど）も含む。
+  - 機能ごとの文書にある `~/.hermes` の禁止（`docs/skill-improvement-mvp.md` など）は、その機能のコードを変えるまで有効。変えるときは、コードと文書を同じPRで直す。
 - CIはGitHub-hosted runnerだけを使い、本番への接続や自己改善の自動適用を行わない。
 - 標準検証は `./scripts/verify.sh`。SecurityはBash 5以上で `bash scripts/security-preflight.sh .`。`.agents/skills/` と `templates/` は共通ルールの参照資産であり、自動起動や本番変更の許可ではない。
 - 通常レーンだけを採用し、Auto-Fix / Auto-Merge例外は採用しない。最終Mergeは必ず人間が判断する。

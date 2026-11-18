@@ -32,6 +32,7 @@ description: 合意済みの計画をGitHubの親Issueと子Issueへ変換して
 
 `.github/ISSUE_TEMPLATE/` の親子テンプレートを使う。子IssueはGoal / Context / Scope・Boundaries / Non-goals / Done / Verification / Dependenciesの7項目とする。
 
+- Contextの先頭に、元にした計画書の節（`docs/plan.md` の章と節）を書く。計画書によらないときは「なし（利用者の指示。日付）」と書く。計画書にない機能・仕様・段階を加えることになるなら、登録の前に止まり、AGENTS.md の「計画書にない変更では止まる」に従う。
 - Risk Tier（LOW / MEDIUM / HIGH）と理由を、Scope・Boundariesに1行で書く。安全への影響が分からなければHIGHとする。
 - Doneは、実装の手順ではなく、確認できる結果として書く。
 - Verificationには、必要な正常系、異常系、回帰の確認方法を書く。全観点の空欄は作らない。

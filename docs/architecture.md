@@ -22,9 +22,9 @@ OpenAIを使うHermesには、検査済みの公開入力から障害分析、Sk
 
 | 対象 | 責務・配置案 | 境界 |
 | --- | --- | --- |
-| Hermes本体 | upstreamの固定SHAを隔離環境へ取得 | 本番 `~/.hermes` の読取・変更・起動は禁止。upstream修正は別Issue |
+| Hermes本体 | upstreamの固定SHAを隔離環境へ取得 | 本番 `~/.hermes` は、`~/.hermes/skills` の読取と、人間が承認した書込だけ。そのほかの読取・変更・起動は禁止（[計画書](plan.md) 3章。#116）。upstream修正は別Issue |
 | 拡張コード | このrepoの `src/` に制御・入力検証・評価連携 | 本体のvenv、設定、認証、サービスと分離 |
-| スキル | `fixtures/skills/` の無害な基準、候補は `runs/<run_id>/candidate/` | 実行対象は承認済みパスのみ。本番スキルは対象外 |
+| スキル | `fixtures/skills/` の無害な基準、候補は `runs/<run_id>/candidate/` | 実行対象は承認済みパスのみ。本番スキル（`~/.hermes/skills`）は[計画書](plan.md)の段階に沿って扱う |
 | 評価データ | `fixtures/evaluation/` に公開train/validation、隔離評価者にhiddenセット | 候補生成者へhidden入力・正解・個別traceを渡さない |
 | 改善履歴 | `runs/<run_id>/` のmanifest・イベント・レポート | 原本保持、Secrets・会話履歴を含めない。GitHubには検査済み要約のみ |
 | 採用台帳 | SHA、評価、承認、配備、復旧の対応 | 正本は改ざん検出可能なファイルとGitHub証跡。Memoryだけに依存しない |

@@ -418,7 +418,7 @@ class SetupTests(unittest.TestCase):
     def test_agent_references_are_present(self):
         import re
         text = (ROOT / 'AGENTS.md').read_text()
-        for path in re.findall(r'(?<![A-Za-z0-9_/])(?:docs|\.agents|templates)/[A-Za-z0-9_./-]+\.(?:md|sh)', text):
+        for path in re.findall(r'(?<![A-Za-z0-9_/])(?:docs|\.agents|\.claude|templates)/[A-Za-z0-9_./-]+\.(?:md|sh)', text):
             self.assertTrue((ROOT / path).is_file(), path)
 
 

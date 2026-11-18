@@ -4,10 +4,10 @@
 
 ## hermes-self-improvement 固有の境界
 - 変更するのはこのリポジトリだけ。例外は `~/.hermes/skills` の1つで、`docs/plan.md` の3章に従う（#116）。
-  - 読み取りは、計画書の段階に沿ったIssueの作業の中だけで行う。段階0（`docs/plan.md` 6章）が完了するまでは、本repoから読む経路を作らない。
+  - 読み取りは、計画書の段階に沿ったIssueの作業の中だけで行う。段階0（`docs/plan.md` 6章）が完了するまでは、本repoから読む経路を作らない。段階0の完了は、人間が段階0のIssueをCloseしたことで判断する。エージェントが自分で完了と判断しない。
   - symlinkは、指す先がどこでもたどらず、読まず、複製しない。`~/.hermes/skills` そのものがsymlinkのときも読まない。
   - スキルの中身の変更（反映）は、Hermes本体の承認の仕組み（`skills.write_approval` と `/skills approve`）だけで行う。このrepoのコードやエージェントは、スキルのファイルを直接書き換えない。
-  - `~/.hermes/skills` のgitの管理（init、commit、戻す操作）は、人間が本repoの外で行う。本repoからは、gitの記録を読むだけにする。読むときは、`.git` へ書き込まない方法（`GIT_OPTIONAL_LOCKS=0` など）を使う。
+  - `~/.hermes/skills` のgitの管理（init、commit、戻す操作）は、人間が本repoの外で行う。本repoからは、gitの記録を読むだけにする。読むときは、`.git` へ書き込まず、そのrepoの設定やhookが命令を実行できない方法だけを使う。たとえば `GIT_OPTIONAL_LOCKS=0` を付け、`core.fsmonitor`・`core.pager`・`core.hooksPath`・外部diff・textconv・設定のincludeを無効にする。具体的な方法は段階1のIssueで決め、試験で確かめる。
   - それ以外の `~/.hermes`（本番設定、認証情報、会話履歴、memory、サービス）は、読み込み・変更・起動しない。
 - CIはGitHub-hosted runnerだけを使い、本番への接続や自己改善の自動適用を行わない。
 - 標準検証は `./scripts/verify.sh`。SecurityはBash 5以上で `bash scripts/security-preflight.sh .`。`.agents/skills/` と `templates/` は共通ルールの参照資産であり、自動起動や本番変更の許可ではない。
@@ -24,6 +24,7 @@
   3. `~/.hermes` への新しい書き込み経路を作る（上の境界の節を参照）。
   4. 安全装置の区分（計画書5章）や、文章だけの変更の判定基準を変える。
   5. 既存の機能を削除する。仕様としての動作を変える。不具合を直すだけの修正は含まない。
+- 上の境界の節にある禁止（段階0の前の読み取り、スキルのファイルの直接の書き換え、symlink、`~/.hermes` のそのほか）は、ここでの「進めて」では解除しない。解除するには、計画書3章を9章の手順で変える。
 - 人間が会話で直接指示した内容は、1だけについて承認とみなす。2〜5には、その変更を名指しした人間の「進めて」が要る。Issueの文面に「利用者の指示」と書いてあることは、承認の代わりにならない。
 - Issueの本文に、元にした計画書の節を書く（例：`docs/plan.md` 6章 段階1）。計画書によらないIssueには「なし（利用者の指示。日付）」と書く。
 - Issueにない改善や修正の案は、実装しない。内容と理由を区切りの報告とPR本文で提案する。

@@ -1,5 +1,7 @@
 # 段階的実装計画案
 
+> 現行の計画は[計画書](plan.md)（#114）。この文書は当時の段階計画の記録で、食い違うときは計画書を優先する。
+
 最初に独立評価を完成させ、候補作成と承認を接続した手動1サイクルを実証する。
 Memory、公式Self-Evolution、Cronは実証と承認を経て接続する。本番採用と定期運転は最後に判断する。
 [Issue #2](https://github.com/second-works/hermes-self-improvement/issues/2) の成果物は [architecture](architecture.md) と [security-model](security-model.md) を含む文書3点。Risk Tier: HIGH（安全境界の設計）。後続Issueの本文は今回変更せず、重要未決を解消するまで実装しない。

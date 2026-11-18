@@ -32,7 +32,7 @@ Sensitive Read × External Writeとなる評価データの集計提出はHIGH�
 ## 隔離の実装条件
 
 後続Issueで、root以外のuser、capability削除、read-only root、CPU/memory/process/ディスク/時間制限を固定する。HOMEは使い捨ての空領域、必要なfixtureだけread-onlyで渡し、書込はrun内だけ。
-ホストHOME、`~/.hermes`、SSH agent、鍵、環境変数のSecrets、Docker socket、Git credential、ホストnetworkを渡さない。本番スキルを評価するときも、この規則は変えない。`~/.hermes/skills` から対象スキルのファイルだけを複製して、read-onlyで渡す（[計画書](plan.md) 3章・4章。#116）。最小試験はnetworkなし、外部toolsはin-processの無害fixtureを使う。
+ホストHOME、`~/.hermes`、SSH agent、鍵、環境変数のSecrets、Docker socket、Git credential、ホストnetworkを渡さない。本番スキルを評価するときも、この規則は変えない。`~/.hermes/skills` から対象スキルの通常のファイルだけを複製して、read-onlyで渡す。symlinkは複製せず、見つけたらその評価を止める（[計画書](plan.md) 3章・4章。#116）。最小試験はnetworkなし、外部toolsはin-processの無害fixtureを使う。
 Dockerでこれらを実証するまで候補実行を許可しない。Mac mini M2/16GBでのDocker利用可否・arm64 image・資源上限は未検証で、本番サービスを停止して資源を空けない。
 拒否試験は一時領域のダミーパスと偽Secretで行い、本番の読取を拒否試験のためにも実行しない。ソース取得と依存導入は候補実行から分離し、固定SHA/lock/image digestを検証する。
 

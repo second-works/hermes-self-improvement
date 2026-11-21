@@ -39,6 +39,14 @@
 - Issue #1では、最小権限、Secrets非公開、失敗を成功扱いしないこと、CIからHermes本番へ接続しないことを確認する。
 - docs/repository-setup.mdの採用範囲と実際のworkflowを照合し、正式レビュー（Codex連携またはClaude Codeのレビュー記録）の未確認をレビュー成功と報告しない。
 
+## このrepoでの役割分担（#122）
+末尾の軽量ブロックにある「Codexは計画とIssue化、Claude Codeは実装からレビュー指摘対応まで」は共通の既定。このrepoでは、次の役割分担を優先する。この節は役割を決めるだけで、上の境界、止まる条件、正式レビュー、必須check、人間によるマージの判断は、どれも緩めない。
+- 計画の方針は、利用者とHermesが一緒に決める。計画書の変更は、これまでどおり `docs/plan.md` の9章に従う。
+- Hermesは、着手の前に既存のIssueとPRを確かめ、重複がないことを見てから、1つのIssueに実装担当を1人だけ割り当てる。
+- 実装担当の既定はClaude Code。Codexは、PRの最終headそのものを、実装担当から独立してレビューする。headが変わったら、古いレビュー結果を使わない。
+- Codexが実装するときは、着手の前に、Codex以外の独立したレビュー担当を誰にするかを人間と話し合って決める。決まるまで実装を進めない。決まった後も、`.github/pr-gate-review` と上の正式レビューの規則（#69）を満たさないかぎり、レビュー成功と扱わない。
+- PRがそろったら、Hermesは変更内容、checkの結果、レビューの結果、残るリスクをまとめて人間に報告する。マージは、人間からの明示のマージ指示を待ってから行う。Hermesやエージェントが自分でマージを判断しない。
+
 <!-- lightweight:begin (managed by the ai-development lightweight placement; edit outside this block) -->
 # AGENTS.md
 
